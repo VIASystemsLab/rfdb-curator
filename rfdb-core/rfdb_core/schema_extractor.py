@@ -87,6 +87,7 @@ from rdflib import BNode, Graph, Literal, URIRef
 from rdflib.collection import Collection
 from rdflib.namespace import RDF, RDFS, SH, XSD
 
+from rfdb_core.prefixes import declared_prefixes
 from rfdb_core.vocab import SCHEMA_DIGITAL_DOCUMENT as _SCHEMA_DIGITAL_DOCUMENT
 
 # Predicates whose values are free-form prose and should render as a multi-line
@@ -152,6 +153,9 @@ class SchemaExtractor:
         # collides with the schema.ttl @prefix (http://) and mangles CURIEs to
         # 'schema1:'. Rebind explicitly so compaction matches the schema file.
         self.graph.bind("schema", "http://schema.org/", override=True, replace=True)
+        # The CURIE prefix map the schema declares (sh:declare). Read here so a
+        # conflicting declaration fails at load, like a Turtle syntax error does.
+        self.prefixes: dict[str, str] = declared_prefixes(self.graph)
         self._cache: dict[str, dict[str, Any]] | None = None
 
     # ------------------------------------------------------------------

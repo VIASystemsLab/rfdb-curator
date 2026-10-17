@@ -18,6 +18,75 @@
 @prefix wdt:     <http://www.wikidata.org/prop/direct/> .
 @prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
 
+# Namespaces used by the integrated external vocabularies, beyond the ones
+# above. The shapes do not use them; they are declared so the prefix map
+# covers the integrated data too.
+# Polifonia Core, Music Meta and Source; Glottolog:
+@prefix dc:      <http://purl.org/dc/elements/1.1/> .
+# Polifonia Music Meta and Source:
+@prefix cc:      <http://creativecommons.org/ns#> .
+@prefix vann:    <http://purl.org/vocab/vann/> .
+# Glottolog:
+@prefix bibo:    <http://purl.org/ontology/bibo/> .
+@prefix dctype:  <http://purl.org/dc/dcmitype/> .
+@prefix frbr:    <http://purl.org/vocab/frbr/core#> .
+@prefix geo:     <http://www.w3.org/2003/01/geo/wgs84_pos#> .
+@prefix gold:    <http://purl.org/linguistics/gold/> .
+@prefix isbd:    <http://iflastandards.info/ns/isbd/elements/> .
+@prefix lexvo:   <http://lexvo.org/ontology#> .
+@prefix vcard:   <http://www.w3.org/2001/vcard-rdf/3.0#> .
+@prefix void:    <http://rdfs.org/ns/void#> .
+
+# Namespaces used by the data files under data/, beyond the ones above. The
+# shapes do not use them; they are declared so the prefix map covers the
+# repository's data too.
+# data/examples/data.ttl:
+@prefix wd:      <http://www.wikidata.org/entity/> .
+
+# The schema's own release and prefix map, kept as data so they survive
+# parsing. Every @prefix above has a matching sh:declare below, and
+# owl:versionInfo matches the vX.Y.Z tag of the release.
+rfdbs:
+  a owl:Ontology ;
+  owl:versionInfo "2.2.2" ;
+  sh:declare
+    [ sh:prefix "cidoc" ; sh:namespace "http://www.cidoc-crm.org/cidoc-crm/"^^xsd:anyURI ] ,
+    [ sh:prefix "core" ; sh:namespace "https://w3id.org/polifonia/ontology/core/"^^xsd:anyURI ] ,
+    [ sh:prefix "dcterms" ; sh:namespace "http://purl.org/dc/terms/"^^xsd:anyURI ] ,
+    [ sh:prefix "foaf" ; sh:namespace "http://xmlns.com/foaf/0.1/"^^xsd:anyURI ] ,
+    [ sh:prefix "glottolog" ; sh:namespace "http://glottolog.org/resource/languoid/id/"^^xsd:anyURI ] ,
+    [ sh:prefix "lrmoo" ; sh:namespace "http://iflastandards.info/ns/lrm/lrmoo/"^^xsd:anyURI ] ,
+    [ sh:prefix "mm" ; sh:namespace "https://w3id.org/polifonia/ontology/music-meta/"^^xsd:anyURI ] ,
+    [ sh:prefix "owl" ; sh:namespace "http://www.w3.org/2002/07/owl#"^^xsd:anyURI ] ,
+    [ sh:prefix "prism" ; sh:namespace "http://prismstandard.org/namespaces/basic/2.0/"^^xsd:anyURI ] ,
+    [ sh:prefix "rdf" ; sh:namespace "http://www.w3.org/1999/02/22-rdf-syntax-ns#"^^xsd:anyURI ] ,
+    [ sh:prefix "rdfs" ; sh:namespace "http://www.w3.org/2000/01/rdf-schema#"^^xsd:anyURI ] ,
+    [ sh:prefix "rfdb" ; sh:namespace "https://rosfeatr.eu/rdf/data/"^^xsd:anyURI ] ,
+    [ sh:prefix "rfdbs" ; sh:namespace "https://rosfeatr.eu/rdf/schema/"^^xsd:anyURI ] ,
+    [ sh:prefix "schema" ; sh:namespace "http://schema.org/"^^xsd:anyURI ] ,
+    [ sh:prefix "sh" ; sh:namespace "http://www.w3.org/ns/shacl#"^^xsd:anyURI ] ,
+    [ sh:prefix "skos" ; sh:namespace "http://www.w3.org/2004/02/skos/core#"^^xsd:anyURI ] ,
+    [ sh:prefix "source" ; sh:namespace "https://w3id.org/polifonia/ontology/source/"^^xsd:anyURI ] ,
+    [ sh:prefix "wdt" ; sh:namespace "http://www.wikidata.org/prop/direct/"^^xsd:anyURI ] ,
+    [ sh:prefix "xsd" ; sh:namespace "http://www.w3.org/2001/XMLSchema#"^^xsd:anyURI ] ,
+    # External vocabularies: Polifonia Core, Music Meta and Source; Glottolog.
+    [ sh:prefix "dc" ; sh:namespace "http://purl.org/dc/elements/1.1/"^^xsd:anyURI ] ,
+    # External vocabularies: Polifonia Music Meta and Source.
+    [ sh:prefix "cc" ; sh:namespace "http://creativecommons.org/ns#"^^xsd:anyURI ] ,
+    [ sh:prefix "vann" ; sh:namespace "http://purl.org/vocab/vann/"^^xsd:anyURI ] ,
+    # External vocabularies: Glottolog.
+    [ sh:prefix "bibo" ; sh:namespace "http://purl.org/ontology/bibo/"^^xsd:anyURI ] ,
+    [ sh:prefix "dctype" ; sh:namespace "http://purl.org/dc/dcmitype/"^^xsd:anyURI ] ,
+    [ sh:prefix "frbr" ; sh:namespace "http://purl.org/vocab/frbr/core#"^^xsd:anyURI ] ,
+    [ sh:prefix "geo" ; sh:namespace "http://www.w3.org/2003/01/geo/wgs84_pos#"^^xsd:anyURI ] ,
+    [ sh:prefix "gold" ; sh:namespace "http://purl.org/linguistics/gold/"^^xsd:anyURI ] ,
+    [ sh:prefix "isbd" ; sh:namespace "http://iflastandards.info/ns/isbd/elements/"^^xsd:anyURI ] ,
+    [ sh:prefix "lexvo" ; sh:namespace "http://lexvo.org/ontology#"^^xsd:anyURI ] ,
+    [ sh:prefix "vcard" ; sh:namespace "http://www.w3.org/2001/vcard-rdf/3.0#"^^xsd:anyURI ] ,
+    [ sh:prefix "void" ; sh:namespace "http://rdfs.org/ns/void#"^^xsd:anyURI ] ,
+    # Data files: data/examples/data.ttl.
+    [ sh:prefix "wd" ; sh:namespace "http://www.wikidata.org/entity/"^^xsd:anyURI ] .
+
 # ================================
 # Shape for Place
 # ================================
@@ -28,6 +97,7 @@ rfdbs:PlaceShape
   sh:description "A geographic location or place, which may be associated with various resources such as publication locations or organization locations."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Name"@en, "Nome"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -38,11 +108,13 @@ rfdbs:PlaceShape
   ] ;
   sh:property [
     sh:path skos:altLabel ;
+    sh:name "Alternative names"@en, "Nomi alternativi"@it ;
     sh:datatype rdf:langString ;
     sh:description "Alternate names for the place (e.g., translations, historical names)" ;
   ] ;
   sh:property [
     sh:path owl:sameAs ;
+    sh:name "External identifiers"@en, "Identificativi esterni"@it ;
     sh:minCount 0 ;
     sh:nodeKind sh:IRI ;
     sh:description "External identifier for the place (use to link to Wikidata)" ;
@@ -58,6 +130,7 @@ rfdbs:SubjectShape
   sh:description "A subject, theme, concept, or topic that can be associated with musical works or other resources. Subjects include stories, plots, characters, and narrative elements."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Name"@en, "Nome"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -68,6 +141,7 @@ rfdbs:SubjectShape
   ] ;
   sh:property [
     sh:path skos:altLabel ;
+    sh:name "Alternative names"@en, "Nomi alternativi"@it ;
     sh:datatype rdf:langString ;
     sh:description "Alternate names for the subject" ;
   ] .
@@ -82,6 +156,7 @@ rfdbs:SourceTypeShape
   sh:description "A categorization of source documents, such as 'Libretto a stampa' (printed libretto) or 'Score' (musical score)."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Name"@en, "Nome"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -92,11 +167,13 @@ rfdbs:SourceTypeShape
   ] ;
   sh:property [
     sh:path skos:altLabel ;
+    sh:name "Alternative names"@en, "Nomi alternativi"@it ;
     sh:datatype rdf:langString ;
     sh:description "Alternate names for the type" ;
   ] ;
   sh:property [
     sh:path rdfs:comment ;
+    sh:name "Description"@en, "Descrizione"@it ;
     sh:maxCount 1 ;
     sh:datatype xsd:string ;
     sh:description "Optional description of the type" ;
@@ -113,6 +190,7 @@ rfdbs:MusicalWorkShape
   sh:description "A musical work such as an opera or composition. A work is the intellectual creation itself, distinct from its various expressions and manifestations."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Title"@en, "Titolo"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -123,11 +201,13 @@ rfdbs:MusicalWorkShape
   ] ;
   sh:property [
     sh:path skos:altLabel ;
+    sh:name "Alternative titles"@en, "Titoli alternativi"@it ;
     sh:datatype rdf:langString ;
     sh:description "Alternate names for the work (e.g., translations, alternate titles)" ;
   ] ;
   sh:property [
     sh:path dcterms:date ;
+    sh:name "Date"@en, "Data"@it ;
     sh:maxCount 1 ;
     sh:or (
       [ sh:datatype xsd:date ]
@@ -138,11 +218,22 @@ rfdbs:MusicalWorkShape
   ] ;
   sh:property [
     sh:path owl:sameAs ;
+    sh:name "External identifiers"@en, "Identificativi esterni"@it ;
     sh:nodeKind sh:IRI ;
-    sh:description "External identifiers (e.g., Wikidata, VIAF, Corago ID)" ;
+    sh:description "External identifiers (e.g., Wikidata, Corago ID). A VIAF ID goes in wdt:P214, not here." ;
+  ] ;
+  sh:property [
+    sh:path wdt:P214 ;
+    sh:name "VIAF ID"@en, "Identificativo VIAF"@it ;
+    sh:minCount 0 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:pattern "^[1-9]([0-9]{1,8}|[0-9]{18,21})$" ;
+    sh:description "VIAF cluster ID (Wikidata P214) of the work, stored as Wikidata stores it: the bare ID text, e.g. \"293925180\". The VIAF IRI is http://viaf.org/viaf/ followed by the ID, the formatter URI for RDF resource (P1921) Wikidata declares for P214." ;
   ] ;
   sh:property [
     sh:path cidoc:P129_is_about ;
+    sh:name "Subjects"@en, "Soggetti"@it ;
     sh:nodeKind sh:IRI ;
     sh:class cidoc:E89_Propositional_Object ;
     sh:node rfdbs:SubjectShape ;
@@ -150,6 +241,7 @@ rfdbs:MusicalWorkShape
   ] ;
   sh:property [
     sh:path core:hasAgentRole ;
+    sh:name "Persons and roles"@en, "Persone e ruoli"@it ;
     sh:nodeKind sh:IRI ;
     sh:class core:AgentRole ;
     sh:node rfdbs:AgentRoleShape ;
@@ -166,6 +258,7 @@ rfdbs:ExpressionShape
   sh:description "An Expression is a specific intellectual realization of a MusicalWork. For example, a Libretto is an Expression of an Opera (MusicalWork)."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Title"@en, "Titolo"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -176,6 +269,7 @@ rfdbs:ExpressionShape
   ] ;
   sh:property [
     sh:path cidoc:P148i_is_component_of ;
+    sh:name "Musical work"@en, "Opera musicale"@it ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
     sh:class lrmoo:F1_Work ;
@@ -184,6 +278,7 @@ rfdbs:ExpressionShape
   ] ;
   sh:property [
     sh:path lrmoo:R76_is_derivative_of ;
+    sh:name "Derived from"@en, "Derivata da"@it ;
     sh:minCount 0 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
@@ -193,18 +288,30 @@ rfdbs:ExpressionShape
   ] ;
   sh:property [
     sh:path skos:altLabel ;
+    sh:name "Alternative titles"@en, "Titoli alternativi"@it ;
     sh:datatype rdf:langString ;
     sh:description "Alternate names for the expression" ;
   ] ;
   sh:property [
     sh:path core:hasAgentRole ;
+    sh:name "Persons and roles"@en, "Persone e ruoli"@it ;
     sh:nodeKind sh:IRI ;
     sh:class core:AgentRole ;
     sh:node rfdbs:AgentRoleShape ;
     sh:description "Agent roles for the expression: librettist (original/translator), arranger, etc." ;
   ] ;
   sh:property [
+    sh:path wdt:P214 ;
+    sh:name "VIAF ID"@en, "Identificativo VIAF"@it ;
+    sh:minCount 0 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:pattern "^[1-9]([0-9]{1,8}|[0-9]{18,21})$" ;
+    sh:description "VIAF cluster ID (Wikidata P214) of the expression, e.g. a translation, stored as Wikidata stores it: the bare ID text, e.g. \"308534901\". The VIAF IRI is http://viaf.org/viaf/ followed by the ID, the formatter URI for RDF resource (P1921) Wikidata declares for P214." ;
+  ] ;
+  sh:property [
     sh:path rdfs:comment ;
+    sh:name "Note"@en, "Nota"@it ;
     sh:maxCount 1 ;
     sh:datatype xsd:string ;
     sh:description "Optional free-text note for the expression" ;
@@ -220,6 +327,7 @@ rfdbs:ManifestationShape
   sh:description "A Manifestation is the product type that embodies an Expression, this accomunates all phisical copies that are distinct Items."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Title"@en, "Titolo"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -231,6 +339,7 @@ rfdbs:ManifestationShape
 
   sh:property [
     sh:path lrmoo:R4_embodies ;
+    sh:name "Expression"@en, "Espressione"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
@@ -241,6 +350,7 @@ rfdbs:ManifestationShape
 
   sh:property [
     sh:path prism:publicationDate ;
+    sh:name "Publication date"@en, "Data di pubblicazione"@it ;
     sh:maxCount 1 ;
     sh:or (
       [ sh:datatype xsd:date ]
@@ -252,9 +362,20 @@ rfdbs:ManifestationShape
 
   sh:property [
     sh:path rdfs:comment ;
+    sh:name "Description"@en, "Descrizione"@it ;
     sh:maxCount 1 ;
     sh:datatype xsd:string ;
     sh:description "Optional description of the manifestation" ;
+  ] ;
+
+  sh:property [
+    sh:path wdt:P5504 ;
+    sh:name "RISM ID"@en, "Identificativo RISM"@it ;
+    sh:minCount 0 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:pattern "^sources/[0-9]+$" ;
+    sh:description "RISM ID (Wikidata P5504) of the RISM source record describing this manifestation, print or manuscript, stored as Wikidata stores it: the record type and number, e.g. \"sources/990052516\". A RISM source record lists its exemplars beneath it; those correspond to Sources and go in the Source's rdfs:seeAlso. The RISM page is https://rism.online/ followed by the ID, the formatter URL (P1630) Wikidata declares for P5504." ;
   ] .
 
 
@@ -269,6 +390,7 @@ rfdbs:SourceShape
   sh:description "A particular physical copy of a document, such as a specific printed edition of a libretto, held by a library or archive. Items exemplify Manifestations."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Title"@en, "Titolo"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -280,12 +402,14 @@ rfdbs:SourceShape
   ] ;
   sh:property [
     sh:path skos:altLabel ;
+    sh:name "Alternative titles"@en, "Titoli alternativi"@it ;
     sh:datatype rdf:langString ;
     sh:description "Alternate names for the item" ;
   ] ;
 
   sh:property [
     sh:path prism:publicationDate ;
+    sh:name "Publication date"@en, "Data di pubblicazione"@it ;
     sh:maxCount 1 ;
     sh:or (
       [ sh:datatype xsd:date ]
@@ -297,6 +421,7 @@ rfdbs:SourceShape
 
   sh:property [
     sh:path dcterms:language ;
+    sh:name "Language"@en, "Lingua"@it ;
     sh:nodeKind sh:IRI ;
     sh:class dcterms:LinguisticSystem ;
     sh:node rfdbs:LanguageShape ;
@@ -305,6 +430,7 @@ rfdbs:SourceShape
 
   sh:property [
     sh:path core:hasPlace ;
+    sh:name "Place of publication"@en, "Luogo di pubblicazione"@it ;
     sh:minCount 0 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
@@ -315,6 +441,7 @@ rfdbs:SourceShape
 
   sh:property [
     sh:path core:hasType ;
+    sh:name "Document type"@en, "Tipo documento"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
@@ -325,6 +452,7 @@ rfdbs:SourceShape
 
   sh:property [
     sh:path cidoc:P51_has_former_or_current_owner ;
+    sh:name "Holding institution"@en, "Ente conservatore"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
@@ -335,6 +463,7 @@ rfdbs:SourceShape
 
   sh:property [
     sh:path dcterms:identifier ;
+    sh:name "Shelfmark"@en, "Collocazione"@it ;
     sh:minCount 0 ;
     sh:maxCount 1 ;
     sh:datatype xsd:string ;
@@ -343,20 +472,32 @@ rfdbs:SourceShape
 
   sh:property [
     sh:path core:text ;
+    sh:name "Title-page transcription"@en, "Trascrizione del frontespizio"@it ;
     sh:minCount 0 ;
-    sh:maxCount 1 ;
-    sh:datatype rdf:langString ;
-    sh:description "Fontespizio transcription (title-page text)" ;
+    sh:or (
+      [ sh:datatype rdf:langString ]
+      [ sh:datatype xsd:string ]
+    ) ;
+    sh:description "Fontespizio transcription (title-page text). May be repeated, e.g. one per title page; the language tag is optional." ;
   ] ;
 
   sh:property [
     sh:path rdfs:seeAlso ;
+    sh:name "External links"@en, "Link esterni"@it ;
     sh:nodeKind sh:IRI ;
-    sh:description "External references (Link): catalog links, etc." ;
+    # Any rism.online link here must be an exemplar (holding) in RISM's own
+    # form; other RISM records describe a different level.
+    sh:or (
+      [ sh:not [ sh:pattern "^https?://(www\\.)?rism\\.online/" ] ]
+      [ sh:pattern "^https://rism\\.online/sources/[0-9]+/holdings/[0-9]+$" ]
+    ) ;
+    sh:message "A RISM link on a Source must be the IRI of a RISM exemplar (holding), exactly https://rism.online/sources/<number>/holdings/<number>, e.g. https://rism.online/sources/990052516/holdings/204680 (https, no trailing slash). A RISM source ID belongs on the Manifestation as wdt:P5504 \"sources/<number>\"; a RISM person or institution belongs on that Person or Holding Organization record." ;
+    sh:description "External references (Link): catalog links, etc. A RISM exemplar of this copy goes here as its holding IRI, exactly https://rism.online/sources/<number>/holdings/<number>; any other rism.online link is rejected. The RISM source ID itself belongs on the Manifestation (wdt:P5504)." ;
   ] ;
 
   sh:property [
     sh:path rdfs:comment ;
+    sh:name "Notes"@en, "Note"@it ;
     sh:maxCount 1 ;
     sh:datatype xsd:string ;
     sh:description "Additional free-text notes" ;
@@ -364,6 +505,7 @@ rfdbs:SourceShape
 
   sh:property [
     sh:path lrmoo:R7_exemplifies ;
+    sh:name "Manifestation"@en, "Manifestazione"@it ;
       sh:minCount 0 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
@@ -373,6 +515,7 @@ rfdbs:SourceShape
   ] ;
   sh:property [
     sh:path dcterms:contributor ;
+    sh:name "Digital copy donor"@en, "Donatore della copia digitale"@it ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
     sh:node rfdbs:ContributorShape ;
@@ -381,11 +524,11 @@ rfdbs:SourceShape
 
   sh:property [
     sh:path cidoc:P138i_has_representation ;
+    sh:name "Digital copies"@en, "Copie digitali"@it ;
     sh:minCount 0 ;
     sh:nodeKind sh:IRI ;
     sh:class schema:DigitalDocument ;
     sh:node rfdbs:DigitalCopyShape ;
-    rdfs:label "Digital copies"@en, "Copie digitali"@it ;
     sh:description "Digitised copies (PDF scans) of this source (Copie digitali). Managed via the file-upload panel, not the generic form." ;
   ] .
 
@@ -403,6 +546,7 @@ rfdbs:DigitalCopyShape
   sh:description "A digitised copy (PDF scan) of a source, with integrity and provenance metadata."@en ;
   sh:property [
     sh:path schema:name ;
+    sh:name "File name"@en, "Nome del file"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:datatype xsd:string ;
@@ -410,6 +554,7 @@ rfdbs:DigitalCopyShape
   ] ;
   sh:property [
     sh:path schema:encodingFormat ;
+    sh:name "Format"@en, "Formato"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:hasValue "application/pdf" ;
@@ -417,6 +562,7 @@ rfdbs:DigitalCopyShape
   ] ;
   sh:property [
     sh:path schema:contentUrl ;
+    sh:name "Download URL"@en, "URL di download"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:datatype xsd:anyURI ;
@@ -424,6 +570,7 @@ rfdbs:DigitalCopyShape
   ] ;
   sh:property [
     sh:path schema:contentSize ;
+    sh:name "File size (bytes)"@en, "Dimensione del file (byte)"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:datatype xsd:integer ;
@@ -431,6 +578,7 @@ rfdbs:DigitalCopyShape
   ] ;
   sh:property [
     sh:path schema:sha256 ;
+    sh:name "SHA-256 checksum"@en, "Checksum SHA-256"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:datatype xsd:string ;
@@ -438,6 +586,7 @@ rfdbs:DigitalCopyShape
   ] ;
   sh:property [
     sh:path schema:numberOfPages ;
+    sh:name "Number of pages"@en, "Numero di pagine"@it ;
     sh:minCount 0 ;
     sh:maxCount 1 ;
     sh:datatype xsd:integer ;
@@ -455,6 +604,7 @@ rfdbs:PersonShape
   sh:description "A person who may have various roles in cultural works, such as composer, librettist, arranger, or translator."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Name"@en, "Nome"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -465,20 +615,33 @@ rfdbs:PersonShape
   ] ;
   sh:property [
     sh:path skos:altLabel ;
+    sh:name "Alternative names"@en, "Nomi alternativi"@it ;
     sh:datatype rdf:langString ;
     sh:description "Alternate names for the person (e.g., pseudonyms, translated names)" ;
   ] ;
   sh:property [
     sh:path owl:sameAs ;
+    sh:name "External identifiers"@en, "Identificativi esterni"@it ;
     sh:nodeKind sh:IRI ;
     sh:description "External identifier for the person (use to link to Wikidata)" ;
   ] ;
   sh:property [
     sh:path wdt:P214 ;
+    sh:name "VIAF ID"@en, "Identificativo VIAF"@it ;
     sh:minCount 0 ;
     sh:maxCount 1 ;
-    sh:nodeKind sh:IRI ;
-    sh:description "VIAF link (Wikidata P214)" ;
+    sh:datatype xsd:string ;
+    sh:pattern "^[1-9]([0-9]{1,8}|[0-9]{18,21})$" ;
+    sh:description "VIAF cluster ID (Wikidata P214), stored as Wikidata stores it: the bare ID text, e.g. \"100995617\". The VIAF IRI is http://viaf.org/viaf/ followed by the ID, the formatter URI for RDF resource (P1921) Wikidata declares for P214." ;
+  ] ;
+  sh:property [
+    sh:path wdt:P5504 ;
+    sh:name "RISM ID"@en, "Identificativo RISM"@it ;
+    sh:minCount 0 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:pattern "^people/[0-9]+$" ;
+    sh:description "RISM ID (Wikidata P5504), stored as Wikidata stores it: the record type and number, e.g. \"people/1874\". The RISM page is https://rism.online/ followed by the ID, the formatter URL (P1630) Wikidata declares for P5504." ;
   ] .
 
 # ================================
@@ -491,6 +654,7 @@ rfdbs:RoleShape
   sh:description "A role or function that a person may play in relation to a work, such as composer, librettist, translator, arranger, etc."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Name"@en, "Nome"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -501,6 +665,7 @@ rfdbs:RoleShape
   ] ;
   sh:property [
     sh:path skos:altLabel ;
+    sh:name "Alternative names"@en, "Nomi alternativi"@it ;
     sh:datatype rdf:langString ;
     sh:description "Alternate names for the role (e.g., translations)" ;
   ] .
@@ -516,12 +681,14 @@ rfdbs:AgentRoleShape
   sh:description "A specific assignment of a role to a person, representing the participation of an agent in a creative or related activity."@en ;
   sh:property [
     sh:path rdf:type ;
+    sh:name "Type"@en, "Tipo"@it ;
     sh:minCount 1 ;
     sh:hasValue core:AgentRole ;
     sh:description "An agent role must have at least one rdf:type and core:AgentRole must be among them" ;
   ] ;
   sh:property [
     sh:path core:hasAgent ;
+    sh:name "Person"@en, "Persona"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
@@ -531,6 +698,7 @@ rfdbs:AgentRoleShape
   ] ;
   sh:property [
     sh:path core:hasRole ;
+    sh:name "Role"@en, "Ruolo"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
@@ -550,6 +718,7 @@ rfdbs:HoldingOrganizationShape
   sh:description "An institution such as a library, archive, or museum that holds and preserves source documents and other materials."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Name"@en, "Nome"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -560,24 +729,38 @@ rfdbs:HoldingOrganizationShape
   ] ;
   sh:property [
     sh:path skos:altLabel ;
+    sh:name "Alternative names"@en, "Nomi alternativi"@it ;
     sh:datatype rdf:langString ;
     sh:description "Alternate names for the organization (e.g., acronyms, translations)" ;
   ] ;
   sh:property [
     sh:path owl:sameAs ;
+    sh:name "External identifiers"@en, "Identificativi esterni"@it ;
     sh:minCount 0 ;
     sh:nodeKind sh:IRI ;
     sh:description "External identifier for the organization (use to link to Wikidata)" ;
   ] ;
   sh:property [
     sh:path wdt:P214 ;
+    sh:name "VIAF ID"@en, "Identificativo VIAF"@it ;
     sh:minCount 0 ;
     sh:maxCount 1 ;
-    sh:nodeKind sh:IRI ;
-    sh:description "VIAF link (Wikidata P214)" ;
+    sh:datatype xsd:string ;
+    sh:pattern "^[1-9]([0-9]{1,8}|[0-9]{18,21})$" ;
+    sh:description "VIAF cluster ID (Wikidata P214), stored as Wikidata stores it: the bare ID text, e.g. \"100995617\". The VIAF IRI is http://viaf.org/viaf/ followed by the ID, the formatter URI for RDF resource (P1921) Wikidata declares for P214." ;
+  ] ;
+  sh:property [
+    sh:path wdt:P5504 ;
+    sh:name "RISM ID"@en, "Identificativo RISM"@it ;
+    sh:minCount 0 ;
+    sh:maxCount 1 ;
+    sh:datatype xsd:string ;
+    sh:pattern "^institutions/[0-9]+$" ;
+    sh:description "RISM ID (Wikidata P5504), stored as Wikidata stores it: the record type and number, e.g. \"institutions/30002520\". The RISM page is https://rism.online/ followed by the ID, the formatter URL (P1630) Wikidata declares for P5504." ;
   ] ;
   sh:property [
     sh:path core:hasPlace ;
+    sh:name "Location"@en, "Sede"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
@@ -598,12 +781,14 @@ rfdbs:LanguageShape
   sh:description "A language resource from a controlled vocabulary (e.g. Glottolog). Reference data: browse and select only."@en ;
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Name"@en, "Nome"@it ;
     sh:minCount 1 ;
     sh:datatype rdf:langString ;
     sh:description "Primary label for the language (e.g. 'Russian'@en)" ;
   ] ;
   sh:property [
     sh:path skos:prefLabel ;
+    sh:name "Preferred name"@en, "Nome preferito"@it ;
     sh:datatype rdf:langString ;
     sh:description "Preferred label (skos:prefLabel), present in Glottolog data" ;
   ] .
@@ -635,6 +820,7 @@ sh:or (
 ) ;
 sh:property [
     sh:path rdfs:label ;
+    sh:name "Short name"@en, "Nome breve"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -645,6 +831,7 @@ sh:property [
   ] ;
 sh:property [
   sh:path foaf:name ;
+  sh:name "Full name"@en, "Nome completo"@it ;
   sh:minCount 1 ;
   sh:maxCount 1 ;
   sh:or ( [ sh:datatype rdf:langString ] [ sh:datatype xsd:string ] ) ;
@@ -667,6 +854,7 @@ rfdbs:PerformanceShape
 
   sh:property [
     sh:path rdfs:label ;
+    sh:name "Title"@en, "Titolo"@it ;
     sh:minCount 1 ;
     sh:maxCount 1 ;
     sh:or (
@@ -678,6 +866,7 @@ rfdbs:PerformanceShape
 
   sh:property [
     sh:path lrmoo:R80_performed ;
+    sh:name "Work performed"@en, "Opera rappresentata"@it ;
     sh:minCount 1 ;
     sh:nodeKind sh:IRI ;
     sh:class lrmoo:F1_Work ;
@@ -687,6 +876,7 @@ rfdbs:PerformanceShape
 
   sh:property [
     sh:path dcterms:date ;
+    sh:name "Date"@en, "Data"@it ;
     sh:maxCount 1 ;
     sh:or (
       [ sh:datatype xsd:date ]
@@ -698,6 +888,7 @@ rfdbs:PerformanceShape
 
   sh:property [
     sh:path core:hasPlace ;
+    sh:name "Place"@en, "Luogo"@it ;
     sh:maxCount 1 ;
     sh:nodeKind sh:IRI ;
     sh:class core:Place ;
@@ -707,6 +898,7 @@ rfdbs:PerformanceShape
 
   sh:property [
     sh:path core:hasAgentRole ;
+    sh:name "Persons and roles"@en, "Persone e ruoli"@it ;
     sh:nodeKind sh:IRI ;
     sh:class core:AgentRole ;
     sh:node rfdbs:AgentRoleShape ;
@@ -715,6 +907,7 @@ rfdbs:PerformanceShape
 
   sh:property [
     sh:path cidoc:P19_was_intended_use_of ;
+    sh:name "Manifestation made for this performance"@en, "Manifestazione realizzata per questa rappresentazione"@it ;
     sh:nodeKind sh:IRI ;
     sh:class lrmoo:F3_Manifestation ;
     sh:node rfdbs:ManifestationShape ;
@@ -723,6 +916,7 @@ rfdbs:PerformanceShape
 
   sh:property [
     sh:path cidoc:P16_used_specific_object ;
+    sh:name "Manifestation used at this performance"@en, "Manifestazione usata in questa rappresentazione"@it ;
     sh:nodeKind sh:IRI ;
     sh:class lrmoo:F3_Manifestation ;
     sh:node rfdbs:ManifestationShape ;
@@ -731,6 +925,7 @@ rfdbs:PerformanceShape
 
   sh:property [
     sh:path owl:sameAs ;
+    sh:name "External identifiers"@en, "Identificativi esterni"@it ;
     sh:minCount 0 ;
     sh:nodeKind sh:IRI ;
     sh:description "External identifier(s) for the performance/event, e.g. Corago ID such as https://corago.unibo.it/evento/0000376534" ;

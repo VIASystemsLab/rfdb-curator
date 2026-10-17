@@ -57,7 +57,7 @@ jobs:
 
       - name: Check prefix-map coverage
         # Fails if a @prefix declared in any schema/data TTL is missing from or
-        # mismatched against rfdb_core.prefixes.PREFIXES (served by
+        # mismatched against the schema's sh:declare (the map served by
         # /api/v1/dataexplorer/meta/prefixes).
         # The script lives in curator-backend but only reads rfdb-core + the TTLs.
         working-directory: .

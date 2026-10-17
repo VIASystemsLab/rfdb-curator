@@ -24,12 +24,6 @@
 <http://glottolog.org/resource/languoid/id/stan1295> a dcterms:LinguisticSystem ;
     rdfs:label "German"@en .
 
-rfdb:LibrettoManoscritto a core:Type ;
-    rdfs:label "Libretto Manoscritto"@en .
-
-rfdb:LibrettoStampa a core:Type ;
-    rdfs:label "Libretto a Stampa"@en .
-
 rfdb:Libretto_11 a lrmoo:F2_Expression ;
     rdfs:label "La *forza dell'amore e dell'odio"@en ;
     cidoc:P148i_is_component_of rfdb:T11 ;
@@ -81,22 +75,16 @@ rfdb:Libretto_11d_item a source:Source, lrmoo:F5_Item ;
 rfdb:Person_1 a core:Person ;
     rdfs:label "Pallavicino, Stefano Benedetto"@en ;
     owl:sameAs wd:Q321084 ;
-    wdt:P214 <https://viaf.org/viaf/44588699> .
+    wdt:P214 "44588699" .
 
 rfdb:Person_3 a core:Person ;
     rdfs:label "Metastasio, Pietro"@en ;
     owl:sameAs wd:Q29473 ;
-    wdt:P214 <https://viaf.org/viaf/64192672> .
+    wdt:P214 "64192672" .
 
 rfdb:Place_P2 a core:Place ;
     rdfs:label "Milano"@en ;
     owl:sameAs wd:Q490 .
-
-rfdb:Traduttore a core:Role ;
-    rdfs:label "Traduttore"@en .
-
-rfdb:Compositore a core:Role ;
-    rdfs:label "Compositore"@en .
 
 rfdb:Cantante a core:Role ;
     rdfs:label "Cantante"@it ;
@@ -113,9 +101,6 @@ rfdb:HO_2 a core:Organization ;
     core:hasPlace rfdb:Place_P2 ;
     skos:altLabel "I-Bc"@it .
 
-rfdb:Librettista a core:Role ;
-    rdfs:label "Librettista"@en .
-
 rfdb:Libretto a core:Type ;
     rdfs:label "Libretto"@en .
 
@@ -124,7 +109,8 @@ rfdb:Person_2 a core:Person ;
 
 rfdb:Person_4 a core:Person ;
     rdfs:label "Araja, Francesco"@en ;
-    wdt:P214 <https://viaf.org/viaf/100995617> .
+    wdt:P214 "100995617" ;
+    wdt:P5504 "people/30000135" .
 
 rfdb:Place_P1 a core:Place ;
     rdfs:label "San Pietroburgo"@en ;
@@ -184,5 +170,3 @@ rfdb:DigitalCopy_11d a schema:DigitalDocument ;
     schema:contentUrl "https://rosfeatr.eu/files/7f3e_example.pdf"^^xsd:anyURI ;
     schema:contentSize "98304"^^xsd:integer ;
     schema:sha256 "TEST-PLACEHOLDER-7f3e"^^xsd:string .
-
-

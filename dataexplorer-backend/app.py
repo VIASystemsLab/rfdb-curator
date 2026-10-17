@@ -92,6 +92,11 @@ async def lifespan(app: FastAPI):
         )
         raise
     logger.info("Schema loaded from '%s'.", settings.schema_path)
+    if not app.state.schema_extractor.prefixes:
+        logger.warning(
+            "Schema '%s' declares no prefixes (sh:declare); IRIs will not be compacted.",
+            settings.schema_path,
+        )
 
     # Built through the seam's factory, keyed on settings.triplestore, so swapping
     # stores is a config change rather than an edit here.

@@ -9,7 +9,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "dataexplorer-backend"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_DIR = REPO_ROOT / "dataexplorer-backend"
+SCHEMA_PATH = REPO_ROOT / "schema" / "schema.ttl"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
@@ -22,9 +24,11 @@ GRAPHS_URL = f"{META}/graphs"
 def _make_meta_app() -> FastAPI:
     """Build a minimal FastAPI app with just the meta router mounted at /api/v1/dataexplorer."""
     from api.meta import router
+    from rfdb_core.schema_extractor import SchemaExtractor
 
     app = FastAPI()
     app.include_router(router, prefix="/api/v1/dataexplorer")
+    app.state.schema_extractor = SchemaExtractor(str(SCHEMA_PATH))
     return app
 
 
@@ -41,7 +45,7 @@ def test_get_prefixes_returns_200_with_prefixes_key() -> None:
 
 
 def test_get_prefixes_covers_all_ttl_sources() -> None:
-    """The curated map spans schema, data-only, and glottolog-only prefixes."""
+    """The schema's sh:declare covers schema, data-only, and glottolog-only prefixes."""
     prefixes = TestClient(_make_meta_app()).get(PREFIXES_URL).json()["prefixes"]
     assert prefixes["rfdb"] == "https://rosfeatr.eu/rdf/data/"  # schema.ttl
     assert prefixes["lrmoo"] == "http://iflastandards.info/ns/lrm/lrmoo/"  # schema.ttl
@@ -50,7 +54,7 @@ def test_get_prefixes_covers_all_ttl_sources() -> None:
 
 
 def test_get_prefixes_excludes_rdflib_default_noise() -> None:
-    """rdflib's auto-bound vocabularies must not leak into the curated map."""
+    """rdflib's auto-bound vocabularies must not leak into the declared map."""
     prefixes = TestClient(_make_meta_app()).get(PREFIXES_URL).json()["prefixes"]
     for noise in ("brick", "csvw", "dcat", "qb", "odrl", "prov", "doap"):
         assert noise not in prefixes, f"unexpected rdflib default '{noise}' in map"

@@ -1,7 +1,7 @@
 """Meta routes: schema-level information not tied to individual shapes or entities.
 
 Currently exposes:
-  GET /api/v1/dataexplorer/meta/prefixes — curated CURIE prefix map (rfdb_core/prefixes.py).
+  GET /api/v1/dataexplorer/meta/prefixes — CURIE prefix map declared by the schema (sh:declare).
   GET /api/v1/dataexplorer/meta/graphs   — active/named graphs, triple counts, config warnings.
   GET /api/v1/dataexplorer/meta/files    — digital-copy storage stats (staged/registered/orphans).
 
@@ -15,21 +15,17 @@ from fastapi import APIRouter, HTTPException, Request
 from core.config import settings
 from rfdb_core.file_storage import REGISTERED_PREFIX, STAGED_PREFIX, StorageError
 from rfdb_core.files_state import collect_file_state, key_file_id
-from rfdb_core.prefixes import PREFIXES
 
 router = APIRouter()
 
 
 @router.get("/meta/prefixes")
-def get_prefixes():
-    """Return the curated CURIE prefix→namespace map.
+def get_prefixes(request: Request):
+    """Return the CURIE prefix→namespace map the schema declares.
 
-    Served from the hand-maintained ``rfdb_core.prefixes.PREFIXES`` (the union of the
-    ``@prefix`` declarations across schema/data/vocab/glottolog), **not** the rdflib
-    schema graph — the latter also carries ~29 unrelated well-known vocabularies
-    (``brick``, ``dcat``, …) that rdflib pre-binds into every ``Graph`` and would
-    otherwise leak into the map. See ``rfdb_core/prefixes.py`` for the maintenance note
-    and the manual sanity check.
+    Read from the schema's ``sh:declare`` declarations at load time (see
+    ``rfdb_core.prefixes``), **not** from the rdflib graph's namespaces, which also
+    carry ~29 unrelated vocabularies rdflib pre-binds into every ``Graph``.
 
     Returns:
         ``{"prefixes": {"cidoc": "http://…", "xsd": "http://…", …}}``
@@ -37,7 +33,7 @@ def get_prefixes():
     The frontend consumes this at startup to hydrate its prefix map for IRI
     compaction and the Data Context Panel.
     """
-    return {"prefixes": dict(PREFIXES)}
+    return {"prefixes": dict(request.app.state.schema_extractor.prefixes)}
 
 
 def _count(rows: list[dict], key: str = "count") -> int:

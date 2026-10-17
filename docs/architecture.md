@@ -496,12 +496,13 @@ GET /api/v1/dataexplorer/meta/files      — digital-copy storage stats
 }
 ```
 
-The map is served from the hand-maintained `rfdb_core.prefixes.PREFIXES` — the union of the
-`@prefix` declarations across the schema, vocab, data, and Glottolog Turtle files —
-**not** from the rdflib schema graph's `namespaces()`. rdflib pre-binds ~29 unrelated
-well-known vocabularies (`brick`, `dcat`, …) into every `Graph`, which would otherwise
-leak into the map; `rfdb-core/rfdb_core/prefixes.py` carries the maintenance note and a
-sanity check (`curator-backend/scripts/check_prefixes.py`, gated in CI).
+The map is read from the schema's `sh:declare` declarations when the schema loads
+(`rfdb_core.prefixes.declared_prefixes`), **not** from the rdflib schema graph's
+`namespaces()`. rdflib pre-binds ~29 unrelated well-known vocabularies (`brick`, `dcat`, …)
+into every `Graph`, which would otherwise leak into the map. The schema declares the
+prefixes of the vocab, data and Glottolog files too; `curator-backend/scripts/check_prefixes.py`
+(pre-commit and CI) fails when a `@prefix` in any schema or data TTL file is not declared.
+A prefix declared with two namespaces stops the service at startup.
 
 This endpoint resolved the prefix-map duplication gap between `utils/prefixes.js` and
 `utils/jsonld.js` on the frontend — both now hydrate from it at app startup

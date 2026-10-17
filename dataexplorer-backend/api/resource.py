@@ -43,7 +43,6 @@ from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import DCTERMS, RDF, RDFS, XSD
 
 from api.graph import preferred_label
-from rfdb_core.prefixes import PREFIXES
 from rfdb_core.vocab import RFDB_BASE, RFDB_SCHEMA_BASE
 
 router = APIRouter()
@@ -192,8 +191,14 @@ def _alternates(iri: str, supported: tuple[str, ...]) -> Graph:
     return graph
 
 
-def _respond(graph: Graph, iri: str, media_type: str, supported: tuple[str, ...]) -> Response:
-    """Serialize ``graph`` as ``media_type``, with the project's CURIE prefixes bound.
+def _respond(
+    graph: Graph,
+    iri: str,
+    media_type: str,
+    supported: tuple[str, ...],
+    prefixes: dict[str, str],
+) -> Response:
+    """Serialize ``graph`` as ``media_type``, with the schema's CURIE prefixes bound.
 
     ``Vary: Accept`` is not decoration: without it a shared cache may hand a
     JSON-LD client the Turtle it stored for someone else. ``Content-Location``
@@ -202,9 +207,9 @@ def _respond(graph: Graph, iri: str, media_type: str, supported: tuple[str, ...]
     alternates discoverable without ConnegP-specific knowledge.
     """
     if media_type == HTML_MEDIA_TYPE:
-        body = _render_html(graph, iri)
+        body = _render_html(graph, iri, _namespaces(prefixes))
     else:
-        for prefix, namespace in PREFIXES.items():
+        for prefix, namespace in prefixes.items():
             graph.bind(prefix, namespace)
         body = graph.serialize(format=MEDIA_TYPES[media_type])
 
@@ -239,12 +244,6 @@ def _respond(graph: Graph, iri: str, media_type: str, supported: tuple[str, ...]
 # twin of the frontend's ``resolveFileUrl`` re-basing.
 _LOCAL_SPACES = tuple((ns, urlsplit(ns).path) for ns in (RFDB_BASE, RFDB_SCHEMA_BASE))
 
-# Longest namespace first, so a namespace that is a prefix of another cannot
-# shadow it.
-_NAMESPACES = sorted(
-    ((ns, prefix) for prefix, ns in PREFIXES.items()), key=lambda pair: -len(pair[0])
-)
-
 # RDF 1.1 makes a plain literal and an ``xsd:string``-typed one the same term, so
 # printing that datatype would be noise rather than information.
 _IMPLICIT_DATATYPE = str(XSD.string)
@@ -277,14 +276,22 @@ footer { margin-top: 2.6rem; padding-top: .9rem; border-top: 1px solid #8883;
 """
 
 
-def _curie(iri: str) -> str:
-    """Compact an IRI to ``prefix:local`` using the project's curated prefix map.
+def _namespaces(prefixes: dict[str, str]) -> list[tuple[str, str]]:
+    """``(namespace, prefix)`` pairs, longest namespace first.
 
-    The curated map, not the graph's namespace manager: a bare ``rdflib.Graph``
+    Longest first so a namespace that is a prefix of another cannot shadow it.
+    """
+    return sorted(((ns, prefix) for prefix, ns in prefixes.items()), key=lambda pair: -len(pair[0]))
+
+
+def _curie(iri: str, namespaces: list[tuple[str, str]]) -> str:
+    """Compact an IRI to ``prefix:local`` using the schema's declared prefix map.
+
+    The declared map, not the graph's namespace manager: a bare ``rdflib.Graph``
     pre-binds ~29 unrelated vocabularies that would leak into the output (see
     ``rfdb_core.prefixes``). Falls back to the full IRI, which is never wrong.
     """
-    for namespace, prefix in _NAMESPACES:
+    for namespace, prefix in namespaces:
         if iri.startswith(namespace):
             return f"{prefix}:{iri[len(namespace) :]}"
     return iri
@@ -304,7 +311,7 @@ def _href(iri: str) -> str | None:
     return iri if iri.startswith(("http://", "https://")) else None
 
 
-def _term(term: object) -> str:
+def _term(term: object, namespaces: list[tuple[str, str]]) -> str:
     """Render one RDF term as an HTML fragment — a link where it can be one."""
     if isinstance(term, Literal):
         value = escape(str(term))
@@ -321,23 +328,27 @@ def _term(term: object) -> str:
         if datatype == _URI_DATATYPE and (href := _href(str(term))):
             value = f'<a href="{escape(href, quote=True)}">{value}</a>'
         if datatype and datatype != _IMPLICIT_DATATYPE:
-            value += f' <span class="meta">{escape(_curie(datatype))}</span>'
+            value += f' <span class="meta">{escape(_curie(datatype, namespaces))}</span>'
         return value
 
-    label = escape(_curie(str(term)))
+    label = escape(_curie(str(term), namespaces))
     href = _href(str(term))
     return f'<a href="{escape(href, quote=True)}">{label}</a>' if href else f"<code>{label}</code>"
 
 
-def _section(title: str, rows: list[tuple[object, object]]) -> str:
+def _section(
+    title: str, rows: list[tuple[object, object]], namespaces: list[tuple[str, str]]
+) -> str:
     """One ``<h2>`` + table, or nothing at all when there is nothing to show."""
     if not rows:
         return ""
-    cells = "".join(f"<tr><th>{_term(a)}</th><td>{_term(b)}</td></tr>" for a, b in rows)
+    cells = "".join(
+        f"<tr><th>{_term(a, namespaces)}</th><td>{_term(b, namespaces)}</td></tr>" for a, b in rows
+    )
     return f"<h2>{escape(title)}</h2><table>{cells}</table>"
 
 
-def _render_html(graph: Graph, iri: str) -> str:
+def _render_html(graph: Graph, iri: str, namespaces: list[tuple[str, str]]) -> str:
     """Render a resource's description as one self-contained HTML page.
 
     The field set is the one ``GET /api/v1/dataexplorer/graph/node`` assembles —
@@ -383,12 +394,12 @@ def _render_html(graph: Graph, iri: str) -> str:
     for rows in (literals, outbound, inbound):
         rows.sort(key=lambda row: (str(row[0]), str(row[1])))
 
-    heading = preferred_label(labels) or _curie(iri)
+    heading = preferred_label(labels) or _curie(iri, namespaces)
     head_links = "\n".join(
         f'<link rel="alternate" type="{media_type}" href="{_variant_url(media_type)}">'
         for media_type in MEDIA_TYPES
     )
-    type_line = " · ".join(_term(URIRef(t)) for t in sorted(types))
+    type_line = " · ".join(_term(URIRef(t), namespaces) for t in sorted(types))
     variants = " · ".join(
         f'<a href="{_variant_url(media_type)}">{media_type}</a>' for media_type in MEDIA_TYPES
     )
@@ -407,9 +418,9 @@ def _render_html(graph: Graph, iri: str) -> str:
 <h1>{escape(heading)}</h1>
 <p class="iri"><code>{escape(iri)}</code></p>
 {f'<p><span class="meta">rdf:type</span> {type_line}</p>' if type_line else ""}
-{_section("Properties", literals)}
-{_section("Links", outbound)}
-{_section("Referenced by", inbound)}
+{_section("Properties", literals, namespaces)}
+{_section("Links", outbound, namespaces)}
+{_section("Referenced by", inbound, namespaces)}
 <footer>
 Also available as: {variants} ·
 <a href="?_profile={ALT_PROFILE}">alternate representations</a>
@@ -487,7 +498,7 @@ def dereference_entity(
     if _profile == ALT_PROFILE:
         graph = _alternates(iri, supported)
 
-    return _respond(graph, iri, media_type, supported)
+    return _respond(graph, iri, media_type, supported, request.app.state.schema_extractor.prefixes)
 
 
 @router.get("/schema/{shape_name}")
@@ -529,4 +540,4 @@ def dereference_shape(
         if _profile == ALT_PROFILE
         else request.app.state.schema_extractor.graph.cbd(URIRef(iri))
     )
-    return _respond(graph, iri, media_type, supported)
+    return _respond(graph, iri, media_type, supported, request.app.state.schema_extractor.prefixes)

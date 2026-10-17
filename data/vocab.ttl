@@ -4,17 +4,20 @@
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 
 # Canonical controlled vocabulary for the editor seed stage.
-# NOTE: data/data.ttl is test-only fixture data and must not be treated as canonical seed.
+# NOTE: data/examples/data.ttl is test-only fixture data and must not be treated as canonical seed.
 
 rfdb:DocumentTypeScheme a skos:ConceptScheme ;
-  rdfs:label "RFDB Document Types"@en .
+  rdfs:label "RFDB Document Types"@en ;
+  skos:altLabel "Tipi di documento RFDB"@it .
 
 rfdb:RoleTypeScheme a skos:ConceptScheme ;
-  rdfs:label "RFDB Role Types"@en .
+  rdfs:label "RFDB Role Types"@en ;
+  skos:altLabel "Tipi di ruolo RFDB"@it .
 
 # --- Core Type vocabulary ---
 rfdb:Libretto a core:Type, skos:Concept ;
   rdfs:label "Libretto"@en ;
+  skos:altLabel "Libretto"@it ;
   skos:inScheme rfdb:DocumentTypeScheme .
 
 rfdb:LibrettoStampa a core:Type, skos:Concept ;

@@ -52,12 +52,12 @@ repos:
         entry: bash -c 'env -u VIRTUAL_ENV uv run --offline ruff format .'
         pass_filenames: false
         files: ^((curator|dataexplorer)-backend|rfdb-core|tests)/.*\.py$
-      # Keep rfdb_core.prefixes.PREFIXES (served by
-      # /api/v1/dataexplorer/meta/prefixes) in sync with the @prefix declarations
-      # across the schema/data TTL files. Fires only when a TTL or the curated map
-      # itself changes; the script picks the files.
+      # Every @prefix across the schema/data TTL files must be declared in the
+      # schema's sh:declare, which is the prefix map served by
+      # /api/v1/dataexplorer/meta/prefixes. Fires only when a TTL or the reader
+      # changes; the script picks the files.
       - id: prefix-map-check
-        name: prefix-map coverage (rfdb-core/rfdb_core/prefixes.py vs TTL files)
+        name: prefix-map coverage (schema sh:declare vs TTL files)
         language: system
         entry: bash -c 'env -u VIRTUAL_ENV uv run --offline python curator-backend/scripts/check_prefixes.py'
         pass_filenames: false
