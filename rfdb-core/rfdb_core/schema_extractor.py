@@ -107,6 +107,21 @@ LONG_TEXT_PREDICATES: frozenset[str] = frozenset(
 )
 
 
+def _english_first(literals: list[Literal]) -> Literal | None:
+    """Pick the English literal, else an untagged one, else any; None if empty.
+
+    Labels and names come in several languages (``"RISM ID"@en``,
+    ``"Identificativo RISM"@it``), and ``Graph.value`` would return an arbitrary one.
+    """
+    en = next((lit for lit in literals if (lit.language or "").lower() == "en"), None)
+    if en is not None:
+        return en
+    no_lang = next((lit for lit in literals if not lit.language), None)
+    if no_lang is not None:
+        return no_lang
+    return literals[0] if literals else None
+
+
 def _curie(uri: URIRef | BNode | None, graph: Graph) -> str | None:
     """Convert a full URI to a CURIE (prefix:local) using the graph's namespace manager.
 
@@ -270,7 +285,7 @@ class SchemaExtractor:
         if path is None:
             return None
 
-        name = g.value(prop_node, SH.name)
+        name = _english_first([o for o in g.objects(prop_node, SH.name) if isinstance(o, Literal)])
         description = g.value(prop_node, SH.description) or ""
         datatype = g.value(prop_node, SH.datatype)
 
@@ -369,24 +384,13 @@ class SchemaExtractor:
         """Return the best available label for a shape, preferring English.
 
         Priority: rdfs:label (en) > rdfs:label (no lang) > rdfs:label (any) >
-                  sh:name (en) > sh:name (any) > None
+                  sh:name (en) > sh:name (no lang) > sh:name (any) > None
         """
         g = self.graph
         labels = [o for o in g.objects(shape_uri, RDFS.label) if isinstance(o, Literal)]
         if labels:
-            en = next((lbl for lbl in labels if (lbl.language or "").lower() == "en"), None)
-            if en is not None:
-                return en
-            no_lang = next((lbl for lbl in labels if not lbl.language), None)
-            if no_lang is not None:
-                return no_lang
-            return labels[0]
-
-        names = [o for o in g.objects(shape_uri, SH.name) if isinstance(o, Literal)]
-        if names:
-            en = next((n for n in names if (n.language or "").lower() == "en"), None)
-            return en or names[0]
-        return None
+            return _english_first(labels)
+        return _english_first([o for o in g.objects(shape_uri, SH.name) if isinstance(o, Literal)])
 
     def _infer_nested_shape_role(self, nested_shape: URIRef | None) -> str | None:
         """Return the shape role of a nested shape, or None if no nested shape."""
