@@ -170,27 +170,25 @@ class SchemaExtractor:
         """Return the descriptor for a single NodeShape by its full URI string, or None."""
         return self._shapes().get(shape_id)
 
-    def find_links_to_shape(self, nested_shape_id: str) -> list[tuple[str, str]]:
-        """Find every shape that links to ``nested_shape_id`` and via which predicate.
+    def file_links(self) -> list[tuple[str, str]]:
+        """Find every property that links an entity to an uploaded file.
 
-        Scans all NodeShape properties for ``sh:node`` references to the given
-        shape, so the *schema* stays the single source of truth for how entities
-        are connected — callers never hardcode parent classes or predicates.
-        Multiple parents are first-class: any shape may declare the link.
-
-        Args:
-            nested_shape_id: Full URI of the linked NodeShape
-                (e.g. ``…/schema/DigitalCopyShape``).
+        A link is a property the form renders as a file upload (``file-list``:
+        its ``sh:node`` shape targets ``schema:DigitalDocument``). Using the same
+        rule as the form means the upload widget and the file lifecycle (the
+        download route, the stats, the cleanup script) cannot disagree, whatever
+        the upload shape is called. Several upload shapes, or several classes
+        linking to one, are simply more links.
 
         Returns:
             Sorted, deduplicated ``[(parent_target_class_uri, link_predicate_uri), …]``;
-            empty when no shape links to it.
+            empty when the schema declares no file upload.
         """
         links = {
             (shape["targetClassUri"], prop["pathUri"])
             for shape in self.get_all_shapes()
             for prop in shape.get("properties", [])
-            if prop.get("nestedShape") == nested_shape_id and shape.get("targetClassUri")
+            if prop.get("type") == "file-list" and shape.get("targetClassUri")
         }
         return sorted(links)
 

@@ -24,7 +24,7 @@ from rfdb_core.files_state import (
     staged_content_url,
 )
 from rfdb_core.schema_extractor import SchemaExtractor
-from rfdb_core.vocab import DIGITAL_COPY_SHAPE_ID, RFDB_BASE, SCHEMA_DIGITAL_DOCUMENT
+from rfdb_core.vocab import RFDB_BASE, SCHEMA_DIGITAL_DOCUMENT
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "schema.ttl"
 
@@ -49,8 +49,8 @@ class _FakeStore:
 
 def _link_predicate() -> str:
     """A predicate the schema actually declares as linking a parent to a copy."""
-    links = _EXTRACTOR.find_links_to_shape(DIGITAL_COPY_SHAPE_ID)
-    assert links, "schema.ttl declares no link to DigitalCopyShape"
+    links = _EXTRACTOR.file_links()
+    assert links, "schema.ttl declares no file-upload link"
     return links[0][1]
 
 
@@ -145,3 +145,49 @@ def test_published_content_url_is_an_absolute_cool_uri() -> None:
     # The staged path is deliberately still relative: it is one service's working
     # state, not a published identity. The client picks a base on that distinction.
     assert not staged_content_url(FILE_ID).startswith("http")
+
+
+_RENAMED_UPLOAD_SCHEMA = """
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix schema: <http://schema.org/> .
+@prefix ex: <http://example.org/> .
+
+ex:PosterScanShape a sh:NodeShape ;
+  sh:targetClass schema:DigitalDocument ;
+  sh:property [ sh:path schema:name ; sh:datatype xsd:string ] .
+
+ex:FilmShape a sh:NodeShape ;
+  sh:targetClass ex:Film ;
+  sh:property [ sh:path rdfs:label ; sh:datatype xsd:string ] ;
+  sh:property [ sh:path ex:poster ; sh:node ex:PosterScanShape ] .
+
+ex:ScreeningShape a sh:NodeShape ;
+  sh:targetClass ex:Screening ;
+  sh:property [ sh:path rdfs:label ; sh:datatype xsd:string ] ;
+  sh:property [ sh:path ex:flyer ; sh:node ex:PosterScanShape ] ;
+  sh:property [ sh:path ex:film ; sh:node ex:FilmShape ] .
+"""
+
+
+def _extractor(tmp_path: Path, turtle: str) -> SchemaExtractor:
+    schema = tmp_path / "schema.ttl"
+    schema.write_text(turtle, encoding="utf-8")
+    return SchemaExtractor(str(schema))
+
+
+def test_file_links_follow_the_upload_rule_not_a_shape_name(tmp_path: Path) -> None:
+    """Any name works, and every class linking to the upload shape is a link."""
+    links = _extractor(tmp_path, _RENAMED_UPLOAD_SCHEMA).file_links()
+    assert links == [
+        ("http://example.org/Film", "http://example.org/poster"),
+        ("http://example.org/Screening", "http://example.org/flyer"),
+    ]
+
+
+def test_no_upload_shape_means_no_file_links(tmp_path: Path) -> None:
+    without_upload = _RENAMED_UPLOAD_SCHEMA.replace(
+        "sh:targetClass schema:DigitalDocument", "sh:targetClass ex:Poster"
+    )
+    assert _extractor(tmp_path, without_upload).file_links() == []

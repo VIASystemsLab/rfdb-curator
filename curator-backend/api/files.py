@@ -13,7 +13,7 @@ A digital copy is a bridge node whose fields are machine-filled. The flow:
    resolves against the very origin the client just POSTed to.
 3. The node travels inside the normal JSON-LD payload of ``POST /api/v1/curator/entities``
    under whatever predicate the *schema* declares (any shape with a property
-   whose ``sh:node`` targets ``DigitalCopyShape`` gets the widget). The write
+   whose ``sh:node`` shape targets ``schema:DigitalDocument`` gets the widget). The write
    path re-derives the metadata server-side — including ``contentUrl``, which it
    rewrites to the published path — and promotes the object to ``registered/``
    on persist. See ``api/data.py``.

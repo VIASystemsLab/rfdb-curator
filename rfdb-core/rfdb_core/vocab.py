@@ -22,7 +22,6 @@ RFDB_BASE = "https://rosfeatr.eu/rdf/data/"
 # constant rather than a literal repeated at each use.
 RFDB_SCHEMA_BASE = "https://rosfeatr.eu/rdf/schema/"
 
-DIGITAL_COPY_SHAPE_ID = RFDB_SCHEMA_BASE + "DigitalCopyShape"
 SCHEMA_NS = "http://schema.org/"
 SCHEMA_DIGITAL_DOCUMENT = SCHEMA_NS + "DigitalDocument"
 SCHEMA_NAME = SCHEMA_NS + "name"

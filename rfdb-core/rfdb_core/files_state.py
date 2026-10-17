@@ -25,7 +25,7 @@ from __future__ import annotations
 import re
 
 from rfdb_core.file_storage import REGISTERED_PREFIX, STAGED_PREFIX
-from rfdb_core.vocab import DIGITAL_COPY_SHAPE_ID, RFDB_BASE, SCHEMA_DIGITAL_DOCUMENT
+from rfdb_core.vocab import RFDB_BASE, SCHEMA_DIGITAL_DOCUMENT
 
 # The minted file-id format: `File_` + 8 lowercase hex (see the curator's
 # stage_file). Both services validate against it — the writer to reject a
@@ -109,7 +109,7 @@ def is_file_referenced(file_id: str, store, extractor) -> bool:
     if not FILE_ID_RE.match(file_id):
         raise ValueError(f"Malformed file id: {file_id!r}")
 
-    link_preds = [pred for _, pred in extractor.find_links_to_shape(DIGITAL_COPY_SHAPE_ID)]
+    link_preds = [pred for _, pred in extractor.file_links()]
     if not link_preds:
         # No shape links to a digital copy: nothing can be referenced at all.
         return False
@@ -147,7 +147,7 @@ def collect_file_state(storage, store, extractor) -> dict:
         StorageNotConfigured: storage credentials are absent.
     """
     linked: set[str] = set()
-    for _, link_pred in extractor.find_links_to_shape(DIGITAL_COPY_SHAPE_ID):
+    for _, link_pred in extractor.file_links():
         rows = store.query(
             f"SELECT ?file {store.from_clause()} WHERE {{ ?parent <{link_pred}> ?file . }}"
         )

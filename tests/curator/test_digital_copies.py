@@ -34,7 +34,7 @@ from rfdb_core.file_storage import InMemoryStorage, registered_key, staged_key
 from rfdb_core.files_state import file_content_url
 from rfdb_core.schema_extractor import SchemaExtractor
 from rfdb_core.vocab import SCHEMA_CONTENT_URL
-from scripts.cleanup_files import reconcile
+from scripts.cleanup_files import NoFileLinks, reconcile
 
 FILE_ID_RE = re.compile(r"^File_[0-9a-f]{8}$")
 RFDB = "https://rosfeatr.eu/rdf/data/"
@@ -325,7 +325,7 @@ def test_reconciled_copy_passes_shacl_validation(env):
     _reconcile_digital_copies(payload, env.request)
 
     # A copy is only valid as something's representation, so give it a parent — the
-    # same link predicate the schema declares (see find_links_to_shape).
+    # same link predicate the schema declares (see SchemaExtractor.file_links).
     payload.add(
         (
             URIRef("https://rosfeatr.eu/rdf/data/probe_source"),
@@ -487,3 +487,23 @@ def test_reconcile_script_dry_run_changes_nothing(env):
     )
     assert actions["deleted_staged"] == ["File_bbbbbbbb"]
     assert staged_key("File_bbbbbbbb") in storage.objects  # still there
+
+
+def test_reconcile_refuses_when_the_schema_declares_no_upload(env):
+    """With no upload links, every file would look unreferenced: abort, touch nothing."""
+    storage = InMemoryStorage()
+    storage.put_pdf(registered_key("File_aaaaaaaa"), io.BytesIO(b"%PDF-a"))
+    _link(env, "File_aaaaaaaa")
+    no_uploads = SimpleNamespace(file_links=lambda: [])
+
+    with pytest.raises(NoFileLinks):
+        reconcile(
+            storage,
+            env.store,
+            no_uploads,
+            staged_ttl_s=0,
+            registered_grace_s=0,
+            now=10**9,
+        )
+    assert registered_key("File_aaaaaaaa") in storage.objects
+    assert f"{RFDB}File_aaaaaaaa" in {str(s) for s in env.store.g.subjects()}
