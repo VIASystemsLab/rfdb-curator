@@ -194,7 +194,8 @@ one component a read-only deployment omits.
 | `GET` | `/api/v1/dataexplorer/entities/search` | Autocomplete for linked-resource fields |
 | `GET` | `/api/v1/dataexplorer/entities/get?id=<iri>` | All triples for one entity, in the editor's JSON shape (the RDF sibling is `GET /rdf/data/{id}`) |
 | `GET` | `/api/v1/dataexplorer/graph/node` | Schema-aware graph traversal (one node + its relation edges) |
-| `GET` | `/api/v1/dataexplorer/meta/prefixes` | Curated CURIE prefix-to-namespace map (from `rfdb_core/prefixes.py`) |
+| `GET` | `/api/v1/dataexplorer/meta/schema` | The loaded schema's version (`owl:versionInfo`) |
+| `GET` | `/api/v1/dataexplorer/meta/prefixes` | CURIE prefix-to-namespace map the schema declares (`sh:declare`) |
 | `GET` | `/api/v1/dataexplorer/meta/graphs` | Named graphs with triple/term counts and advisory config warnings |
 | `GET` | `/api/v1/dataexplorer/meta/files` | Digital-copy storage stats (staged/registered/orphans) |
 
@@ -478,7 +479,8 @@ Three read-only metadata endpoints back the Data Context Panel
 covered by `tests/dataexplorer/test_api_meta.py`.
 
 ```text
-GET /api/v1/dataexplorer/meta/prefixes   — curated CURIE prefix map
+GET /api/v1/dataexplorer/meta/schema     — the loaded schema's version
+GET /api/v1/dataexplorer/meta/prefixes   — CURIE prefix map declared by the schema
 GET /api/v1/dataexplorer/meta/graphs     — named graphs, triple counts, config warnings
 GET /api/v1/dataexplorer/meta/files      — digital-copy storage stats
 ```

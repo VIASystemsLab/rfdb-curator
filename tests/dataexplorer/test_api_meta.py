@@ -1,4 +1,4 @@
-"""Unit tests for the reader's meta routes: meta/prefixes and meta/graphs."""
+"""Unit tests for the reader's meta routes: meta/schema, meta/prefixes and meta/graphs."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 META = "/api/v1/dataexplorer/meta"
+SCHEMA_URL = f"{META}/schema"
 PREFIXES_URL = f"{META}/prefixes"
 GRAPHS_URL = f"{META}/graphs"
 
@@ -35,6 +36,16 @@ def _make_meta_app() -> FastAPI:
 # ---------------------------------------------------------------------------
 # GET /api/v1/dataexplorer/meta/prefixes
 # ---------------------------------------------------------------------------
+
+
+def test_get_schema_reports_the_loaded_version() -> None:
+    """meta/schema serves the version the loaded schema states about itself."""
+    from rfdb_core.schema_extractor import SchemaExtractor
+
+    res = TestClient(_make_meta_app()).get(SCHEMA_URL)
+    assert res.status_code == 200
+    assert res.json() == {"version": SchemaExtractor(str(SCHEMA_PATH)).version}
+    assert res.json()["version"]
 
 
 def test_get_prefixes_returns_200_with_prefixes_key() -> None:

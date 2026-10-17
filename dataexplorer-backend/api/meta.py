@@ -1,6 +1,7 @@
 """Meta routes: schema-level information not tied to individual shapes or entities.
 
 Currently exposes:
+  GET /api/v1/dataexplorer/meta/schema   — the loaded schema's version (owl:versionInfo).
   GET /api/v1/dataexplorer/meta/prefixes — CURIE prefix map declared by the schema (sh:declare).
   GET /api/v1/dataexplorer/meta/graphs   — active/named graphs, triple counts, config warnings.
   GET /api/v1/dataexplorer/meta/files    — digital-copy storage stats (staged/registered/orphans).
@@ -17,6 +18,17 @@ from rfdb_core.file_storage import REGISTERED_PREFIX, STAGED_PREFIX, StorageErro
 from rfdb_core.files_state import collect_file_state, key_file_id
 
 router = APIRouter()
+
+
+@router.get("/meta/schema")
+def get_schema_info(request: Request):
+    """Return what the loaded schema says about itself.
+
+    Returns:
+        ``{"version": "2.2.2"}``, or ``{"version": null}`` when the schema states
+        no ``owl:versionInfo``.
+    """
+    return {"version": request.app.state.schema_extractor.version}
 
 
 @router.get("/meta/prefixes")

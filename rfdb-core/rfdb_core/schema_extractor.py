@@ -85,7 +85,7 @@ from typing import Any
 
 from rdflib import BNode, Graph, Literal, URIRef
 from rdflib.collection import Collection
-from rdflib.namespace import RDF, RDFS, SH, XSD
+from rdflib.namespace import OWL, RDF, RDFS, SH, XSD
 
 from rfdb_core.prefixes import declared_prefixes
 from rfdb_core.vocab import SCHEMA_DIGITAL_DOCUMENT as _SCHEMA_DIGITAL_DOCUMENT
@@ -123,6 +123,22 @@ def _english_first(literals: list[Literal]) -> Literal | None:
     return literals[0] if literals else None
 
 
+def _declared_version(graph: Graph) -> str | None:
+    """The schema's release, from ``owl:versionInfo`` on its ``owl:Ontology`` node.
+
+    Raises:
+        ValueError: the schema states more than one version.
+    """
+    versions = {
+        str(version)
+        for ontology in graph.subjects(RDF.type, OWL.Ontology)
+        for version in graph.objects(ontology, OWL.versionInfo)
+    }
+    if len(versions) > 1:
+        raise ValueError(f"The schema states several versions: {', '.join(sorted(versions))}")
+    return versions.pop() if versions else None
+
+
 def _curie(uri: URIRef | BNode | None, graph: Graph) -> str | None:
     """Convert a full URI to a CURIE (prefix:local) using the graph's namespace manager.
 
@@ -156,6 +172,8 @@ class SchemaExtractor:
         # The CURIE prefix map the schema declares (sh:declare). Read here so a
         # conflicting declaration fails at load, like a Turtle syntax error does.
         self.prefixes: dict[str, str] = declared_prefixes(self.graph)
+        # The schema's own release (owl:versionInfo), or None if it states none.
+        self.version: str | None = _declared_version(self.graph)
         self._cache: dict[str, dict[str, Any]] | None = None
 
     # ------------------------------------------------------------------

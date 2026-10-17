@@ -170,6 +170,7 @@ def test_route_set_is_exactly_the_read_surface(monkeypatch: pytest.MonkeyPatch) 
         "/api/v1/dataexplorer/entities/get",
         "/api/v1/dataexplorer/entities/search",
         "/api/v1/dataexplorer/graph/node",
+        "/api/v1/dataexplorer/meta/schema",
         "/api/v1/dataexplorer/meta/prefixes",
         "/api/v1/dataexplorer/meta/graphs",
         "/api/v1/dataexplorer/meta/files",

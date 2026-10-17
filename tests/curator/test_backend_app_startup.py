@@ -78,6 +78,8 @@ def test_startup_initialization_order_populates_services_before_seeding(
     calls: list[str] = []
 
     class SchemaExtractorStub:
+        version = None
+
         def __init__(self, schema_path: str):
             calls.append("schema_extractor")
             self.schema_path = schema_path
@@ -162,6 +164,8 @@ def test_reset_data_on_startup_clears_store_before_seeding(
     calls: list[str] = []
 
     class SchemaExtractorStub:
+        version = None
+
         def __init__(self, schema_path: str):
             calls.append("schema_extractor")
             self.schema_path = schema_path
@@ -240,6 +244,8 @@ def test_first_write_can_read_shape_dep_graph_after_startup(
     captured: dict[str, object] = {}
 
     class SchemaExtractorStub:
+        version = None
+
         def __init__(self, schema_path: str):
             self.schema_path = schema_path
 

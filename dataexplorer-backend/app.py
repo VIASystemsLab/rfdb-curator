@@ -91,7 +91,16 @@ async def lifespan(app: FastAPI):
             exc_info=True,
         )
         raise
-    logger.info("Schema loaded from '%s'.", settings.schema_path)
+    logger.info(
+        "Schema loaded from '%s' (version %s).",
+        settings.schema_path,
+        app.state.schema_extractor.version or "unknown",
+    )
+    if app.state.schema_extractor.version is None:
+        logger.warning(
+            "Schema '%s' states no version (owl:versionInfo on an owl:Ontology node).",
+            settings.schema_path,
+        )
     if not app.state.schema_extractor.prefixes:
         logger.warning(
             "Schema '%s' declares no prefixes (sh:declare); IRIs will not be compacted.",

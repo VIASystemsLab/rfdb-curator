@@ -109,7 +109,11 @@ async def lifespan(app: FastAPI):
             exc_info=True,
         )
         raise
-    logger.info("Schema loaded from '%s'.", settings.schema_path)
+    logger.info(
+        "Schema loaded from '%s' (version %s).",
+        settings.schema_path,
+        app.state.schema_extractor.version or "unknown",
+    )
 
     # -- 2. Triplestore ----------------------------------------------------
     # Built through the seam's factory, keyed on settings.triplestore, so swapping
