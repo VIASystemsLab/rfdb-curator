@@ -9,7 +9,7 @@ example data that go with it. Model changes go upstream, not into these files.
 
 | | |
 | - | - |
-| Upstream | <https://github.com/UniVR-DH/rfdb-schema> |
+| Upstream | <https://github.com/VIASystemsLab/rfdb-schema> |
 | Release | `v2.2.2` (`owl:versionInfo "2.2.2"` in `schema.ttl`) |
 | Commit | `6a6c74f3d98dd1258ce658751f75624600129e8f` |
 | Copied | 2026-10-17 |
