@@ -56,6 +56,11 @@
 # both services would be individually self-consistent.
 x-read-only-shapes: &read_only_shapes '["https://rosfeatr.eu/rdf/schema/LanguageShape"]'
 
+# Predicates whose form fields are multi-line text (full IRIs). Both backends
+# build the same field descriptors, so they get one value. This is the rfdb
+# schema's set; a fork lists its own description and note predicates here.
+x-long-text-predicates: &long_text_predicates '["http://www.w3.org/2000/01/rdf-schema#comment", "http://purl.org/dc/terms/description", "http://purl.org/dc/terms/abstract", "http://www.w3.org/2004/02/skos/core#definition", "http://www.w3.org/2004/02/skos/core#note", "http://www.w3.org/2004/02/skos/core#scopeNote", "https://w3id.org/polifonia/ontology/core/text"]'
+
 # Base IRIs, identical for both backends for the same reason: the writer mints
 # records and file nodes under DATA_BASE_URI, and the reader serves them and
 # recovers their local ids from it. Override both in a root .env to use other
@@ -166,7 +171,7 @@ services:
       TRIPLESTORE: oxigraph
       # Docker-internal hostname — only used inside the container network.
       OXIGRAPH_URL: http://oxigraph:7878
-      DATA_GRAPH_URI: "https://rosfeatr.eu/rdf/graph/"
+      DATA_GRAPH_URI: "${DATA_GRAPH_URI:-https://rosfeatr.eu/rdf/graph/}"
       DATA_BASE_URI: *data_base_uri
       SCHEMA_BASE_URI: *schema_base_uri
       # Read timeout (seconds) for bulk Turtle loads. The ~38 MB Glottolog
@@ -174,9 +179,9 @@ services:
       # larger seed files.
       OXIGRAPH_LOAD_TIMEOUT: "${OXIGRAPH_LOAD_TIMEOUT:-300}"
       # Paths inside the container, mapped by the volumes block below.
-      SCHEMA_PATH: /app/schema/schema.ttl
-      VOCAB_PATH: '["/app/data/vocab.ttl", "/app/data/glottolog_language.ttl"]'
-      DATA_PATH: /app/data/data.ttl
+      SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/schema.ttl}"
+      VOCAB_PATH: '${VOCAB_PATH:-["/app/data/vocab.ttl", "/app/data/glottolog_language.ttl"]}'
+      DATA_PATH: "${DATA_PATH:-/app/data/data.ttl}"
       # Set true only when you want a full store wipe on restart (dev/test).
       # Must be false in production — data loss is irreversible.
       RESET_DATA_ON_STARTUP: "${RESET_DATA_ON_STARTUP:-false}"
@@ -199,6 +204,7 @@ services:
       READ_ONLY: "${READ_ONLY:-false}"
       # Shared with dataexplorer-backend via the anchor at the top of this file.
       READ_ONLY_SHAPES: *read_only_shapes
+      LONG_TEXT_PREDICATES: *long_text_predicates
       # NOT needed by this stack's own frontends: they issue same-origin
       # requests through the Vite proxy, so nothing here has to be edited to
       # browse the stack from another host. This list is for clients that do go
@@ -294,10 +300,10 @@ services:
       # service will correctly report an empty store.
       TRIPLESTORE: oxigraph
       OXIGRAPH_URL: http://oxigraph:7878
-      DATA_GRAPH_URI: "https://rosfeatr.eu/rdf/graph/"
+      DATA_GRAPH_URI: "${DATA_GRAPH_URI:-https://rosfeatr.eu/rdf/graph/}"
       DATA_BASE_URI: *data_base_uri
       SCHEMA_BASE_URI: *schema_base_uri
-      SCHEMA_PATH: /app/schema/schema.ttl
+      SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/schema.ttl}"
       # No OXIGRAPH_LOAD_TIMEOUT: it bounds bulk Turtle loads, and this service
       # never loads any.
       #
@@ -311,6 +317,7 @@ services:
       # render a UI. Withholding it meant the editor could only get the flags from
       # the writer, and therefore showed nothing whenever the writer was down (C20).
       READ_ONLY_SHAPES: *read_only_shapes
+      LONG_TEXT_PREDICATES: *long_text_predicates
       S3_ENDPOINT: "http://garage:3900"
       S3_REGION: garage
       S3_BUCKET: "${S3_BUCKET:-sources}"

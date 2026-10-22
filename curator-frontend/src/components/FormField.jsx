@@ -15,9 +15,9 @@
  *   lang-string-list - one text + language row per value (<LangStringList>)
  *   default          - plain text input
  *
- * Fields flagged `longText` by the backend (rdfs:comment, description/note
- * predicates, core:text) render a multi-line <textarea> instead of a single-line
- * input — applies to the `default` and single `lang-string` widgets.
+ * Fields flagged `longText` by the backend (their predicate is in the
+ * LONG_TEXT_PREDICATES setting) render a multi-line <textarea> instead of a
+ * single-line input — applies to the `default` and single `lang-string` widgets.
  *
  * Props:
  *   field      {object}    - Property descriptor from /api/v1/curator/forms

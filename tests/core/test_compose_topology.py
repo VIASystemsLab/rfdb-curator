@@ -143,13 +143,14 @@ def test_both_backends_get_the_same_read_only_shapes(filename: str) -> None:
     assert len(set(values.values())) == 1, f"{filename}: the two values have drifted: {values}"
 
 
-@pytest.mark.parametrize("variable", ["DATA_BASE_URI", "SCHEMA_BASE_URI"])
+@pytest.mark.parametrize("variable", ["DATA_BASE_URI", "SCHEMA_BASE_URI", "LONG_TEXT_PREDICATES"])
 @pytest.mark.parametrize("filename", COMPOSE_FILES)
-def test_both_backends_get_the_same_base_iris(filename: str, variable: str) -> None:
-    """The writer mints under the base IRIs and the reader serves and parses them.
+def test_both_backends_get_the_same_schema_settings(filename: str, variable: str) -> None:
+    """Settings both backends must agree on, or they describe the data differently.
 
-    Different values would leave the reader unable to find or resolve what the
-    writer created, with no error from either service.
+    The writer mints under the base IRIs and the reader serves and parses them;
+    both build field descriptors from the long-text list. Different values fail
+    silently, with no error from either service.
     """
     services = _services(filename)
     values = {

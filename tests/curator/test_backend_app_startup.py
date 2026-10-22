@@ -80,7 +80,7 @@ def test_startup_initialization_order_populates_services_before_seeding(
     class SchemaExtractorStub:
         version = None
 
-        def __init__(self, schema_path: str):
+        def __init__(self, schema_path: str, _long_text_predicates=()):
             calls.append("schema_extractor")
             self.schema_path = schema_path
 
@@ -166,7 +166,7 @@ def test_reset_data_on_startup_clears_store_before_seeding(
     class SchemaExtractorStub:
         version = None
 
-        def __init__(self, schema_path: str):
+        def __init__(self, schema_path: str, _long_text_predicates=()):
             calls.append("schema_extractor")
             self.schema_path = schema_path
 
@@ -246,7 +246,7 @@ def test_first_write_can_read_shape_dep_graph_after_startup(
     class SchemaExtractorStub:
         version = None
 
-        def __init__(self, schema_path: str):
+        def __init__(self, schema_path: str, _long_text_predicates=()):
             self.schema_path = schema_path
 
     class ShaclValidatorStub:
@@ -346,7 +346,7 @@ def test_startup_failure_stops_before_partially_initialized_state(
     app_module = _import_backend_app(monkeypatch)
 
     class FailingSchemaExtractor:
-        def __init__(self, _schema_path: str):
+        def __init__(self, _schema_path: str, _long_text_predicates=()):
             raise BadSyntax("schema/schema.ttl", 0, "", 0, "broken schema")
 
     monkeypatch.setattr(app_module, "SchemaExtractor", FailingSchemaExtractor)

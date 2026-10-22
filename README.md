@@ -214,7 +214,7 @@ The root README is the entry point (overview, setup, schema, API, configuration)
 | [docs/architecture.md](docs/architecture.md) | System design: the schema-driven pipeline, the writer/reader service split and what each owns, the API endpoint reference, SHACL extraction, validation and delete behavior, the metadata API, and the storage stack. |
 | [docs/development.md](docs/development.md) | Development workflow: environment setup, code quality, CI, schema and data change workflows, troubleshooting, and the commit checklist. |
 | [docs/deployment.md](docs/deployment.md) | Deployment & operations: the development/testing configuration, data-reset modes, and seed sources; the read-vs-full deploy modes; plus the production runbook and its complete-but-never-deployed status. |
-| [docs/custom-schema.md](docs/custom-schema.md) | Running your own deployment: the base IRIs a fork sets, and the path they must keep. |
+| [docs/custom-schema.md](docs/custom-schema.md) | Running your own deployment: the checklist of what a fork sets (schema, base IRIs, graph, seed data, long-text fields, Welcome guide) and where. |
 
 The live task list lives in the root `TODO.md`.
 

@@ -125,6 +125,24 @@ class BaseServiceSettings(BaseSettings):
     same value. Supply it from a single YAML anchor in Compose rather than two
     literals that can be edited apart."""
 
+    long_text_predicates: list[str] = [
+        "http://www.w3.org/2000/01/rdf-schema#comment",
+        "http://purl.org/dc/terms/description",
+        "http://purl.org/dc/terms/abstract",
+        "http://www.w3.org/2004/02/skos/core#definition",
+        "http://www.w3.org/2004/02/skos/core#note",
+        "http://www.w3.org/2004/02/skos/core#scopeNote",
+        "https://w3id.org/polifonia/ontology/core/text",
+    ]
+    """Full IRIs of the predicates whose form fields are multi-line text.
+
+    SHACL has no long-text hint, so the property's ``sh:path`` decides. Any other
+    text field gets a one-line input and saves the same way. Supplied as a JSON
+    array string via ``LONG_TEXT_PREDICATES``. The default is the description,
+    note and transcription predicates of the rfdb schema, the value both compose
+    files set. Both services build the same field descriptors, so give them the
+    same value."""
+
     # ------------------------------------------------------------------ #
     # HTTP / CORS                                                          #
     # ------------------------------------------------------------------ #
@@ -198,6 +216,17 @@ class BaseServiceSettings(BaseSettings):
         """
         if not v.endswith(("/", "#")):
             raise ValueError(f"must end with '/' or '#', got {v!r}")
+        return v
+
+    @field_validator("long_text_predicates", mode="before")
+    @classmethod
+    def parse_long_text_predicates(cls, v: str | list[str]) -> list[str]:
+        """Accept ``LONG_TEXT_PREDICATES`` as a JSON array string or a list.
+
+        An empty string means no long-text fields at all, the same as ``[]``.
+        """
+        if isinstance(v, str):
+            return json.loads(v) if v.strip() else []
         return v
 
     @field_validator("read_only_shapes", mode="before")

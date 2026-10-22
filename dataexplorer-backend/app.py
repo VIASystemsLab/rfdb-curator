@@ -82,7 +82,9 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up RossijskijFeatrDB dataexplorer backend…")
 
     try:
-        app.state.schema_extractor = SchemaExtractor(settings.schema_path)
+        app.state.schema_extractor = SchemaExtractor(
+            settings.schema_path, settings.long_text_predicates
+        )
     except BadSyntax as exc:
         logger.error(
             "Invalid Turtle syntax in schema '%s'. Details: %s",

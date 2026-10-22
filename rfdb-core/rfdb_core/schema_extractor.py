@@ -81,6 +81,7 @@ restart is required.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from rdflib import BNode, Graph, Literal, URIRef
@@ -89,23 +90,6 @@ from rdflib.namespace import OWL, RDF, RDFS, SH, XSD
 
 from rfdb_core.prefixes import declared_prefixes
 from rfdb_core.vocab import SCHEMA_DIGITAL_DOCUMENT as _SCHEMA_DIGITAL_DOCUMENT
-
-# Predicates whose values are free-form prose and should render as a multi-line
-# textarea rather than a single-line input. SHACL has no native "long text" hint,
-# so we derive it from the property's sh:path: these are the description / note /
-# transcription predicates used across the schema. Extend this set to opt another
-# predicate into the larger textarea widget.
-LONG_TEXT_PREDICATES: frozenset[str] = frozenset(
-    {
-        str(RDFS.comment),  # rdfs:comment — free-text notes / descriptions
-        "http://purl.org/dc/terms/description",  # dcterms:description
-        "http://purl.org/dc/terms/abstract",  # dcterms:abstract
-        "http://www.w3.org/2004/02/skos/core#definition",  # skos:definition
-        "http://www.w3.org/2004/02/skos/core#note",  # skos:note
-        "http://www.w3.org/2004/02/skos/core#scopeNote",  # skos:scopeNote
-        "https://w3id.org/polifonia/ontology/core/text",  # core:text — title-page transcription
-    }
-)
 
 
 def _english_first(literals: list[Literal]) -> Literal | None:
@@ -162,7 +146,16 @@ class SchemaExtractor:
     the parsed metadata.
     """
 
-    def __init__(self, schema_path: str) -> None:
+    def __init__(self, schema_path: str, long_text_predicates: Iterable[str] = ()) -> None:
+        """Parse the schema.
+
+        Args:
+            schema_path: The SHACL schema Turtle file.
+            long_text_predicates: Full IRIs of the predicates whose fields render
+                as a multi-line input (the ``LONG_TEXT_PREDICATES`` setting). SHACL
+                has no long-text hint, so the property's ``sh:path`` decides.
+        """
+        self.long_text_predicates = frozenset(long_text_predicates)
         self.graph = Graph()
         self.graph.parse(schema_path, format="turtle")
         # rdflib pre-binds 'schema' to https://schema.org/ (TLS variant), which
@@ -386,7 +379,7 @@ class SchemaExtractor:
             "name": str(name) if name else path_curie.split(":")[-1],
             "description": str(description),
             "type": field_type,
-            "longText": str(path) in LONG_TEXT_PREDICATES,
+            "longText": str(path) in self.long_text_predicates,
             "datatype": datatype_curie,
             "datatypeOptions": [_curie(dt, g) for dt in datatype_options],
             "languageTagPolicy": language_tag_policy,

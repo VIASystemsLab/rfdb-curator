@@ -91,10 +91,9 @@ Other conventions:
   `sh:uniqueLang true` is enforced per language.
 - **Date precision.** A year-only or year-month value is stored as entered,
   never promoted to a full date.
-- **Long text.** SHACL has no long-text hint, so a fixed set of description,
-  note and transcription predicates get a multi-line input
-  (`LONG_TEXT_PREDICATES` in `rfdb-core/rfdb_core/schema_extractor.py`). Any
-  other text field gets a single line and saves the same way.
+- **Long text.** SHACL has no long-text hint, so the predicates listed in the
+  `LONG_TEXT_PREDICATES` setting get a multi-line input. Any other text field
+  gets a single line and saves the same way.
 - **Field names.** `sh:name` gives the label, English first, then untagged,
   then any language.
 
@@ -119,7 +118,7 @@ Both base IRIs are settings; [custom-schema.md](custom-schema.md) explains them.
 - **Structural:** `rdf`, `rdfs`, `owl`, `xsd`, `sh`. `rdfs:label` marks
   standalone entities and supplies record labels.
 - **File uploads:** `schema:` (see below).
-- **Long text:** the predicates in `LONG_TEXT_PREDICATES` (see above).
+- **Long text:** whatever the `LONG_TEXT_PREDICATES` setting lists (see above).
 
 No other ontology term is read by name. Everything else comes from the schema.
 

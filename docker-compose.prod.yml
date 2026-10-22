@@ -68,6 +68,11 @@
 # Mirrors the anchor in docker-compose.yml.
 x-read-only-shapes: &read_only_shapes '["https://rosfeatr.eu/rdf/schema/LanguageShape"]'
 
+# Predicates whose form fields are multi-line text (full IRIs). Both backends
+# build the same field descriptors, so they get one value. This is the rfdb
+# schema's set; a fork lists its own description and note predicates here.
+x-long-text-predicates: &long_text_predicates '["http://www.w3.org/2000/01/rdf-schema#comment", "http://purl.org/dc/terms/description", "http://purl.org/dc/terms/abstract", "http://www.w3.org/2004/02/skos/core#definition", "http://www.w3.org/2004/02/skos/core#note", "http://www.w3.org/2004/02/skos/core#scopeNote", "https://w3id.org/polifonia/ontology/core/text"]'
+
 # CORS origins, built from RFDB_DOMAIN rather than set a second time. The proxy
 # serves every frontend and API from that one origin, so a browser never makes a
 # cross-origin request and this value is never actually consulted. That holds
@@ -96,10 +101,10 @@ x-s3-env: &s3_env
 x-store-env: &store_env
   TRIPLESTORE: oxigraph
   OXIGRAPH_URL: http://oxigraph:7878
-  DATA_GRAPH_URI: "https://rosfeatr.eu/rdf/graph/"
+  DATA_GRAPH_URI: "${DATA_GRAPH_URI:-https://rosfeatr.eu/rdf/graph/}"
   DATA_BASE_URI: "${DATA_BASE_URI:?Set DATA_BASE_URI in .env.prod}"
   SCHEMA_BASE_URI: "${SCHEMA_BASE_URI:?Set SCHEMA_BASE_URI in .env.prod}"
-  SCHEMA_PATH: /app/schema/schema.ttl
+  SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/schema.ttl}"
 
 x-logging-env: &logging_env
   LOG_FILE: logs/app.jsonl
@@ -246,6 +251,7 @@ services:
       # it states which shapes are editable, so any client needs it to render a
       # UI (D11). Same anchor the curator uses.
       READ_ONLY_SHAPES: *read_only_shapes
+      LONG_TEXT_PREDICATES: *long_text_predicates
       CORS_ORIGINS: *cors_origins
       # No VOCAB_PATH / DATA_PATH / RESET_DATA_ON_STARTUP / SEED_* / READ_ONLY /
       # MAX_UPLOAD_MB: every one is a write concern, and this service's Settings
@@ -414,8 +420,8 @@ services:
       # Read timeout (seconds) for bulk Turtle loads; the ~38 MB Glottolog vocab
       # needs well over Oxigraph's default. Writer-only, so not in store_env.
       OXIGRAPH_LOAD_TIMEOUT: "${OXIGRAPH_LOAD_TIMEOUT:-300}"
-      VOCAB_PATH: '["/app/data/vocab.ttl", "/app/data/glottolog_language.ttl"]'
-      DATA_PATH: /app/data/data.ttl
+      VOCAB_PATH: '${VOCAB_PATH:-["/app/data/vocab.ttl", "/app/data/glottolog_language.ttl"]}'
+      DATA_PATH: "${DATA_PATH:-/app/data/data.ttl}"
 
       # Hardcoded rather than env-overridable: a stray
       # RESET_DATA_ON_STARTUP=true in a misconfigured .env.prod would
@@ -431,6 +437,7 @@ services:
       # `full` + READ_ONLY=true is a valid frozen-editor demo.
       READ_ONLY: "${READ_ONLY:-false}"
       READ_ONLY_SHAPES: *read_only_shapes
+      LONG_TEXT_PREDICATES: *long_text_predicates
       MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-500}"
 
       CORS_ORIGINS: *cors_origins

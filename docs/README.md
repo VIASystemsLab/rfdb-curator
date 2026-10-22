@@ -11,5 +11,5 @@ files go deeper on specific topics.
 | [architecture.md](architecture.md) | System design: the schema-driven pipeline, the writer/reader service split and what each owns, the API endpoint reference, SHACL extraction, validation and delete behavior, the metadata API, and the Oxigraph/Garage storage stack. |
 | [development.md](development.md) | Development workflow: environment setup, code quality, CI, schema and data change workflows, troubleshooting, logs, and the commit checklist. |
 | [deployment.md](deployment.md) | Deployment & operations: development/testing configuration, data-reset modes, and seed sources; plus the production deployment plan (work in progress). |
-| [custom-schema.md](custom-schema.md) | Running your own deployment: the base IRIs a fork sets, and the path they must keep. |
+| [custom-schema.md](custom-schema.md) | Running your own deployment: the checklist of what a fork sets (schema, base IRIs, graph, seed data, long-text fields, Welcome guide) and where. |
 

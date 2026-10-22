@@ -98,7 +98,9 @@ async def lifespan(app: FastAPI):
 
     # -- 1. Schema services ------------------------------------------------
     try:
-        app.state.schema_extractor = SchemaExtractor(settings.schema_path)
+        app.state.schema_extractor = SchemaExtractor(
+            settings.schema_path, settings.long_text_predicates
+        )
         app.state.shape_dep_graph = _build_shape_dep_graph(app.state.schema_extractor)
         app.state.shacl_validator = ShaclValidator(settings.schema_path)
     except BadSyntax as exc:
