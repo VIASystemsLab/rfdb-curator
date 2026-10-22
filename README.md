@@ -132,7 +132,7 @@ Startup seeding, data-reset modes, and the full environment-variable reference l
 
 ## The Schema
 
-The active SHACL schema lives in `schema/schema.ttl` and is the single source of truth: every record type, form field, constraint, datatype, and relation is derived from it at runtime. **To experiment with a different model, replace `schema/schema.ttl`** (or repoint `SCHEMA_PATH`) — forms, validation, and the record-type list all follow automatically, with no code changes.
+The loaded SHACL schema is the source of truth: every record type, form field, constraint, datatype, and relation is derived from it at runtime. This repository ships the rfdb schema in `schema/schema.ttl`, copied from a tagged release of [rfdb-schema](https://github.com/VIASystemsLab/rfdb-schema) and recorded in [schema/README.md](schema/README.md); model changes go upstream. **To run a different model, point `SCHEMA_PATH` at it**: forms, validation, and the record-type list all follow, with no code changes. What a schema must provide is in [docs/data-model.md](docs/data-model.md); what a fork sets is in [docs/custom-schema.md](docs/custom-schema.md).
 
 ### Data Model
 
@@ -166,7 +166,7 @@ Each `sh:NodeShape` becomes a form type and each `sh:property` becomes a form fi
 
 Shapes with a `sh:property` on `rdfs:label` are treated as standalone entities; shapes without one are helper/bridge nodes rendered inline when referenced by a parent (e.g. `rfdbs:AgentRoleShape`). Shapes whose shape-level `sh:or` branches into multiple `sh:class` alternatives (e.g. `rfdbs:ContributorShape`, `foaf:Person` or `foaf:Organization`) surface a type-selection dropdown at creation time.
 
-> Modeling principles and design decisions — the vocabularies used and for what, WEMI layering and link direction, the Agent Role bridge pattern, and the literal/language/date/IRI policies — are in [docs/data-model.md](docs/data-model.md). Per-shape fields and cardinalities live in the schema itself (`schema/schema.ttl`, or `GET /api/v1/dataexplorer/shapes`). The schema-driven extraction and validation pipeline is described in [docs/architecture.md](docs/architecture.md).
+> What the application requires of any schema (entity and helper shapes, the constraints the editor understands, identifiers, uploads) is in [docs/data-model.md](docs/data-model.md). The rfdb model's own decisions and rationale are in upstream's [data-model.md](https://github.com/VIASystemsLab/rfdb-schema/blob/v2.2.2/docs/data-model.md). Per-shape fields and cardinalities live in the schema itself (`schema/schema.ttl`, or `GET /api/v1/dataexplorer/shapes`). The schema-driven extraction and validation pipeline is described in [docs/architecture.md](docs/architecture.md).
 
 ---
 
@@ -210,7 +210,7 @@ The root README is the entry point (overview, setup, schema, API, configuration)
 | Document | Covers |
 |---|---|
 | [docs/getting-started.md](docs/getting-started.md) | What the editor is for, the WEMI data model in brief, and how to run it locally and in production. |
-| [docs/data-model.md](docs/data-model.md) | Modeling principles and design decisions: the vocabularies used and for what, WEMI layering, the bridge-node pattern, and the literal/language/date/IRI policies. Per-shape fields live in `schema/schema.ttl`. |
+| [docs/data-model.md](docs/data-model.md) | The data-model contract: what any schema must provide for this application, and the rfdb schema this repository runs. Per-shape fields live in `schema/schema.ttl`. |
 | [docs/architecture.md](docs/architecture.md) | System design: the schema-driven pipeline, the writer/reader service split and what each owns, the API endpoint reference, SHACL extraction, validation and delete behavior, the metadata API, and the storage stack. |
 | [docs/development.md](docs/development.md) | Development workflow: environment setup, code quality, CI, schema and data change workflows, troubleshooting, and the commit checklist. |
 | [docs/deployment.md](docs/deployment.md) | Deployment & operations: the development/testing configuration, data-reset modes, and seed sources; the read-vs-full deploy modes; plus the production runbook and its complete-but-never-deployed status. |
@@ -265,7 +265,7 @@ rfdb-curator/
 ├── graphexplorer-frontend/       # Standalone read-only graph visualizer (own Vite app;
 │                                 #   proxies /api + /rdf → dataexplorer-backend:8001)
 │
-├── schema/schema.ttl             # Active SHACL schema (source of truth)
+├── schema/                       # rfdb SHACL schema, copied from upstream (see schema/README.md)
 ├── data/                         # vocab.ttl (controlled vocabulary) + data.ttl (test fixtures)
 ├── docs/                         # Topic documentation (see the Documentation section)
 ├── docker-compose.yml

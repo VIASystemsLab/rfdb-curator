@@ -1,7 +1,7 @@
 # Getting Started with RFDB Curator
 
 A short orientation: what the editor is for, the shape of the data model you will be
-working with, and how to run it locally. For the full RDF/SHACL reference see
+working with, and how to run it locally. For what the application requires of a schema see
 [data-model.md](data-model.md); for running a development environment see
 [development.md](development.md); for configuration, data seeding, the deploy modes, and the
 production runbook see [deployment.md](deployment.md).

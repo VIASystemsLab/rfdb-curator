@@ -95,6 +95,25 @@ goes through `docker compose run --rm --no-deps <service>`; the commands are in
 - RDF validation uses the Dockerized Jena `riot --validate` workflow in
   `build-commands.md` → "RDF Validation with Jena".
 
+## The schema is copied, not edited
+
+`schema/schema.ttl`, `data/vocab.ttl` and `data/data.ttl` are copies of a
+tagged release of the upstream schema repository, recorded in
+`schema/README.md`. They change only by deliberately copying a newer release
+with the procedure there, never in passing as part of other work. A model
+change is made upstream. If a task seems to need one, stop and say so.
+
+Two checks, when asked or before relying on the copy:
+
+- **Does the copy match the recorded release?** Offline: `git hash-object`
+  on each of the three files must print the blob id in `schema/README.md`, and
+  `owl:versionInfo` in `schema/schema.ttl` must equal the recorded release.
+  Confirming the recorded ids against upstream (`git ls-tree <tag> <path>` in a
+  clone) needs the network, so ask first.
+- **Is there a newer release?** Compare the recorded tag with upstream's
+  latest release and read upstream's `CHANGELOG.md` in between. A MAJOR
+  release changes what validates. This needs the network, so ask first.
+
 ## Python and naming
 
 Imports go standard library → third-party → local package:

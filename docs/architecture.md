@@ -2,8 +2,8 @@
 
 How the pieces fit together: the schema-driven pipeline, the writer/reader service
 split, frontend responsibilities, how SHACL shapes are extracted into form and
-validation metadata, how validation and delete behave, and the storage/runtime stack. For the RDF/SHACL
-modeling itself (ontologies, shapes, prefixes) see [data-model.md](data-model.md); for
+validation metadata, how validation and delete behave, and the storage/runtime stack. For what
+the application requires of a schema see [data-model.md](data-model.md); for
 the day-to-day workflow of changing schema/data/code see [development.md](development.md).
 
 ---
@@ -81,7 +81,7 @@ Two things about the split are worth stating explicitly:
 Together, the two services turn RDF and SHACL semantics into stable API structures the
 frontend can consume. They:
 
-- loads the active SHACL schema from `schema/schema.ttl`
+- loads the SHACL schema at `SCHEMA_PATH` (`schema/schema.ttl` in this repository)
 - extracts all `sh:NodeShape` definitions
 - extracts field descriptors from `sh:property` blocks
 - preserves shape labels and descriptions

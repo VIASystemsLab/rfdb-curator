@@ -12,7 +12,7 @@ RossijskijFeatrDB (rfdb-curator) is a standalone SHACL-driven RDF curation proje
 
 ## Main Features
 
-1. **SHACL schema** (`schema/schema.ttl`) drives forms and validation.
+1. **SHACL schema** (loaded from `SCHEMA_PATH`) drives forms and validation. This repository ships the rfdb schema in `schema/`, copied from a tagged upstream release (`schema/README.md`).
 2. **Shared library** (`rfdb-core/`) holds what both services need: the `TripleStore` seam, the SHACL schema extractor, the object-storage seam, the CURIE map, the settings base, and the shared FastAPI edge wiring. Framework-free apart from one module behind a `web` extra.
 3. **Curator backend** (`curator-backend/`, :8000) is the **only** service that writes: create/update, delete, SHACL validation, upload staging, and startup seeding.
 4. **Data Explorer backend** (`dataexplorer-backend/`, :8001) answers every read: listing, counts, entity fetch, autocomplete, graph traversal, metadata, digital-copy downloads. It has no validator, no seeder and no write route, and runs independently of the curator.

@@ -150,10 +150,13 @@ pre-commit is meant to catch formatting/hygiene issues before CI does.
 
 ## 4. Schema Change Workflow
 
-To add or change a form in the editor, update the active SHACL schema at `schema/schema.ttl`. 
-Each new record type is a `sh:NodeShape`.
+Forms come from the SHACL schema at `SCHEMA_PATH`. In this repository that is
+`schema/schema.ttl`, a copy of a tagged [rfdb-schema](https://github.com/VIASystemsLab/rfdb-schema)
+release: a model change is made upstream, released, and copied in by the procedure in
+[schema/README.md](../schema/README.md), never by editing the copy. To try a model of your
+own, point `SCHEMA_PATH` at it. Each record type is a `sh:NodeShape`.
 
-When adding/changing shapes, verify:
+When a schema adds or changes shapes, verify:
 
 `sh:targetClass`, `rdfs:label`, `sh:description`, `sh:property`, `sh:path`, `sh:minCount`, `sh:maxCount`, `sh:datatype`, `sh:nodeKind`, `sh:class`, `sh:node`, `sh:or`, `sh:hasValue`, `sh:closed`, `sh:uniqueLang`
 
@@ -171,7 +174,7 @@ into its own in-memory index at startup.
 Two behaviors matter when adding or changing a shape, and both are documented elsewhere:
 
 - **Helper/bridge vs. standalone-entity classification** — whether a shape renders as a top-level record or as a nested inline editor is derived from the schema (whether it declares an `rdfs:label` property), not hardcoded per class name. Check both the SHACL shape and the resulting `/api/v1/dataexplorer/shapes` metadata before changing frontend code. See [architecture.md](architecture.md#helperbridge-shape-classification).
-- **Performance and contributor modeling rationale** — the deliberate use of `cidoc:P19_was_intended_use_of` vs `cidoc:P16_used_specific_object`, and of `dcterms:contributor` with `rfdbs:ContributorShape`, should be preserved unless there is an explicit migration plan. See [data-model.md](data-model.md#intentional-modeling-decisions).
+- **Modeling rationale** — why the rfdb model uses `cidoc:P19_was_intended_use_of` and `cidoc:P16_used_specific_object` side by side, and `dcterms:contributor` with `rfdbs:ContributorShape`. These belong to the model, so they are documented upstream, in [data-model.md](https://github.com/VIASystemsLab/rfdb-schema/blob/v2.2.2/docs/data-model.md).
 
 ---
 
