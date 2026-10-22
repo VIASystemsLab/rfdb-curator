@@ -46,9 +46,10 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from core.config import settings
 from rfdb_core.file_storage import registered_key, staged_key
 from rfdb_core.files_state import FILE_ID_RE, is_file_referenced
-from rfdb_core.vocab import RFDB_BASE, SCHEMA_NAME
+from rfdb_core.vocab import SCHEMA_NAME
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ def _rdf_name(store, file_id: str) -> str | None:
     try:
         rows = store.query(
             f"SELECT ?name {store.from_clause()} "
-            f"WHERE {{ <{RFDB_BASE}{file_id}> <{SCHEMA_NAME}> ?name . }} LIMIT 1"
+            f"WHERE {{ <{settings.data_base_uri}{file_id}> <{SCHEMA_NAME}> ?name . }} LIMIT 1"
         )
         return rows[0]["name"] if rows else None
     except Exception:  # store went down between this and the reference check
@@ -146,7 +147,9 @@ def download_file(file_id: str, request: Request):
 
     store = request.app.state.store
     try:
-        published = is_file_referenced(file_id, store, request.app.state.schema_extractor)
+        published = is_file_referenced(
+            file_id, store, request.app.state.schema_extractor, settings.data_base_uri
+        )
     except Exception as exc:  # store unreachable, or a malformed query
         logger.warning("Could not check whether '%s' is referenced: %s", file_id, exc)
         return _serve_unverifiable(file_id, request)

@@ -143,7 +143,7 @@ Three properties of that surface are load-bearing rather than cosmetic:
 - **Links on the HTML page are path-only.** A persisted IRI names `rosfeatr.eu`, but a dev
   reader answers on `localhost:8001`, so linking the IRI as-is would send a developer's
   click to the public internet. The path each link uses is *derived from the namespace*
-  (`RFDB_BASE` is `https://rosfeatr.eu/rdf/data/`, and the router is mounted at `/rdf`) —
+  (`DATA_BASE_URI` is `https://rosfeatr.eu/rdf/data/`, and the router is mounted at `/rdf`) —
   that identity is what makes these URLs cool, and deriving it keeps the links right if the
   namespace ever moves. Same re-basing the frontend does for `schema:contentUrl`.
 - **A variant URL percent-encodes its media type.** `?_mediatype=application/ld+json`

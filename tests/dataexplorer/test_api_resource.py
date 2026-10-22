@@ -37,9 +37,10 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from api.resource import router  # noqa: E402
+from core.config import settings  # noqa: E402
 from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
-from rfdb_core.vocab import RFDB_BASE  # noqa: E402
 
+RFDB_BASE = settings.data_base_uri
 LOCAL = "Src1"
 IRI = f"{RFDB_BASE}{LOCAL}"
 

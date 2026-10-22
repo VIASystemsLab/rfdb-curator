@@ -12,13 +12,16 @@
 #   docker compose down -v             # tear down including named volumes
 #
 # ---------------------------------------------------------------------------
-# TWO MODES, selected by Compose profile (Task 9)
+# TWO MODES, selected by Compose profile
 # ---------------------------------------------------------------------------
 # The reader/writer boundary is a *service* boundary, so which kind of instance
 # this is becomes a deploy-time choice with no code change:
 #
 #   docker compose up                  # READ mode — 4 services, no editor
 #   docker compose --profile full up   # FULL mode — + curator-backend/-frontend
+#
+# Default: READ. With no --profile flag and an empty or missing
+# COMPOSE_PROFILES in .env, Compose activates no profile.
 #
 # Base services carry **no `profiles:` key**, so read mode needs no flag. Only
 # `curator-*` are `full`-only.
@@ -52,6 +55,13 @@
 # same class of bug (C20) this arrangement exists to remove, but quieter, because
 # both services would be individually self-consistent.
 x-read-only-shapes: &read_only_shapes '["https://rosfeatr.eu/rdf/schema/LanguageShape"]'
+
+# Base IRIs, identical for both backends for the same reason: the writer mints
+# records and file nodes under DATA_BASE_URI, and the reader serves them and
+# recovers their local ids from it. Override both in a root .env to use other
+# namespaces. See the .env.example files for where each one ends up.
+x-data-base-uri: &data_base_uri "${DATA_BASE_URI:-https://rosfeatr.eu/rdf/data/}"
+x-schema-base-uri: &schema_base_uri "${SCHEMA_BASE_URI:-https://rosfeatr.eu/rdf/schema/}"
 
 services:
 
@@ -157,6 +167,8 @@ services:
       # Docker-internal hostname — only used inside the container network.
       OXIGRAPH_URL: http://oxigraph:7878
       DATA_GRAPH_URI: "https://rosfeatr.eu/rdf/graph/"
+      DATA_BASE_URI: *data_base_uri
+      SCHEMA_BASE_URI: *schema_base_uri
       # Read timeout (seconds) for bulk Turtle loads. The ~38 MB Glottolog
       # vocab below needs well over Oxigraph's default; raise if you add
       # larger seed files.
@@ -255,7 +267,7 @@ services:
   # Data Explorer backend — FastAPI + uvicorn, reads only
   # --------------------------------------------------------------------------
   # Same store, same bucket, no write path. It does NOT depend on
-  # curator-backend: that independence is the point of the split, and Task 9's
+  # curator-backend: that independence is the point of the split, and the
   # read-only deploy mode runs this service with no writer present at all.
   #
   # It also does not wait for the store to be reachable — an unreachable store is
@@ -283,6 +295,8 @@ services:
       TRIPLESTORE: oxigraph
       OXIGRAPH_URL: http://oxigraph:7878
       DATA_GRAPH_URI: "https://rosfeatr.eu/rdf/graph/"
+      DATA_BASE_URI: *data_base_uri
+      SCHEMA_BASE_URI: *schema_base_uri
       SCHEMA_PATH: /app/schema/schema.ttl
       # No OXIGRAPH_LOAD_TIMEOUT: it bounds bulk Turtle loads, and this service
       # never loads any.

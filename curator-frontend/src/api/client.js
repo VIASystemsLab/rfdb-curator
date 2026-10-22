@@ -130,6 +130,12 @@ export const apiClient = {
   getPrefixes: () => readHttp.get(`${READ_API}/meta/prefixes`).then((r) => r.data.prefixes),
 
   /**
+   * Fetch what the loaded schema says about itself and the deployment's base IRIs:
+   * { version, dataBaseUri, schemaBaseUri }. Called once at app startup.
+   */
+  getSchemaInfo: () => readHttp.get(`${READ_API}/meta/schema`).then((r) => r.data),
+
+  /**
    * Stage a PDF (upload-first flow). Returns the prefilled digital-copy node
    * ({id, fileId, name, contentUrl, contentSize, sha256, numberOfPages}) that
    * the FileField appends to form state; it becomes a bridge node in the

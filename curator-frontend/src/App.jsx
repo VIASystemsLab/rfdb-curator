@@ -89,6 +89,7 @@ export default function App() {
   const [guideOpen, setGuideOpen] = useState(false) // first-time curator welcome guide (WEMI overlay)
   const [showContext, setShowContext] = useState(false) // read-only Data Context Panel in the main area
   const [toast, setToast] = useState('') // transient bottom-right confirmation (e.g. after save)
+  const [dataBaseUri, setDataBaseUri] = useState(null) // DATA_BASE_URI, from /api/v1/dataexplorer/meta/schema
   // Draft cache keyed by `shape::<shapeId>`. Single slot per shape form (last state wins),
   // so unsaved input survives shape/record navigation even though ShapeForm re-hydrates
   // via reset() on every shape/record change. Seeded from sessionStorage (with a 1h TTL)
@@ -206,6 +207,17 @@ export default function App() {
         'Failed to fetch prefix map from /api/v1/dataexplorer/meta/prefixes; IRI compaction disabled.',
       )
     })
+
+    // The namespace that marks an IRI as one of our records. On failure the
+    // inspector shows record IRIs as plain text instead of links.
+    apiClient
+      .getSchemaInfo()
+      .then((info) => setDataBaseUri(info.dataBaseUri || null))
+      .catch(() => {
+        console.warn(
+          'Failed to fetch schema info from /api/v1/dataexplorer/meta/schema; record links disabled.',
+        )
+      })
   }, [])
 
   useEffect(() => {
@@ -454,6 +466,7 @@ export default function App() {
                 validation={validation}
                 record={selectedRecord}
                 onNavigate={(iri) => handleViewRecord({ id: iri })}
+                dataBaseUri={dataBaseUri}
               />
             </aside>
           </>

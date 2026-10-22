@@ -114,6 +114,18 @@ in this repository too.
 
 ### Platform & future
 
+- [ ] **FUTURE (next release) — base IRIs with any path.** `DATA_BASE_URI` and
+  `SCHEMA_BASE_URI` are settings, but the IRIs only resolve when their paths are
+  `/rdf/data/` and `/rdf/schema/`: the proxy forwards only `/rdf/*`
+  (`proxy/Caddyfile`), and the reader's routes are fixed in
+  `dataexplorer-backend/api/resource.py`. With another path, records still save
+  and edit, but visiting an IRI, the links on the reader's HTML pages and opening
+  uploaded PDFs from the editor all 404. To plan: register the reader's routes at
+  each base's path, have the proxy route those paths from the environment, and
+  check the frontends' `/rdf/` assumptions (`resolveFileUrl`, `fileDownloadUrl`
+  and `entityPageUrl` in `curator-frontend/src/api/client.js`, the graph
+  explorer's client). Until then [docs/custom-schema.md](docs/custom-schema.md)
+  tells a fork to keep the paths.
 - [ ] **DEFERRED — cross-entity date-order check.** E.g. an Expression's creation date should
   be after its Work's, and a Manifestation's after its Expression's. Too specific and strict to
   enforce now: historical dates are often approximate or uncertain. Reconsider once the

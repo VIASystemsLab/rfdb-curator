@@ -47,17 +47,20 @@ simply invisible to the reader — setting `READ_ONLY=true` has no effect on
 For Docker Compose, edit the relevant `environment:` block. `OXIGRAPH_URL` uses the
 Docker-internal hostname since the store is a separate service; `SCHEMA_PATH` /
 `VOCAB_PATH` / `DATA_PATH` are container paths backed by the `volumes:` mounts (change
-both together). `OXIGRAPH_URL` and `DATA_GRAPH_URI` **must match across the two
-services**, or the reader will correctly report an empty store.
+both together). `OXIGRAPH_URL`, `DATA_GRAPH_URI`, `DATA_BASE_URI` and
+`SCHEMA_BASE_URI` **must match across the two services**, or the reader will report
+an empty store or fail to find what the writer minted.
 
 | Variable | Service | Required | Description |
 |---|---|---|---|
 | `TRIPLESTORE` | both | No | Which `TripleStore` implementation to build. Only `oxigraph` ships today; the seam exists so a second one is a config change. Default: `oxigraph`. |
 | `OXIGRAPH_URL` | both | Yes | Base URL of the Oxigraph HTTP endpoint, no trailing slash. `http://localhost:7878` locally, `http://oxigraph:7878` inside Docker. Must match across services. |
 | `DATA_GRAPH_URI` | both | Yes | Named graph URI where instance data is stored and queried. Every SPARQL read uses `FROM <uri>`; every Turtle load targets `?graph=<uri>`. Must match across services. |
+| `DATA_BASE_URI` | both | Yes | Namespace every minted record and digital copy is named under, ending in `/` or `#`. With `https://rosfeatr.eu/rdf/data/`, a new Place is `https://rosfeatr.eu/rdf/data/Place_4f3a9d12` and a PDF's `schema:contentUrl` is `…/data/File_0123abcd/content`. Served to the curator frontend on `GET /api/v1/dataexplorer/meta/schema`. Must match across services. |
+| `SCHEMA_BASE_URI` | both | Yes | Namespace of the loaded schema's SHACL shapes, ending in `/` or `#`, e.g. `https://rosfeatr.eu/rdf/schema/` for `…/schema/PlaceShape`. Must match the schema file and across services. |
 | `OXIGRAPH_LOAD_TIMEOUT` | both | No | Read timeout (seconds) for bulk Turtle loads. Only the writer loads, but the field is in the shared base. Default: `300`. |
 | `SCHEMA_PATH` | both | Yes | Path to `schema.ttl` relative to the service working directory. Docker mounts it at `/app/schema/schema.ttl`. |
-| `CORS_ORIGINS` | both | Yes | JSON array string of allowed CORS origins, e.g. `["http://localhost:5173"]`. Must not contain `"*"` — the app aborts at import time if it does. The reader needs **both** frontend origins. |
+| `CORS_ORIGINS` | both | Yes | JSON array string of allowed CORS origins, e.g. `["http://localhost:5173"]`. Must not contain `"*"` — the app aborts at import time if it does. The reader needs **both** frontend origins. In production it is not set by hand: `docker-compose.prod.yml` builds it from `RFDB_DOMAIN`. |
 | `S3_ENDPOINT` | both | No | Object-storage endpoint for digital copies. Empty disables it: `GET /api/v1/dataexplorer/meta/files` then reports `configured: false` instead of erroring. |
 | `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | both | No | Object-storage credentials. The writer stages and promotes objects; the reader streams them out. |
 | `LOG_FILE`, `LOG_LEVEL`, `TRUNCATE_LOG_ON_STARTUP`, `TRUNCATE_LOG_ON_FRESH_CONTAINER_START` | both | Yes / No | Structured JSON-lines logging. Each service writes to its own volume. |
@@ -262,7 +265,7 @@ Three details that are load-bearing rather than stylistic:
 - **`/rdf/*` must be served by this domain and no other.** Those URLs are the permanent
   public identifiers stored inside the triples. A second origin serving them would give
   every resource two URLs, which is what a stable identifier is not. Keep `RFDB_DOMAIN`
-  equal to the namespace in `rfdb-core/rfdb_core/vocab.py`.
+  equal to the host of `DATA_BASE_URI` and `SCHEMA_BASE_URI` in `.env.prod`.
 - **The explorer's image must be built with `VITE_BASE_PATH=/explorer/`** to match the route
   that serves it. Vite bakes asset URLs against `base` at build time, so a bundle built for
   `/` would request `/assets/…`, hit the fallback route, and be handed the *editor's*

@@ -1,7 +1,8 @@
 """Meta routes: schema-level information not tied to individual shapes or entities.
 
 Currently exposes:
-  GET /api/v1/dataexplorer/meta/schema   — the loaded schema's version (owl:versionInfo).
+  GET /api/v1/dataexplorer/meta/schema   — the loaded schema's version (owl:versionInfo)
+                                           and the base IRIs records and shapes are named under.
   GET /api/v1/dataexplorer/meta/prefixes — CURIE prefix map declared by the schema (sh:declare).
   GET /api/v1/dataexplorer/meta/graphs   — active/named graphs, triple counts, config warnings.
   GET /api/v1/dataexplorer/meta/files    — digital-copy storage stats (staged/registered/orphans).
@@ -22,13 +23,22 @@ router = APIRouter()
 
 @router.get("/meta/schema")
 def get_schema_info(request: Request):
-    """Return what the loaded schema says about itself.
+    """Return what the loaded schema says about itself, and the namespaces in use.
+
+    The base IRIs are served as explicit values rather than looked up by a prefix
+    name, so a deployment can declare them under any prefix. The curator frontend
+    reads ``dataBaseUri`` to tell this deployment's records from external IRIs.
 
     Returns:
-        ``{"version": "2.2.2"}``, or ``{"version": null}`` when the schema states
-        no ``owl:versionInfo``.
+        ``{"version": "2.2.2", "dataBaseUri": "https://…/data/",
+        "schemaBaseUri": "https://…/schema/"}``. ``version`` is ``null`` when the
+        schema states no ``owl:versionInfo``.
     """
-    return {"version": request.app.state.schema_extractor.version}
+    return {
+        "version": request.app.state.schema_extractor.version,
+        "dataBaseUri": settings.data_base_uri,
+        "schemaBaseUri": settings.schema_base_uri,
+    }
 
 
 @router.get("/meta/prefixes")
@@ -190,6 +200,7 @@ def get_file_stats(request: Request):
             request.app.state.storage,
             request.app.state.store,
             request.app.state.schema_extractor,
+            settings.data_base_uri,
         )
     except StorageError:
         raise  # → app-level storage handler (clean 503 + logged cause)

@@ -1,7 +1,8 @@
 """Settings shared by every RossijskijFeatrDB service.
 
 Holds only what more than one service needs: how to reach the triplestore, where
-the SHACL schema lives, CORS, logging, and the object-storage credentials. Each
+the SHACL schema lives, the base IRIs records and shapes are named under, CORS,
+logging, and the object-storage credentials. Each
 service instantiates a module-level ``settings`` singleton of its own: the curator
 from a subclass adding its seeding/reset/read-only knobs, the reader from
 :class:`BaseServiceSettings` directly, since it needs nothing more.
@@ -31,6 +32,10 @@ class BaseServiceSettings(BaseSettings):
             loads (``?graph=<uri>``). Example: ``https://rosfeatr.eu/rdf/graph/``
         schema_path: Path to the SHACL schema Turtle file, relative to the
             service's working directory. Example: ``schema/schema.ttl``
+        data_base_uri: Namespace every minted record and digital copy is named
+            under. Example: ``https://rosfeatr.eu/rdf/data/``
+        schema_base_uri: Namespace of the schema's SHACL shapes. Example:
+            ``https://rosfeatr.eu/rdf/schema/``
         cors_origins: Allowed CORS origins, supplied as a JSON array string and
             parsed by :meth:`parse_cors`. Both compose files give both services
             the same value.
@@ -83,6 +88,22 @@ class BaseServiceSettings(BaseSettings):
 
     Both services parse it: the curator for validation and form schemas, the
     reader for relation predicates and type/relation labels."""
+
+    # ------------------------------------------------------------------ #
+    # Base IRIs                                                            #
+    # ------------------------------------------------------------------ #
+
+    data_base_uri: str
+    """Namespace every record this deployment mints is named under, digital-copy
+    nodes included: ``<data_base_uri>Place_ab12cd34``, and a copy's
+    ``schema:contentUrl`` is ``<data_base_uri>File_x/content``. Both services slice
+    it off an IRI to recover a local id, and the reader serves the IRIs under it
+    on ``/rdf/data/{local_name}``."""
+
+    schema_base_uri: str
+    """Namespace of the schema's SHACL shapes (the ``rfdbs:`` prefix in the rfdb
+    schema). The reader serves the shapes under it on ``/rdf/schema/{name}``.
+    Must match the namespace the loaded schema names its shapes in."""
 
     read_only_shapes: list[str] = []
     """Shape URIs whose records are not editable in this deployment.
@@ -166,6 +187,18 @@ class BaseServiceSettings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Validators                                                           #
     # ------------------------------------------------------------------ #
+
+    @field_validator("data_base_uri", "schema_base_uri")
+    @classmethod
+    def check_namespace(cls, v: str) -> str:
+        """Require a base IRI to end in ``/`` or ``#``.
+
+        IRIs are built by appending a local name to the base, so a base without a
+        separator would mint ``…/dataPlace_1`` and fail no check along the way.
+        """
+        if not v.endswith(("/", "#")):
+            raise ValueError(f"must end with '/' or '#', got {v!r}")
+        return v
 
     @field_validator("read_only_shapes", mode="before")
     @classmethod

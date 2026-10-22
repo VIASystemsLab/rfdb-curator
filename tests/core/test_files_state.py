@@ -24,11 +24,12 @@ from rfdb_core.files_state import (
     staged_content_url,
 )
 from rfdb_core.schema_extractor import SchemaExtractor
-from rfdb_core.vocab import RFDB_BASE, SCHEMA_DIGITAL_DOCUMENT
+from rfdb_core.vocab import SCHEMA_DIGITAL_DOCUMENT
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "schema.ttl"
 
 _EXTRACTOR = SchemaExtractor(str(SCHEMA_PATH))
+DATA_BASE = "https://rosfeatr.eu/rdf/data/"
 FILE_ID = "File_0123abcd"
 
 
@@ -56,8 +57,8 @@ def _link_predicate() -> str:
 
 def test_referenced_when_a_parent_links_to_it() -> None:
     """A parent entity pointing at the file via a schema predicate makes it public."""
-    store = _FakeStore(f"<{RFDB_BASE}S1> <{_link_predicate()}> <{RFDB_BASE}{FILE_ID}> .")
-    assert is_file_referenced(FILE_ID, store, _EXTRACTOR) is True
+    store = _FakeStore(f"<{DATA_BASE}S1> <{_link_predicate()}> <{DATA_BASE}{FILE_ID}> .")
+    assert is_file_referenced(FILE_ID, store, _EXTRACTOR, DATA_BASE) is True
 
 
 def test_not_referenced_when_only_typed() -> None:
@@ -66,13 +67,13 @@ def test_not_referenced_when_only_typed() -> None:
     Same notion of "linked" the reconciler uses, which is what keeps the download
     route and ``cleanup_files.py`` from disagreeing about what is referenced.
     """
-    store = _FakeStore(f"<{RFDB_BASE}{FILE_ID}> a <{SCHEMA_DIGITAL_DOCUMENT}> .")
-    assert is_file_referenced(FILE_ID, store, _EXTRACTOR) is False
+    store = _FakeStore(f"<{DATA_BASE}{FILE_ID}> a <{SCHEMA_DIGITAL_DOCUMENT}> .")
+    assert is_file_referenced(FILE_ID, store, _EXTRACTOR, DATA_BASE) is False
 
 
 def test_not_referenced_in_an_empty_store() -> None:
     """Nothing staged and nothing written: not published."""
-    assert is_file_referenced(FILE_ID, _FakeStore(), _EXTRACTOR) is False
+    assert is_file_referenced(FILE_ID, _FakeStore(), _EXTRACTOR, DATA_BASE) is False
 
 
 def test_an_unrelated_predicate_does_not_publish_a_file() -> None:
@@ -81,8 +82,8 @@ def test_an_unrelated_predicate_does_not_publish_a_file() -> None:
     Otherwise an incidental triple — provenance, annotation, anything pointing at
     the node — would be enough to publish bytes the schema never linked.
     """
-    store = _FakeStore(f"<{RFDB_BASE}S1> <http://example.org/mentions> <{RFDB_BASE}{FILE_ID}> .")
-    assert is_file_referenced(FILE_ID, store, _EXTRACTOR) is False
+    store = _FakeStore(f"<{DATA_BASE}S1> <http://example.org/mentions> <{DATA_BASE}{FILE_ID}> .")
+    assert is_file_referenced(FILE_ID, store, _EXTRACTOR, DATA_BASE) is False
 
 
 @pytest.mark.parametrize(
@@ -112,7 +113,7 @@ def test_malformed_ids_are_refused_before_reaching_the_store(bad_id: str) -> Non
             raise AssertionError("store was queried with a malformed file id")
 
     with pytest.raises(ValueError):
-        is_file_referenced(bad_id, _Explode(), _EXTRACTOR)
+        is_file_referenced(bad_id, _Explode(), _EXTRACTOR, DATA_BASE)
 
 
 def test_staged_and_published_urls_are_different_paths() -> None:
@@ -121,9 +122,9 @@ def test_staged_and_published_urls_are_different_paths() -> None:
     They are served by different services: the staged path by the writer that
     accepted the upload, the published path by the reader.
     """
-    assert staged_content_url(FILE_ID) != file_content_url(FILE_ID)
+    assert staged_content_url(FILE_ID) != file_content_url(FILE_ID, DATA_BASE)
     assert staged_content_url(FILE_ID) == f"/api/v1/curator/files/staged/{FILE_ID}"
-    assert file_content_url(FILE_ID) == f"{RFDB_BASE}{FILE_ID}/content"
+    assert file_content_url(FILE_ID, DATA_BASE) == f"{DATA_BASE}{FILE_ID}/content"
 
 
 def test_published_content_url_is_an_absolute_cool_uri() -> None:
@@ -132,15 +133,15 @@ def test_published_content_url_is_an_absolute_cool_uri() -> None:
     This is decision D9, and it is the one property a URL redesign must not break
     again: ``schema:contentUrl`` goes into the store, so anything relative couples
     persisted data to the API layout — which is what made this task a data
-    migration. Asserted structurally (built from ``RFDB_BASE``, under the resource's
-    own IRI) rather than against a literal, so a namespace change stays a one-line
-    edit in ``vocab.py``.
+    migration. Asserted structurally (built from the data base, under the
+    resource's own IRI) rather than against a literal, so a namespace change stays
+    a setting.
     """
-    url = file_content_url(FILE_ID)
+    url = file_content_url(FILE_ID, DATA_BASE)
     assert url.startswith("https://")
-    assert url.startswith(RFDB_BASE)
+    assert url.startswith(DATA_BASE)
     # A representation *of* the resource, so it must live under the entity's IRI.
-    assert url == f"{RFDB_BASE}{FILE_ID}/content"
+    assert url == f"{DATA_BASE}{FILE_ID}/content"
 
     # The staged path is deliberately still relative: it is one service's working
     # state, not a published identity. The client picks a base on that distinction.

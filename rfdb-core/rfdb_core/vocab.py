@@ -11,17 +11,6 @@ file-stats routes. Keeping them in a service's ``models/`` package would have ma
 this shared library import from that service.
 """
 
-# Namespace every minted data resource lives under, digital-copy nodes included.
-# Both tiers slice it off an IRI to recover a local id (``<RFDB_BASE>File_ab12``
-# → ``File_ab12``), so it sits here rather than in the curator's blank-node
-# handler, which is where it used to live and which the reader cannot import.
-RFDB_BASE = "https://rosfeatr.eu/rdf/data/"
-
-# Namespace of the SHACL shapes (the ``rfdbs:`` prefix). Shape IRIs are minted
-# here and are dereferenceable in their own right, which is why this is a
-# constant rather than a literal repeated at each use.
-RFDB_SCHEMA_BASE = "https://rosfeatr.eu/rdf/schema/"
-
 SCHEMA_NS = "http://schema.org/"
 SCHEMA_DIGITAL_DOCUMENT = SCHEMA_NS + "DigitalDocument"
 SCHEMA_NAME = SCHEMA_NS + "name"

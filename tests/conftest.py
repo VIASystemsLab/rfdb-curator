@@ -26,4 +26,7 @@ def pytest_configure() -> None:
     os.environ.setdefault("OXIGRAPH_URL", "http://localhost:7878")
     os.environ.setdefault("DATA_GRAPH_URI", "https://rfdb.it/graph/data")
     os.environ.setdefault("SCHEMA_PATH", "schema/schema.ttl")
+    # The vendored schema and seed data name their records and shapes here.
+    os.environ.setdefault("DATA_BASE_URI", "https://rosfeatr.eu/rdf/data/")
+    os.environ.setdefault("SCHEMA_BASE_URI", "https://rosfeatr.eu/rdf/schema/")
     os.environ.setdefault("CORS_ORIGINS", '["http://localhost:5173"]')

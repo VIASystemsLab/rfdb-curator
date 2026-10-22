@@ -43,7 +43,6 @@ from core.config import settings
 from models.files import DigitalCopy
 from rfdb_core.file_storage import staged_key
 from rfdb_core.files_state import FILE_ID_RE, staged_content_url
-from rfdb_core.vocab import RFDB_BASE
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -123,7 +122,7 @@ def stage_file(request: Request, file: UploadFile) -> DigitalCopy:
     request.app.state.storage.put_pdf(staged_key(file_id), spool)
 
     return DigitalCopy(
-        id=RFDB_BASE + file_id,
+        id=settings.data_base_uri + file_id,
         fileId=file_id,
         name=original_name,
         # The staged preview path, not the published one: this file is not a

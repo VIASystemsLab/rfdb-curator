@@ -11,7 +11,7 @@ Two things follow from being a data space rather than an application surface (D8
   * **Unversioned.** Versioning an identifier that is persisted inside triples is a
     contradiction; the ``/api/v1/…`` routes carry the version instead.
   * **Local names, not encoded IRIs.** The path segment is the local name, and the
-    full IRI is rebuilt from ``RFDB_BASE``. The editor-facing
+    full IRI is rebuilt from the ``DATA_BASE_URI`` setting. The editor-facing
     ``/api/v1/dataexplorer/entities/get?id=`` still takes a URL-encoded absolute
     IRI because it answers a different question (an editor's bespoke triple list,
     not a representation), but a client that has an RFDB IRI in hand never needs
@@ -43,7 +43,7 @@ from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import DCTERMS, RDF, RDFS, XSD
 
 from api.graph import preferred_label
-from rfdb_core.vocab import RFDB_BASE, RFDB_SCHEMA_BASE
+from core.config import settings
 
 router = APIRouter()
 
@@ -233,7 +233,7 @@ def _respond(
 # ---------------------------------------------------------------------------
 
 # The path each served namespace lives at, derived from the namespace rather than
-# written out: ``RFDB_BASE`` is ``https://rosfeatr.eu/rdf/data/`` and this router
+# written out: ``DATA_BASE_URI`` is ``https://rosfeatr.eu/rdf/data/`` and this router
 # is mounted at ``/rdf``, so the namespace's path component *is* the route. That
 # identity is the whole of D9, and deriving it keeps these links correct if the
 # namespace ever moves.
@@ -242,7 +242,9 @@ def _respond(
 # rosfeatr.eu, but the reader may answer on any non-production host, so an
 # absolute link would send that click to the public site instead. This is the server-side
 # twin of the frontend's ``resolveFileUrl`` re-basing.
-_LOCAL_SPACES = tuple((ns, urlsplit(ns).path) for ns in (RFDB_BASE, RFDB_SCHEMA_BASE))
+_LOCAL_SPACES = tuple(
+    (ns, urlsplit(ns).path) for ns in (settings.data_base_uri, settings.schema_base_uri)
+)
 
 # RDF 1.1 makes a plain literal and an ``xsd:string``-typed one the same term, so
 # printing that datatype would be noise rather than information.
@@ -450,7 +452,7 @@ def dereference_entity(
     the graph unwalkable from an IRI, which is the whole point of dereferencing.
 
     Args:
-        local_name: The IRI's last segment; the full IRI is ``RFDB_BASE`` + this.
+        local_name: The IRI's last segment; the full IRI is ``DATA_BASE_URI`` + this.
         _mediatype: ConnegP override, beating the ``Accept`` header.
         _profile: ConnegP profile token — ``rfdb`` (default) or ``alt`` for the
             list of available representations.
@@ -466,7 +468,7 @@ def dereference_entity(
     supported = (*MEDIA_TYPES, HTML_MEDIA_TYPE)
     media_type = _negotiate(request.headers.get("accept", ""), _mediatype, supported)
     _check_profile(_profile)
-    iri = f"{RFDB_BASE}{local_name}"
+    iri = f"{settings.data_base_uri}{local_name}"
     store = request.app.state.store
 
     # Unbound template variables drop their triple, so each UNION branch
@@ -530,7 +532,7 @@ def dereference_shape(
     supported = tuple(MEDIA_TYPES)
     media_type = _negotiate(request.headers.get("accept", ""), _mediatype, supported)
     _check_profile(_profile)
-    iri = f"{RFDB_SCHEMA_BASE}{shape_name}"
+    iri = f"{settings.schema_base_uri}{shape_name}"
 
     if request.app.state.schema_extractor.get_shape(iri) is None:
         raise HTTPException(status_code=404, detail=f"Shape '{iri}' not found")

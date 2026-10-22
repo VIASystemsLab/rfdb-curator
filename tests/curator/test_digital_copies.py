@@ -300,7 +300,7 @@ def test_reconcile_rederives_staged_metadata(env):
     # contentUrl recomputed to the *published* absolute URL, replacing the staged
     # preview path staging handed back: on persist the file stops being working
     # state and acquires a published identity (D9).
-    assert file_content_url(node.fileId) in values
+    assert file_content_url(node.fileId, RFDB) in values
     assert f"/api/v1/curator/files/staged/{node.fileId}" not in values
 
 
@@ -361,7 +361,7 @@ def test_persisted_content_url_is_an_any_uri_literal(env):
     (url,) = urls
     assert isinstance(url, Literal), f"contentUrl must be a literal, got {type(url).__name__}"
     assert url.datatype == XSD.anyURI, f"expected xsd:anyURI, got {url.datatype}"
-    assert str(url) == file_content_url(node.fileId)
+    assert str(url) == file_content_url(node.fileId, RFDB)
 
 
 def test_reconcile_strips_registered_metadata(env):
@@ -449,6 +449,7 @@ def test_reconcile_script_rules(env):
         storage,
         env.store,
         _EXTRACTOR,
+        data_base=RFDB,
         staged_ttl_s=86_400,
         registered_grace_s=86_400,
         now=clock["now"],
@@ -480,6 +481,7 @@ def test_reconcile_script_dry_run_changes_nothing(env):
         storage,
         env.store,
         _EXTRACTOR,
+        data_base=RFDB,
         staged_ttl_s=86_400,
         registered_grace_s=86_400,
         now=clock["now"],
@@ -501,6 +503,7 @@ def test_reconcile_refuses_when_the_schema_declares_no_upload(env):
             storage,
             env.store,
             no_uploads,
+            data_base=RFDB,
             staged_ttl_s=0,
             registered_grace_s=0,
             now=10**9,

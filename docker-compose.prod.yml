@@ -19,11 +19,13 @@
 #     fails immediately instead of silently deploying with a dev value.
 #
 # ---------------------------------------------------------------------------
-# TWO MODES, exactly as in dev (Task 9)
+# TWO MODES, exactly as in dev, selected by COMPOSE_PROFILES in .env.prod
 # ---------------------------------------------------------------------------
-#   COMPOSE_PROFILES unset   READ  — oxigraph, garage, dataexplorer-backend,
+#   COMPOSE_PROFILES=        READ  — oxigraph, garage, dataexplorer-backend,
 #                                    graphexplorer-frontend, proxy
 #   COMPOSE_PROFILES=full    FULL  — the above + curator-backend/-frontend
+#
+# Default: READ. An empty or missing COMPOSE_PROFILES activates no profile.
 #
 # A read-only instance does not deploy the write tier at all: there is no
 # `/api/v1/curator/*` upstream to reach, rather than a service answering 403 per
@@ -66,6 +68,16 @@
 # Mirrors the anchor in docker-compose.yml.
 x-read-only-shapes: &read_only_shapes '["https://rosfeatr.eu/rdf/schema/LanguageShape"]'
 
+# CORS origins, built from RFDB_DOMAIN rather than set a second time. The proxy
+# serves every frontend and API from that one origin, so a browser never makes a
+# cross-origin request and this value is never actually consulted. That holds
+# for any host, localhost included, and for any port in front of the proxy.
+#
+# FUTURE: if a client on another origin must call the API (another site, a
+# separately hosted frontend), this can no longer be derived. Add a CORS_ORIGINS
+# variable to .env.prod then, holding the extra origins on top of this one.
+x-cors-origins: &cors_origins '["https://${RFDB_DOMAIN:?Set RFDB_DOMAIN in .env.prod}"]'
+
 # Object storage, identical for both backends: the writer stages and promotes
 # blobs, the reader streams them out. Garage is unauthenticated at the S3 layer
 # and lives on `internal`, so these creds never leave the Docker network.
@@ -76,13 +88,17 @@ x-s3-env: &s3_env
   S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env.prod}"
   S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env.prod}"
 
-# The store, identical for both backends. Mismatched values here are the one
-# misconfiguration that produces no error at all: the reader would simply report
-# an empty store, so they are declared once.
+# The store and the base IRIs, identical for both backends. Mismatched values
+# here are the one misconfiguration that produces no error at all: the reader
+# would simply report an empty store, or fail to find the records the writer
+# minted, so they are declared once. See the .env.example files for where each
+# base IRI ends up.
 x-store-env: &store_env
   TRIPLESTORE: oxigraph
   OXIGRAPH_URL: http://oxigraph:7878
   DATA_GRAPH_URI: "https://rosfeatr.eu/rdf/graph/"
+  DATA_BASE_URI: "${DATA_BASE_URI:?Set DATA_BASE_URI in .env.prod}"
+  SCHEMA_BASE_URI: "${SCHEMA_BASE_URI:?Set SCHEMA_BASE_URI in .env.prod}"
   SCHEMA_PATH: /app/schema/schema.ttl
 
 x-logging-env: &logging_env
@@ -230,11 +246,7 @@ services:
       # it states which shapes are editable, so any client needs it to render a
       # UI (D11). Same anchor the curator uses.
       READ_ONLY_SHAPES: *read_only_shapes
-      # Same-origin behind the proxy, so there is no cross-origin request to
-      # allow. Kept required rather than defaulted: an empty list is a
-      # deliberate statement, and falling back to a dev localhost origin in
-      # production would be worse than failing to start.
-      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env.prod}
+      CORS_ORIGINS: *cors_origins
       # No VOCAB_PATH / DATA_PATH / RESET_DATA_ON_STARTUP / SEED_* / READ_ONLY /
       # MAX_UPLOAD_MB: every one is a write concern, and this service's Settings
       # does not define them.
@@ -421,7 +433,7 @@ services:
       READ_ONLY_SHAPES: *read_only_shapes
       MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-500}"
 
-      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env.prod}
+      CORS_ORIGINS: *cors_origins
     volumes:
       # No ./curator-backend:/app — the running code is whatever the image
       # contains, not the host checkout.

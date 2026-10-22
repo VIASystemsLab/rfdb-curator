@@ -44,8 +44,19 @@ def test_get_schema_reports_the_loaded_version() -> None:
 
     res = TestClient(_make_meta_app()).get(SCHEMA_URL)
     assert res.status_code == 200
-    assert res.json() == {"version": SchemaExtractor(str(SCHEMA_PATH)).version}
+    assert res.json()["version"] == SchemaExtractor(str(SCHEMA_PATH)).version
     assert res.json()["version"]
+
+
+def test_get_schema_serves_the_configured_base_iris(monkeypatch: pytest.MonkeyPatch) -> None:
+    """meta/schema serves both base IRIs from the settings, not from a prefix name."""
+    from core.config import settings
+
+    monkeypatch.setattr(settings, "data_base_uri", "https://example.org/kb/data/")
+    monkeypatch.setattr(settings, "schema_base_uri", "https://example.org/kb/shapes/")
+    body = TestClient(_make_meta_app()).get(SCHEMA_URL).json()
+    assert body["dataBaseUri"] == "https://example.org/kb/data/"
+    assert body["schemaBaseUri"] == "https://example.org/kb/shapes/"
 
 
 def test_get_prefixes_returns_200_with_prefixes_key() -> None:

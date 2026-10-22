@@ -25,7 +25,7 @@ from __future__ import annotations
 import re
 
 from rfdb_core.file_storage import REGISTERED_PREFIX, STAGED_PREFIX
-from rfdb_core.vocab import RFDB_BASE, SCHEMA_DIGITAL_DOCUMENT
+from rfdb_core.vocab import SCHEMA_DIGITAL_DOCUMENT
 
 # The minted file-id format: `File_` + 8 lowercase hex (see the curator's
 # stage_file). Both services validate against it — the writer to reject a
@@ -34,11 +34,12 @@ from rfdb_core.vocab import RFDB_BASE, SCHEMA_DIGITAL_DOCUMENT
 FILE_ID_RE = re.compile(r"^File_[0-9a-f]{8}$")
 
 
-def file_content_url(file_id: str) -> str:
+def file_content_url(file_id: str, data_base: str) -> str:
     """Absolute, dereferenceable ``schema:contentUrl`` for a published copy.
 
-    Built from ``RFDB_BASE`` — the same constant that mints the entity's own IRI
-    — so a copy's bytes are addressed as a *representation of the resource*:
+    Built from ``data_base`` (the ``DATA_BASE_URI`` setting), the same namespace
+    that mints the entity's own IRI, so a copy's bytes are addressed as a
+    *representation of the resource*:
     ``https://rosfeatr.eu/rdf/data/File_x/content``.
 
     Absolute on purpose, which **reverses** this function's earlier reasoning
@@ -49,13 +50,13 @@ def file_content_url(file_id: str) -> str:
     base-URL side channel, and the URL resolves by being visited.
 
     Note for clients: this is the **identifier**. Any deployment whose reader is
-    not on ``RFDB_BASE``'s host — every dev stack — must re-base the path onto
+    not on ``data_base``'s host — every dev stack — must re-base the path onto
     its own read origin instead of fetching this URL as-is.
 
     Staged files are not published and have their own path — see
     :func:`staged_content_url`.
     """
-    return f"{RFDB_BASE}{file_id}/content"
+    return f"{data_base}{file_id}/content"
 
 
 def staged_content_url(file_id: str) -> str:
@@ -80,7 +81,7 @@ def staged_content_url(file_id: str) -> str:
     return f"/api/v1/curator/files/staged/{file_id}"
 
 
-def is_file_referenced(file_id: str, store, extractor) -> bool:
+def is_file_referenced(file_id: str, store, extractor, data_base: str) -> bool:
     """Whether a parent entity links to this file via a schema-declared predicate.
 
     This is the "is it a published resource?" test, and RDF answers it. A file's
@@ -100,6 +101,8 @@ def is_file_referenced(file_id: str, store, extractor) -> bool:
         store: A ``TripleStore``; the read is scoped via ``from_clause()``.
         extractor: A ``SchemaExtractor``, used to resolve which predicates link
             a parent entity to a digital copy.
+        data_base: The ``DATA_BASE_URI`` setting, which file nodes are named
+            under.
 
     Raises:
         ValueError: ``file_id`` is malformed. Checked because the id is
@@ -117,7 +120,7 @@ def is_file_referenced(file_id: str, store, extractor) -> bool:
     values = " ".join(f"<{pred}>" for pred in link_preds)
     rows = store.query(
         f"SELECT ?parent {store.from_clause()} WHERE {{ "
-        f"VALUES ?p {{ {values} }} ?parent ?p <{RFDB_BASE}{file_id}> . "
+        f"VALUES ?p {{ {values} }} ?parent ?p <{data_base}{file_id}> . "
         f"}} LIMIT 1"
     )
     return bool(rows)
@@ -128,7 +131,7 @@ def key_file_id(key: str, prefix: str) -> str:
     return key[len(prefix) :].removesuffix(".pdf")
 
 
-def collect_file_state(storage, store, extractor) -> dict:
+def collect_file_state(storage, store, extractor, data_base: str) -> dict:
     """Snapshot RDF and storage state for the reconciler and the stats endpoint.
 
     RDF is the source of truth: ``linked`` are file ids reachable from a parent
@@ -142,6 +145,8 @@ def collect_file_state(storage, store, extractor) -> dict:
             to the configured graph via ``from_clause()``.
         extractor: A ``SchemaExtractor``, used to resolve which predicates link
             a parent entity to a digital copy.
+        data_base: The ``DATA_BASE_URI`` setting. File ids are the part of a
+            node's IRI after it.
 
     Raises:
         StorageNotConfigured: storage credentials are absent.
@@ -152,13 +157,13 @@ def collect_file_state(storage, store, extractor) -> dict:
             f"SELECT ?file {store.from_clause()} WHERE {{ ?parent <{link_pred}> ?file . }}"
         )
         linked |= {
-            r["file"][len(RFDB_BASE) :] for r in rows if (r.get("file") or "").startswith(RFDB_BASE)
+            r["file"][len(data_base) :] for r in rows if (r.get("file") or "").startswith(data_base)
         }
 
     rows = store.query(
         f"SELECT ?n {store.from_clause()} WHERE {{ ?n a <{SCHEMA_DIGITAL_DOCUMENT}> . }}"
     )
-    typed = {r["n"][len(RFDB_BASE) :] for r in rows if (r.get("n") or "").startswith(RFDB_BASE)}
+    typed = {r["n"][len(data_base) :] for r in rows if (r.get("n") or "").startswith(data_base)}
 
     return {
         "linked": linked,

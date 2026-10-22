@@ -1,6 +1,6 @@
 """The deploy-mode invariant, as a test instead of a note to remember.
 
-Task 9 makes which kind of instance this is a deploy-time choice: base services
+Which kind of instance this is, read or full, is a deploy-time choice: base services
 carry no ``profiles:`` key and run in every mode, while ``curator-backend`` and
 ``curator-frontend`` are ``full``-only. The plan attached a warning to that —
 *"re-check after any compose edit"* — because Compose versions **disagree** about
@@ -139,5 +139,26 @@ def test_both_backends_get_the_same_read_only_shapes(filename: str) -> None:
 
     assert set(values) == {"curator-backend", "dataexplorer-backend"}, (
         f"{filename}: READ_ONLY_SHAPES reaches {sorted(values)}; both backends need it"
+    )
+    assert len(set(values.values())) == 1, f"{filename}: the two values have drifted: {values}"
+
+
+@pytest.mark.parametrize("variable", ["DATA_BASE_URI", "SCHEMA_BASE_URI"])
+@pytest.mark.parametrize("filename", COMPOSE_FILES)
+def test_both_backends_get_the_same_base_iris(filename: str, variable: str) -> None:
+    """The writer mints under the base IRIs and the reader serves and parses them.
+
+    Different values would leave the reader unable to find or resolve what the
+    writer created, with no error from either service.
+    """
+    services = _services(filename)
+    values = {
+        name: svc["environment"][variable]
+        for name, svc in services.items()
+        if variable in (svc.get("environment") or {})
+    }
+
+    assert set(values) == {"curator-backend", "dataexplorer-backend"}, (
+        f"{filename}: {variable} reaches {sorted(values)}; both backends need it"
     )
     assert len(set(values.values())) == 1, f"{filename}: the two values have drifted: {values}"
