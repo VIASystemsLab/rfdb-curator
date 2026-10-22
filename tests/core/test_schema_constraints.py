@@ -11,7 +11,7 @@ from rdflib import Graph
 from rfdb_core.schema_extractor import SchemaExtractor
 
 ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
 
 def _assert_conforms(data_graph: Graph) -> None:
@@ -162,7 +162,7 @@ def test_contributor_shape_exposes_type_options() -> None:
 def test_only_contributor_shape_declares_type_options() -> None:
     """No other shape accidentally matches the sh:or/sh:class alternation pattern.
 
-    Regression guard: every other shape's sh:or usage in schema.ttl is a
+    Regression guard: every other shape's sh:or usage in rfdb_schema.ttl is a
     property-level datatype alternation (e.g. rdf:langString | xsd:string),
     not a shape-level sh:class alternation. If a future schema edit adds a
     shape-level sh:or with mixed constraints, this should stay empty; only a

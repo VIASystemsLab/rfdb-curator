@@ -251,7 +251,7 @@ _LOCAL_SPACES = tuple(
 _IMPLICIT_DATATYPE = str(XSD.string)
 
 # The datatype that says a literal's text is a URL. ``schema:contentUrl`` carries
-# it, and must stay a literal rather than an IRI: ``schema.ttl`` declares
+# it, and must stay a literal rather than an IRI: the shipped schema declares
 # ``sh:datatype xsd:anyURI``, so the IRI form dereferences perfectly and fails
 # SHACL (D9, the way that was learned).
 _URI_DATATYPE = str(XSD.anyURI)
@@ -514,7 +514,7 @@ def dereference_shape(
 
     Shape IRIs (``rfdbs:MusicalWorkShape``) appear in data, in every shapes
     response, and in ``READ_ONLY_SHAPES``, so they should dereference like anything
-    else. Served from the parsed ``schema.ttl`` rather than the triplestore — the
+    else. Served from the parsed schema rather than the triplestore — the
     schema is a file this service already holds in memory, and it is not loaded
     into the data graph.
 

@@ -15,7 +15,7 @@ from pathlib import Path
 from pyshacl import validate
 from rdflib import Graph
 
-SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "schema.ttl"
+SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "rfdb_schema.ttl"
 
 _PREFIXES = """
 @prefix core: <https://w3id.org/polifonia/ontology/core/> .

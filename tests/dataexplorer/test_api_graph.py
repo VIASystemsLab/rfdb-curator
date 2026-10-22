@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 from rdflib import Graph
 
 ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 BACKEND_DIR = ROOT / "dataexplorer-backend"
 
 if str(BACKEND_DIR) not in sys.path:
@@ -29,7 +29,7 @@ DATA = "https://rosfeatr.eu/rdf/data/"
 NODE_URL = "/api/v1/dataexplorer/graph/node"
 CORE = "https://w3id.org/polifonia/ontology/core/"
 
-# Known relation predicates (declare sh:node / sh:class in schema.ttl).
+# Known relation predicates (declare sh:node / sh:class in rfdb_schema.ttl).
 HAS_AGENT_ROLE = CORE + "hasAgentRole"
 IS_COMPONENT_OF = "http://www.cidoc-crm.org/cidoc-crm/P148i_is_component_of"
 IS_ABOUT = "http://www.cidoc-crm.org/cidoc-crm/P129_is_about"

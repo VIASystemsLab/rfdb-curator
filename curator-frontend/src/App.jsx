@@ -183,7 +183,7 @@ export default function App() {
         }
         setActiveShape(null)
         setShapesError(
-          'No shapes returned by /api/v1/dataexplorer/shapes. Check backend startup logs and schema/schema.ttl syntax.'
+          'No shapes returned by /api/v1/dataexplorer/shapes. Check backend startup logs and schema/rfdb_schema.ttl syntax.'
         )
       })
       .catch((error) => {

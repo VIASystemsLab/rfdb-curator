@@ -20,7 +20,7 @@ Both services parse the schema at `SCHEMA_PATH` at startup. Forms, validation,
 autocomplete, the record-type list and export are all derived from it, so a
 field or a prefix is defined there and nowhere else.
 
-This repository's [`schema/schema.ttl`](../schema/schema.ttl) is a copy of a
+This repository's [`schema/rfdb_schema.ttl`](../schema/rfdb_schema.ttl) is a copy of a
 tagged upstream release, recorded in [`schema/README.md`](../schema/README.md).
 It changes only by copying a newer release; a model change goes upstream. To run
 another model, point `SCHEMA_PATH` at it (see [custom-schema.md](custom-schema.md)).

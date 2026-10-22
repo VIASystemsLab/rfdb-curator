@@ -1,7 +1,7 @@
 """FastAPI application entrypoint for the RossijskijFeatrDB data-entry backend.
 
 Startup sequence (lifespan context manager):
-  1. Parse ``schema/schema.ttl`` into a ``SchemaExtractor`` and a
+  1. Parse ``schema/rfdb_schema.ttl`` into a ``SchemaExtractor`` and a
      ``ShaclValidator`` (both read the same file; see note in lifespan).
   2. Build a ``TripleStore`` via ``build_triplestore(settings)`` (Oxigraph today).
   3. Optionally call ``TripleStore.clear_store()`` when ``reset_data_on_startup``

@@ -7,7 +7,7 @@ validates before calling, so the guard is unreachable from there) and the
 schema-driven choice of link predicates.
 
 The link predicates come from the schema, never a hardcoded list, so these tests
-use the real ``schema.ttl`` — a schema change that stopped linking digital copies
+use the real ``rfdb_schema.ttl`` — a schema change that stopped linking digital copies
 should fail here rather than silently make every file unpublished.
 """
 
@@ -26,7 +26,7 @@ from rfdb_core.files_state import (
 from rfdb_core.schema_extractor import SchemaExtractor
 from rfdb_core.vocab import SCHEMA_DIGITAL_DOCUMENT
 
-SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "schema.ttl"
+SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "rfdb_schema.ttl"
 
 _EXTRACTOR = SchemaExtractor(str(SCHEMA_PATH))
 DATA_BASE = "https://rosfeatr.eu/rdf/data/"
@@ -51,7 +51,7 @@ class _FakeStore:
 def _link_predicate() -> str:
     """A predicate the schema actually declares as linking a parent to a copy."""
     links = _EXTRACTOR.file_links()
-    assert links, "schema.ttl declares no file-upload link"
+    assert links, "rfdb_schema.ttl declares no file-upload link"
     return links[0][1]
 
 

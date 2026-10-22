@@ -97,7 +97,7 @@ goes through `docker compose run --rm --no-deps <service>`; the commands are in
 
 ## The schema is copied, not edited
 
-`schema/schema.ttl`, `data/vocab.ttl` and `data/data.ttl` are copies of a
+`schema/rfdb_schema.ttl`, `data/vocab.ttl` and `data/data.ttl` are copies of a
 tagged release of the upstream schema repository, recorded in
 `schema/README.md`. They change only by deliberately copying a newer release
 with the procedure there, never in passing as part of other work. A model
@@ -107,7 +107,7 @@ Two checks, when asked or before relying on the copy:
 
 - **Does the copy match the recorded release?** Offline: `git hash-object`
   on each of the three files must print the blob id in `schema/README.md`, and
-  `owl:versionInfo` in `schema/schema.ttl` must equal the recorded release.
+  `owl:versionInfo` in `schema/rfdb_schema.ttl` must equal the recorded release.
   Confirming the recorded ids against upstream (`git ls-tree <tag> <path>` in a
   clone) needs the network, so ask first.
 - **Is there a newer release?** Compare the recorded tag with upstream's

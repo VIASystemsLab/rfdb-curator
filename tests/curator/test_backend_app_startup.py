@@ -24,7 +24,7 @@ def _import_backend_app(monkeypatch: pytest.MonkeyPatch, reset_data_on_startup: 
     """Import the backend app with deterministic environment values."""
     monkeypatch.setenv("OXIGRAPH_URL", "http://localhost:7878")
     monkeypatch.setenv("DATA_GRAPH_URI", "https://rfdb.it/graph/data")
-    monkeypatch.setenv("SCHEMA_PATH", "schema/schema.ttl")
+    monkeypatch.setenv("SCHEMA_PATH", "schema/rfdb_schema.ttl")
     monkeypatch.setenv("VOCAB_PATH", '["data/vocab.ttl"]')
     monkeypatch.setenv("DATA_PATH", "data/data.ttl")
     monkeypatch.setenv("RESET_DATA_ON_STARTUP", str(reset_data_on_startup).lower())
@@ -146,8 +146,8 @@ def test_startup_initialization_order_populates_services_before_seeding(
         "store",
         "seed_store",
     ]
-    assert fake_app.state.schema_extractor.schema_path == "schema/schema.ttl"
-    assert fake_app.state.shacl_validator.schema_path == "schema/schema.ttl"
+    assert fake_app.state.schema_extractor.schema_path == "schema/rfdb_schema.ttl"
+    assert fake_app.state.shacl_validator.schema_path == "schema/rfdb_schema.ttl"
     assert fake_app.state.store.base_url == "http://localhost:7878/"
     assert fake_app.state.seed_report == {
         "seedVocab": False,
@@ -347,7 +347,7 @@ def test_startup_failure_stops_before_partially_initialized_state(
 
     class FailingSchemaExtractor:
         def __init__(self, _schema_path: str, _long_text_predicates=()):
-            raise BadSyntax("schema/schema.ttl", 0, "", 0, "broken schema")
+            raise BadSyntax("schema/rfdb_schema.ttl", 0, "", 0, "broken schema")
 
     monkeypatch.setattr(app_module, "SchemaExtractor", FailingSchemaExtractor)
 

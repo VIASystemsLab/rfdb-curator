@@ -9,7 +9,7 @@ import pytest
 
 from rfdb_core.schema_extractor import SchemaExtractor
 
-SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "schema.ttl"
+SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "rfdb_schema.ttl"
 
 _HEADER = """
 @prefix owl: <http://www.w3.org/2002/07/owl#> .

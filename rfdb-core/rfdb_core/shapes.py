@@ -3,7 +3,7 @@
 Decision D11: the curator and the reader both answer a shapes request, and the
 two payloads must be **identical**, from one code path. The catalogue itself was
 already shared before this module — both services call
-``SchemaExtractor.get_all_shapes()`` over the same ``schema.ttl`` — but the
+``SchemaExtractor.get_all_shapes()`` over the same schema — but the
 ``readOnly`` stamp was not. It lived in the curator's router and read a
 curator-only setting, so the reader could not compute it.
 
@@ -28,7 +28,7 @@ def stamp_read_only(shape: dict, read_only_shapes: Iterable[str]) -> dict:
     """Return a copy of ``shape`` with ``readOnly`` set from ``read_only_shapes``.
 
     Keeps ``SchemaExtractor`` a pure schema parser: whether a shape is editable is
-    per-deployment policy, not schema. (Annotating editability in ``schema.ttl``
+    per-deployment policy, not schema. (Annotating editability in the schema
     was considered and rejected — the same schema protects Glottolog languages in
     one environment and not another, which an annotation cannot express.)
 

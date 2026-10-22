@@ -16,7 +16,7 @@ hard-coded assumptions about the current entity model.
 Data flows through the stack like this:
 
 ```text
-schema/schema.ttl
+schema/rfdb_schema.ttl
     ↓
 schema extractor (rfdb-core, loaded by both services)
     ↓
@@ -63,7 +63,7 @@ service inherits the other's web stack.
 Two things about the split are worth stating explicitly:
 
 - **Both services serve the shape catalogue, and the payloads are identical.** One
-  implementation (`rfdb_core.shapes`) over one `schema.ttl`, `readOnly` flags included. This
+  implementation (`rfdb_core.shapes`) over one schema, `readOnly` flags included. This
   was once an asymmetry — the reader omitted the flag because `READ_ONLY_SHAPES` was filed
   as write policy — and the asymmetry was the bug: the editor needed the flag, could only
   get it from the writer, and so could not render a sidebar during a writer outage.
@@ -81,7 +81,7 @@ Two things about the split are worth stating explicitly:
 Together, the two services turn RDF and SHACL semantics into stable API structures the
 frontend can consume. They:
 
-- loads the SHACL schema at `SCHEMA_PATH` (`schema/schema.ttl` in this repository)
+- loads the SHACL schema at `SCHEMA_PATH` (`schema/rfdb_schema.ttl` in this repository)
 - extracts all `sh:NodeShape` definitions
 - extracts field descriptors from `sh:property` blocks
 - preserves shape labels and descriptions
@@ -129,7 +129,7 @@ precisely *because* the durable, third-party-facing identifiers live in `/rdf/`.
 |---|---|---|
 | `GET` | `/rdf/data/{id}` | **Content-negotiated dereference** of an entity: `text/html`, `text/turtle`, `application/ld+json`, `application/rdf+xml`, `application/n-triples`. Describes the resource in *both* directions, so the graph is walkable from any IRI. `?_mediatype=` overrides `Accept`, `?_profile=alt` lists the representations; `Vary: Accept` is set. |
 | `GET` | `/rdf/data/{fileId}/content` | The bytes of a **published** digital copy — what `schema:contentUrl` points at |
-| `GET` | `/rdf/schema/{ShapeName}` | A SHACL shape's own definition, served from `schema.ttl`. **RDF only** — see below |
+| `GET` | `/rdf/schema/{ShapeName}` | A SHACL shape's own definition, served from the loaded schema. **RDF only** — see below |
 
 An entity's IRI *is* its URL: `https://rosfeatr.eu/rdf/data/{id}`, and production serves
 that host, so a browser pointed at any identifier in the data gets a readable page:
@@ -200,7 +200,7 @@ one component a read-only deployment omits.
 | `GET` | `/api/v1/dataexplorer/meta/files` | Digital-copy storage stats (staged/registered/orphans) |
 
 **Both services serve the same shape catalogue, from one implementation**
-(`rfdb_core.shapes`) over the same `schema.ttl`, `readOnly` flags included. The flags used
+(`rfdb_core.shapes`) over the same schema, `readOnly` flags included. The flags used
 to be curator-only, on the reasoning that `READ_ONLY_SHAPES` was a write concern; it is
 better read as *policy metadata saying which shapes are editable*, which any client needs
 to render a UI. That misfiling meant the editor had to fetch its shape list from the

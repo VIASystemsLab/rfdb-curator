@@ -53,7 +53,7 @@ jobs:
 
       - name: Verify SHACL schema parses
         working-directory: .
-        run: uv run python -c "from rdflib import Graph; Graph().parse('schema/schema.ttl', format='turtle'); print('schema.ttl parses OK')"
+        run: uv run python -c "from rdflib import Graph; Graph().parse('schema/rfdb_schema.ttl', format='turtle'); print('rfdb_schema.ttl parses OK')"
 
       - name: Check prefix-map coverage
         # Fails if a @prefix declared in any schema/data TTL is missing from or

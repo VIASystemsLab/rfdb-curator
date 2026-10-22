@@ -1,7 +1,7 @@
 """SHACL validation wrapper used by all write routes.
 
 The validator is initialised once at startup with the project schema
-(`schema/schema.ttl`) and reused for every POST /api/v1/curator/entities and
+(`schema/rfdb_schema.ttl`) and reused for every POST /api/v1/curator/entities and
 POST /api/v1/curator/validate request.  No data ever reaches Oxigraph without
 passing through here first.
 

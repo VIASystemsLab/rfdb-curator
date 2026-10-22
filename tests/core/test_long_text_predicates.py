@@ -7,7 +7,7 @@ from pathlib import Path
 from rfdb_core.config import BaseServiceSettings
 from rfdb_core.schema_extractor import SchemaExtractor
 
-SCHEMA_PATH = str(Path(__file__).resolve().parents[2] / "schema" / "schema.ttl")
+SCHEMA_PATH = str(Path(__file__).resolve().parents[2] / "schema" / "rfdb_schema.ttl")
 CORE_TEXT = "https://w3id.org/polifonia/ontology/core/text"
 
 

@@ -31,7 +31,7 @@ from rdflib import Graph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = REPO_ROOT / "dataexplorer-backend"
-SCHEMA_PATH = REPO_ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = REPO_ROOT / "schema" / "rfdb_schema.ttl"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))

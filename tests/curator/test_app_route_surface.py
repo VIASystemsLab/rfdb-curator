@@ -29,7 +29,7 @@ def _import_app(monkeypatch: pytest.MonkeyPatch):
     """Import curator-backend's ``app`` module with a deterministic environment."""
     monkeypatch.setenv("OXIGRAPH_URL", "http://localhost:7878")
     monkeypatch.setenv("DATA_GRAPH_URI", "https://rfdb.it/graph/data")
-    monkeypatch.setenv("SCHEMA_PATH", "schema/schema.ttl")
+    monkeypatch.setenv("SCHEMA_PATH", "schema/rfdb_schema.ttl")
     monkeypatch.setenv("VOCAB_PATH", '["data/vocab.ttl"]')
     monkeypatch.setenv("DATA_PATH", "data/data.ttl")
     monkeypatch.setenv("RESET_DATA_ON_STARTUP", "false")

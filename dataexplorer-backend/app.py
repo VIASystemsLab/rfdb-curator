@@ -11,7 +11,7 @@ mostly negative, and the absences are the design:
   * **No ``READ_ONLY`` switch.** There is nothing to switch off.
 
 Startup sequence (lifespan context manager):
-  1. Parse ``schema/schema.ttl`` into a ``SchemaExtractor``.
+  1. Parse ``schema/rfdb_schema.ttl`` into a ``SchemaExtractor``.
   2. Build a ``TripleStore`` via ``build_triplestore(settings)`` (Oxigraph today).
   3. Build the object-storage client for digital-copy downloads.
 

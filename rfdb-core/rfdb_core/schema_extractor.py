@@ -3,7 +3,7 @@ as plain Python dicts consumable by FastAPI route handlers and the frontend.
 
 Overview
 --------
-The application's data model is defined entirely in a SHACL schema (schema.ttl).
+The application's data model is defined entirely in a SHACL schema.
 This module reads that file once at startup, parses every ``sh:NodeShape``, and
 produces structured descriptors that drive two things:
 
@@ -139,7 +139,7 @@ def _curie(uri: URIRef | BNode | None, graph: Graph) -> str | None:
 
 
 class SchemaExtractor:
-    """Parse schema.ttl and expose SHACL NodeShape metadata as Python dicts.
+    """Parse a SHACL schema and expose SHACL NodeShape metadata as Python dicts.
 
     Results are cached after the first parse so the schema file is only read once
     per process lifetime.  Call `get_all_shapes()` or `get_shape(id)` to access
@@ -159,7 +159,7 @@ class SchemaExtractor:
         self.graph = Graph()
         self.graph.parse(schema_path, format="turtle")
         # rdflib pre-binds 'schema' to https://schema.org/ (TLS variant), which
-        # collides with the schema.ttl @prefix (http://) and mangles CURIEs to
+        # collides with the schema's @prefix (http://) and mangles CURIEs to
         # 'schema1:'. Rebind explicitly so compaction matches the schema file.
         self.graph.bind("schema", "http://schema.org/", override=True, replace=True)
         # The CURIE prefix map the schema declares (sh:declare). Read here so a

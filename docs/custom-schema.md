@@ -43,7 +43,7 @@ at it, for example `SCHEMA_PATH=/app/schema/myschema.ttl`. Compose mounts the
 whole `schema/` directory into both backends, so any file there is visible to
 them. Vocabulary and sample-data files go in `data/` the same way.
 
-Keep `schema/schema.ttl` and the files in `data/`. The test suite tests the
+Keep `schema/rfdb_schema.ttl` and the files in `data/`. The test suite tests the
 application against that example schema, so it keeps passing whatever
 `SCHEMA_PATH` the deployment uses.
 

@@ -134,7 +134,7 @@ raises a real question.
 1. `git diff -- data/<file>.ttl` — read the actual diff, not the whole file.
 2. `python3 -c "from rdflib import Graph; Graph().parse('data/<file>.ttl', format='turtle')"`
    — syntax check, ~1s. Never merge in `glottolog_language.ttl` (38MB) for this.
-3. For each *new predicate* in the diff: `grep -n '<local-name>' schema/schema.ttl`. Predicates
+3. For each *new predicate* in the diff: `grep -n '<local-name>' schema/rfdb_schema.ttl`. Predicates
    absent from every shape are legal RDF (shapes aren't `sh:closed` by default) but are
    **invisible** to the graph explorer and curator UI — both are schema-driven
    (`dataexplorer-backend/api/graph.py`: "every shape property ... is a relation"). This is the
@@ -144,7 +144,7 @@ raises a real question.
    `data/vocab.ttl` before assuming it needs declaring locally — it's often already seeded there,
    and redeclaring it in a test-fixture file is redundant clutter, not a bug, but worth flagging.
 5. Only if something looks structurally wrong (cardinality, datatype, class mismatch), run real
-   pySHACL — scoped to just the one file plus `schema/schema.ttl`, no `inference="rdfs"` unless
+   pySHACL — scoped to just the one file plus `schema/rfdb_schema.ttl`, no `inference="rdfs"` unless
    the check specifically needs subclass entailment, and never with `glottolog_language.ttl`
    merged in (rdfs inference over 38MB is why this used to take minutes).
 

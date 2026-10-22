@@ -42,7 +42,7 @@ def list_data(
     both the primary ``rdfs:label`` and the entity IRI.
 
     Args:
-        shapeId: Full URI of a NodeShape defined in ``schema/schema.ttl``.
+        shapeId: Full URI of a NodeShape defined in ``schema/rfdb_schema.ttl``.
         q: Optional free-text filter applied to label and IRI.
         limit: Maximum number of items to return (1–500, default 50).
         offset: Number of items to skip for pagination (default 0).

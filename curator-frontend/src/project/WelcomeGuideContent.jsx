@@ -74,7 +74,7 @@ export const guideSteps = [
 /**
  * Inline SVG of the WEMI chain — no charting dependency.
  *
- * Arrows follow each shape's sh:path (subject → object, per schema/schema.ttl). With
+ * Arrows follow each shape's sh:path (subject → object, per schema/rfdb_schema.ttl). With
  * cidoc:P148i_is_component_of the whole WEMI spine flows one way — child → parent (up):
  * Source → Manifestation → Expression → Work. Performance links to two levels.
  */

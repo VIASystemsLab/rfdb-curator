@@ -60,7 +60,7 @@ an empty store or fail to find what the writer minted.
 | `SCHEMA_BASE_URI` | both | Yes | Namespace of the loaded schema's SHACL shapes, ending in `/` or `#`, e.g. `https://rosfeatr.eu/rdf/schema/` for `…/schema/PlaceShape`. Must match the schema file and across services. |
 | `LONG_TEXT_PREDICATES` | both | No | JSON array of predicate IRIs whose form fields are multi-line text areas. Default: the rfdb schema's description, note and transcription predicates (`rdfs:comment`, `dcterms:description`, `dcterms:abstract`, `skos:definition`, `skos:note`, `skos:scopeNote`, `core:text`). Must match across services. |
 | `OXIGRAPH_LOAD_TIMEOUT` | both | No | Read timeout (seconds) for bulk Turtle loads. Only the writer loads, but the field is in the shared base. Default: `300`. |
-| `SCHEMA_PATH` | both | Yes | Path to `schema.ttl` relative to the service working directory. Docker mounts it at `/app/schema/schema.ttl`. |
+| `SCHEMA_PATH` | both | Yes | Path to `rfdb_schema.ttl` relative to the service working directory. Docker mounts it at `/app/schema/rfdb_schema.ttl`. |
 | `CORS_ORIGINS` | both | Yes | JSON array string of allowed CORS origins, e.g. `["http://localhost:5173"]`. Must not contain `"*"` — the app aborts at import time if it does. The reader needs **both** frontend origins. In production it is not set by hand: `docker-compose.prod.yml` builds it from `RFDB_DOMAIN`. |
 | `S3_ENDPOINT` | both | No | Object-storage endpoint for digital copies. Empty disables it: `GET /api/v1/dataexplorer/meta/files` then reports `configured: false` instead of erroring. |
 | `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | both | No | Object-storage credentials. The writer stages and promotes objects; the reader streams them out. |

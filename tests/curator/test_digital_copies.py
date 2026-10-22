@@ -41,7 +41,7 @@ RFDB = "https://rosfeatr.eu/rdf/data/"
 P138I = "http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation"
 DIGITAL_DOCUMENT = "http://schema.org/DigitalDocument"
 
-_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "schema.ttl"
+_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "rfdb_schema.ttl"
 _EXTRACTOR = SchemaExtractor(str(_SCHEMA_PATH))
 
 
@@ -342,7 +342,7 @@ def test_reconciled_copy_passes_shacl_validation(env):
 def test_persisted_content_url_is_an_any_uri_literal(env):
     """The value must be an ``xsd:anyURI`` **literal**, not an IRI node.
 
-    ``schema.ttl`` declares ``sh:datatype xsd:anyURI`` on ``schema:contentUrl``, and
+    ``rfdb_schema.ttl`` declares ``sh:datatype xsd:anyURI`` on ``schema:contentUrl``, and
     ``sh:datatype`` is satisfied only by a literal — so writing an IRI here produces
     a triple that dereferences perfectly and fails validation. That combination is
     nasty to debug (the data *looks* right), and it is an easy mistake to make now

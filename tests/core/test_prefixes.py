@@ -16,7 +16,7 @@ from rfdb_core.prefixes import declared_prefixes, scan_ttl_prefixes
 from rfdb_core.schema_extractor import SchemaExtractor
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = REPO_ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = REPO_ROOT / "schema" / "rfdb_schema.ttl"
 
 _HEADER = """
 @prefix sh: <http://www.w3.org/ns/shacl#> .

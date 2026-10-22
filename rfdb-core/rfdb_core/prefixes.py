@@ -31,7 +31,7 @@ def declared_prefixes(graph: Graph) -> dict[str, str]:
     fine; with two namespaces it is an error, because no answer would be right.
 
     Example:
-        >>> declared_prefixes(SchemaExtractor("schema/schema.ttl").graph)["rfdb"]
+        >>> declared_prefixes(SchemaExtractor("schema/rfdb_schema.ttl").graph)["rfdb"]
         'https://rosfeatr.eu/rdf/data/'
 
     Raises:
@@ -69,7 +69,7 @@ def scan_ttl_prefixes(paths: Iterable[str]) -> dict[str, str]:
     prefix conflict, later files win. Unreadable paths are skipped silently.
 
     Example:
-        >>> scan_ttl_prefixes(["schema/schema.ttl"])["rfdb"]
+        >>> scan_ttl_prefixes(["schema/rfdb_schema.ttl"])["rfdb"]
         'https://rosfeatr.eu/rdf/data/'
     """
     found: dict[str, str] = {}

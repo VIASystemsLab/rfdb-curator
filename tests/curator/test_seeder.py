@@ -50,7 +50,7 @@ class TestParseVocabPaths:
     def _make_settings(self, vocab_path_value: str, monkeypatch):
         monkeypatch.setenv("OXIGRAPH_URL", "http://localhost:7878")
         monkeypatch.setenv("DATA_GRAPH_URI", "https://rfdb.it/graph/data")
-        monkeypatch.setenv("SCHEMA_PATH", "schema/schema.ttl")
+        monkeypatch.setenv("SCHEMA_PATH", "schema/rfdb_schema.ttl")
         monkeypatch.setenv("VOCAB_PATH", vocab_path_value)
         monkeypatch.setenv("DATA_PATH", "data/data.ttl")
         monkeypatch.setenv("RESET_DATA_ON_STARTUP", "false")

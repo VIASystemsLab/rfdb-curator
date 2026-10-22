@@ -1,7 +1,7 @@
 """Shape metadata for read clients: the sidebar nav and the graph type picker.
 
 **Identical to the curator's shapes response** (decision D11). Both services build
-it with :func:`rfdb_core.shapes.list_shapes` over the same ``schema.ttl``, so there
+it with :func:`rfdb_core.shapes.list_shapes` over the same schema, so there
 is one implementation and one place to change.
 
 This reverses D3, which had the reader omit the ``readOnly`` flag on the grounds

@@ -151,7 +151,7 @@ pre-commit is meant to catch formatting/hygiene issues before CI does.
 ## 4. Schema Change Workflow
 
 Forms come from the SHACL schema at `SCHEMA_PATH`. In this repository that is
-`schema/schema.ttl`, a copy of a tagged [rfdb-schema](https://github.com/VIASystemsLab/rfdb-schema)
+`schema/rfdb_schema.ttl`, a copy of a tagged [rfdb-schema](https://github.com/VIASystemsLab/rfdb-schema)
 release: a model change is made upstream, released, and copied in by the procedure in
 [schema/README.md](../schema/README.md), never by editing the copy. To try a model of your
 own, point `SCHEMA_PATH` at it. Each record type is a `sh:NodeShape`.
@@ -168,7 +168,7 @@ GET /api/v1/dataexplorer/shapes            # both services; the curator's adds t
 GET /api/v1/curator/forms?shapeId=... # curator only — form definitions drive an editing form
 ```
 
-A schema change therefore needs **both** services restarted: each parses `schema.ttl`
+A schema change therefore needs **both** services restarted: each parses the schema
 into its own in-memory index at startup.
 
 Two behaviors matter when adding or changing a shape, and both are documented elsewhere:
@@ -187,7 +187,7 @@ Two behaviors matter when adding or changing a shape, and both are documented el
 
 When the RFDB namespaces change, update these locations together:
 
-- `schema/schema.ttl` — authoritative Turtle prefixes and SHACL shape IRIs. Shape IRIs use `rfdbs:` (`https://rosfeatr.eu/rdf/schema/`); data resources use `rfdb:` (`https://rosfeatr.eu/rdf/data/`).
+- `schema/rfdb_schema.ttl` — authoritative Turtle prefixes and SHACL shape IRIs. Shape IRIs use `rfdbs:` (`https://rosfeatr.eu/rdf/schema/`); data resources use `rfdb:` (`https://rosfeatr.eu/rdf/data/`).
 - `data/vocab.ttl` and `data/data.ttl` — authoritative Turtle data prefixes for seeded and fixture data.
 - `DATA_BASE_URI` and `SCHEMA_BASE_URI` — the settings both backends name records and shapes under. Set them in the compose files (or a root `.env` in dev, `.env.prod` in production); the `.env.example` files show where each one ends up.
 - `curator-backend/models/data.py`, `rfdb-core/rfdb_core/models_data.py` and the two `core/config.py` files — doc examples reference shape/data IRIs.

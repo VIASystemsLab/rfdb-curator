@@ -35,7 +35,7 @@ build-backend = "hatchling.build"
 packages = ["rfdb_core"]
 
 [dependency-groups]
-# pyshacl is a *test-only* dependency here: tests/core/ validates schema.ttl's
+# pyshacl is a *test-only* dependency here: tests/core/ validates rfdb_schema.ttl's
 # SHACL semantics, which is this library's subject (it owns schema_extractor),
 # but nothing in rfdb_core itself runs a validator — that is a write concern and
 # it lives in curator-backend.

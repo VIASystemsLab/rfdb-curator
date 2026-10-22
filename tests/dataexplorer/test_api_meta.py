@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = REPO_ROOT / "dataexplorer-backend"
-SCHEMA_PATH = REPO_ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = REPO_ROOT / "schema" / "rfdb_schema.ttl"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
@@ -69,8 +69,8 @@ def test_get_prefixes_returns_200_with_prefixes_key() -> None:
 def test_get_prefixes_covers_all_ttl_sources() -> None:
     """The schema's sh:declare covers schema, data-only, and glottolog-only prefixes."""
     prefixes = TestClient(_make_meta_app()).get(PREFIXES_URL).json()["prefixes"]
-    assert prefixes["rfdb"] == "https://rosfeatr.eu/rdf/data/"  # schema.ttl
-    assert prefixes["lrmoo"] == "http://iflastandards.info/ns/lrm/lrmoo/"  # schema.ttl
+    assert prefixes["rfdb"] == "https://rosfeatr.eu/rdf/data/"  # rfdb_schema.ttl
+    assert prefixes["lrmoo"] == "http://iflastandards.info/ns/lrm/lrmoo/"  # rfdb_schema.ttl
     assert prefixes["wd"] == "http://www.wikidata.org/entity/"  # data.ttl only
     assert prefixes["lexvo"] == "http://lexvo.org/ontology#"  # glottolog only
 

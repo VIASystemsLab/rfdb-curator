@@ -104,7 +104,7 @@ x-store-env: &store_env
   DATA_GRAPH_URI: "${DATA_GRAPH_URI:-https://rosfeatr.eu/rdf/graph/}"
   DATA_BASE_URI: "${DATA_BASE_URI:?Set DATA_BASE_URI in .env.prod}"
   SCHEMA_BASE_URI: "${SCHEMA_BASE_URI:?Set SCHEMA_BASE_URI in .env.prod}"
-  SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/schema.ttl}"
+  SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/rfdb_schema.ttl}"
 
 x-logging-env: &logging_env
   LOG_FILE: logs/app.jsonl

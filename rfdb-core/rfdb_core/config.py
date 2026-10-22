@@ -31,7 +31,7 @@ class BaseServiceSettings(BaseSettings):
         data_graph_uri: Named graph URI scoping reads (``FROM <uri>``) and Turtle
             loads (``?graph=<uri>``). Example: ``https://rosfeatr.eu/rdf/graph/``
         schema_path: Path to the SHACL schema Turtle file, relative to the
-            service's working directory. Example: ``schema/schema.ttl``
+            service's working directory. Example: ``schema/rfdb_schema.ttl``
         data_base_uri: Namespace every minted record and digital copy is named
             under. Example: ``https://rosfeatr.eu/rdf/data/``
         schema_base_uri: Namespace of the schema's SHACL shapes. Example:
@@ -84,7 +84,7 @@ class BaseServiceSettings(BaseSettings):
     # ------------------------------------------------------------------ #
 
     schema_path: str
-    """Path to the SHACL schema Turtle file (e.g. ``schema/schema.ttl``).
+    """Path to the SHACL schema Turtle file (e.g. ``schema/rfdb_schema.ttl``).
 
     Both services parse it: the curator for validation and form schemas, the
     reader for relation predicates and type/relation labels."""

@@ -179,7 +179,7 @@ services:
       # larger seed files.
       OXIGRAPH_LOAD_TIMEOUT: "${OXIGRAPH_LOAD_TIMEOUT:-300}"
       # Paths inside the container, mapped by the volumes block below.
-      SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/schema.ttl}"
+      SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/rfdb_schema.ttl}"
       VOCAB_PATH: '${VOCAB_PATH:-["/app/data/vocab.ttl", "/app/data/glottolog_language.ttl"]}'
       DATA_PATH: "${DATA_PATH:-/app/data/data.ttl}"
       # Set true only when you want a full store wipe on restart (dev/test).
@@ -303,7 +303,7 @@ services:
       DATA_GRAPH_URI: "${DATA_GRAPH_URI:-https://rosfeatr.eu/rdf/graph/}"
       DATA_BASE_URI: *data_base_uri
       SCHEMA_BASE_URI: *schema_base_uri
-      SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/schema.ttl}"
+      SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/rfdb_schema.ttl}"
       # No OXIGRAPH_LOAD_TIMEOUT: it bounds bulk Turtle loads, and this service
       # never loads any.
       #
