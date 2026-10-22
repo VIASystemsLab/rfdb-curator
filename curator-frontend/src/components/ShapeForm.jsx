@@ -268,27 +268,10 @@ export default function ShapeForm({
         continue
       }
 
-      // --- Language field (dcterms:language) ---
-      // Stores the literal string value of the language code triple.
-      // Falls back to empty string so the input is never left as undefined.
-      // (Path-based special case, not type-based — left as-is.)
-      else if (field.path === 'dcterms:language') {
-        const triple = Array.isArray(val) ? val[0] : val
-        if (triple && typeof triple === 'object' && triple['@value']) {
-          formData[field.path] = triple['@value']
-        } else if (triple && typeof triple === 'object' && triple.object) {
-          formData[field.path] = triple.object
-        } else if (typeof triple === 'string') {
-          formData[field.path] = triple
-        } else {
-          formData[field.path] = ''
-        }
-      }
-
       // --- Entity search ---
       // Initialised to null here; resolved asynchronously in useEffect
       // to obtain a proper {value, label} object the async-select can display.
-      else if (field.type === 'entity-search') {
+      if (field.type === 'entity-search') {
         formData[field.path] = null
       }
 
