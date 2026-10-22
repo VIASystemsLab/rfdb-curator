@@ -122,6 +122,18 @@ functions carry a concise docstring describing intent and expected behaviour.
 
 Sanitize error messages before they reach users or logs.
 
+## Configuration is never a code edit
+
+A value that a deployment or a fork is expected to change is a setting, read
+from the environment. Never ask anyone to edit Python or JavaScript to change
+one. Each setting is documented in every `.env.example` that lists it, with an
+example of the value and of where it ends up (an IRI it mints, a route it
+serves).
+
+The one accepted exception is project-specific UI text, such as the Welcome
+guide. It lives in a single dedicated frontend file that a fork replaces, kept
+apart from the component logic.
+
 ## Deletion is scoped, files and data alike
 
 A wrong-directory `rm` once deleted the backend project files; never let it
