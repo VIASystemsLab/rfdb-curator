@@ -44,6 +44,7 @@ from rdflib.namespace import DCTERMS, RDF, RDFS, XSD
 
 from api.graph import preferred_label
 from core.config import settings
+from rfdb_core.external_ids import external_id_url
 
 router = APIRouter()
 
@@ -313,10 +314,18 @@ def _href(iri: str) -> str | None:
     return iri if iri.startswith(("http://", "https://")) else None
 
 
-def _term(term: object, namespaces: list[tuple[str, str]]) -> str:
-    """Render one RDF term as an HTML fragment — a link where it can be one."""
+def _term(term: object, namespaces: list[tuple[str, str]], link_template: str | None = None) -> str:
+    """Render one RDF term as an HTML fragment — a link where it can be one.
+
+    ``link_template`` is the ``EXTERNAL_ID_LINKS`` template for the predicate a
+    literal is the value of, if any: the literal is then an identifier stored as
+    text, and links to the authority's page.
+    """
     if isinstance(term, Literal):
         value = escape(str(term))
+        if link_template:
+            href = external_id_url(link_template, str(term))
+            value = f'<a href="{escape(href, quote=True)}">{value}</a>'
         if term.language:
             return f'{value} <span class="meta">@{escape(term.language)}</span>'
 
@@ -345,7 +354,9 @@ def _section(
     if not rows:
         return ""
     cells = "".join(
-        f"<tr><th>{_term(a, namespaces)}</th><td>{_term(b, namespaces)}</td></tr>" for a, b in rows
+        f"<tr><th>{_term(a, namespaces)}</th>"
+        f"<td>{_term(b, namespaces, settings.external_id_links.get(str(a)))}</td></tr>"
+        for a, b in rows
     )
     return f"<h2>{escape(title)}</h2><table>{cells}</table>"
 

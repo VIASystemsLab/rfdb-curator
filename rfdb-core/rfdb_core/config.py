@@ -21,6 +21,8 @@ import json
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from rfdb_core.external_ids import PLACEHOLDER
+
 
 class BaseServiceSettings(BaseSettings):
     """Configuration common to the curator (writer) and dataexplorer (reader).
@@ -143,6 +145,19 @@ class BaseServiceSettings(BaseSettings):
     files set. Both services build the same field descriptors, so give them the
     same value."""
 
+    external_id_links: dict[str, str] = {
+        "http://www.wikidata.org/prop/direct/P214": "https://viaf.org/en/viaf/$1",
+        "http://www.wikidata.org/prop/direct/P5504": "https://rism.online/$1",
+    }
+    """Predicates whose text values are external identifiers, mapped to a URL
+    template with ``$1`` where the identifier goes.
+
+    Every UI shows such a value as a link: the form beside its input, the graph
+    explorer's inspector and the reader's HTML page. Supplied as a JSON object
+    string via ``EXTERNAL_ID_LINKS``. The default covers the rfdb schema's VIAF
+    (``wdt:P214``) and RISM (``wdt:P5504``) IDs, with Wikidata's formatter URLs,
+    the value both compose files set. Both services must get the same value."""
+
     # ------------------------------------------------------------------ #
     # HTTP / CORS                                                          #
     # ------------------------------------------------------------------ #
@@ -227,6 +242,26 @@ class BaseServiceSettings(BaseSettings):
         """
         if isinstance(v, str):
             return json.loads(v) if v.strip() else []
+        return v
+
+    @field_validator("external_id_links", mode="before")
+    @classmethod
+    def parse_external_id_links(cls, v: str | dict[str, str]) -> dict[str, str]:
+        """Accept ``EXTERNAL_ID_LINKS`` as a JSON object string or a dict.
+
+        An empty string means no external-identifier links, the same as ``{}``.
+        """
+        if isinstance(v, str):
+            return json.loads(v) if v.strip() else {}
+        return v
+
+    @field_validator("external_id_links")
+    @classmethod
+    def check_link_templates(cls, v: dict[str, str]) -> dict[str, str]:
+        """Require ``$1`` in every template, or the identifier would be dropped."""
+        for predicate, template in v.items():
+            if PLACEHOLDER not in template:
+                raise ValueError(f"template for {predicate} has no $1: {template!r}")
         return v
 
     @field_validator("read_only_shapes", mode="before")

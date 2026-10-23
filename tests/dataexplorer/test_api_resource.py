@@ -560,3 +560,12 @@ def test_shape_alternates_list_only_what_shapes_serve() -> None:
         "application/rdf+xml",
         "application/n-triples",
     }, "the shape route offers no HTML, so its alternates must not advertise it"
+
+
+def test_html_links_an_identifier_stored_as_text() -> None:
+    """A VIAF ID literal links to its VIAF page, per EXTERNAL_ID_LINKS."""
+    turtle = f"""
+    <{IRI}> <http://www.wikidata.org/prop/direct/P214> "293925180" .
+    """
+    page = _html(_StubStore(turtle=turtle))
+    assert '<a href="https://viaf.org/en/viaf/293925180">293925180</a>' in page

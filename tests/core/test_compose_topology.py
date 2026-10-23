@@ -143,7 +143,15 @@ def test_both_backends_get_the_same_read_only_shapes(filename: str) -> None:
     assert len(set(values.values())) == 1, f"{filename}: the two values have drifted: {values}"
 
 
-@pytest.mark.parametrize("variable", ["DATA_BASE_URI", "SCHEMA_BASE_URI", "LONG_TEXT_PREDICATES"])
+@pytest.mark.parametrize(
+    "variable",
+    [
+        "DATA_BASE_URI",
+        "SCHEMA_BASE_URI",
+        "LONG_TEXT_PREDICATES",
+        "EXTERNAL_ID_LINKS",
+    ],
+)
 @pytest.mark.parametrize("filename", COMPOSE_FILES)
 def test_both_backends_get_the_same_schema_settings(filename: str, variable: str) -> None:
     """Settings both backends must agree on, or they describe the data differently.

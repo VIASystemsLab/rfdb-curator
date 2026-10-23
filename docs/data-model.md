@@ -96,6 +96,10 @@ Other conventions:
   gets a single line and saves the same way.
 - **Field names.** `sh:name` gives the label, English first, then untagged,
   then any language.
+- **External identifiers.** An identifier stored as text (a VIAF or RISM ID)
+  is shown as a link when the `EXTERNAL_ID_LINKS` setting has a URL template
+  for its predicate. A text field's `sh:pattern` is checked in the form before
+  the link appears.
 
 ---
 
@@ -119,6 +123,8 @@ Both base IRIs are settings; [custom-schema.md](custom-schema.md) explains them.
   standalone entities and supplies record labels.
 - **File uploads:** `schema:` (see below).
 - **Long text:** whatever the `LONG_TEXT_PREDICATES` setting lists (see above).
+- **External identifiers:** whatever the `EXTERNAL_ID_LINKS` setting maps (see
+  above).
 
 No other ontology term is read by name. Everything else comes from the schema.
 

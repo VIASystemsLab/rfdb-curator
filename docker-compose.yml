@@ -61,6 +61,12 @@ x-read-only-shapes: &read_only_shapes '["https://rosfeatr.eu/rdf/schema/Language
 # schema's set; a fork lists its own description and note predicates here.
 x-long-text-predicates: &long_text_predicates '["http://www.w3.org/2000/01/rdf-schema#comment", "http://purl.org/dc/terms/description", "http://purl.org/dc/terms/abstract", "http://www.w3.org/2004/02/skos/core#definition", "http://www.w3.org/2004/02/skos/core#note", "http://www.w3.org/2004/02/skos/core#scopeNote", "https://w3id.org/polifonia/ontology/core/text"]'
 
+# Predicates whose text values are external identifiers, mapped to the URL of
+# the authority's page ($1 is the identifier). Every UI shows them as links.
+# Both backends get one value. These are the rfdb schema's VIAF and RISM IDs,
+# with Wikidata's formatter URLs; a fork lists its own here.
+x-external-id-links: &external_id_links '{"http://www.wikidata.org/prop/direct/P214": "https://viaf.org/en/viaf/$$1", "http://www.wikidata.org/prop/direct/P5504": "https://rism.online/$$1"}'
+
 # Base IRIs, identical for both backends for the same reason: the writer mints
 # records and file nodes under DATA_BASE_URI, and the reader serves them and
 # recovers their local ids from it. Override both in a root .env to use other
@@ -205,6 +211,7 @@ services:
       # Shared with dataexplorer-backend via the anchor at the top of this file.
       READ_ONLY_SHAPES: *read_only_shapes
       LONG_TEXT_PREDICATES: *long_text_predicates
+      EXTERNAL_ID_LINKS: *external_id_links
       # NOT needed by this stack's own frontends: they issue same-origin
       # requests through the Vite proxy, so nothing here has to be edited to
       # browse the stack from another host. This list is for clients that do go
@@ -318,6 +325,7 @@ services:
       # the writer, and therefore showed nothing whenever the writer was down (C20).
       READ_ONLY_SHAPES: *read_only_shapes
       LONG_TEXT_PREDICATES: *long_text_predicates
+      EXTERNAL_ID_LINKS: *external_id_links
       S3_ENDPOINT: "http://garage:3900"
       S3_REGION: garage
       S3_BUCKET: "${S3_BUCKET:-sources}"

@@ -83,6 +83,13 @@
   opacity: 0.7;
 }
 
+.field-external-link {
+  font-size: 12px;
+  margin-top: var(--space-1);
+  color: var(--color-focus);
+  word-break: break-all;
+}
+
 .field-input {
   background-color: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--color-border-strong);

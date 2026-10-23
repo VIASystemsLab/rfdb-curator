@@ -49,6 +49,7 @@ FIELD_KEYS = {
     "description",
     "type",
     "longText",
+    "linkTemplate",
     "datatype",
     "datatypeOptions",
     "languageTagPolicy",

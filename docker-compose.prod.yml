@@ -73,6 +73,12 @@ x-read-only-shapes: &read_only_shapes '["https://rosfeatr.eu/rdf/schema/Language
 # schema's set; a fork lists its own description and note predicates here.
 x-long-text-predicates: &long_text_predicates '["http://www.w3.org/2000/01/rdf-schema#comment", "http://purl.org/dc/terms/description", "http://purl.org/dc/terms/abstract", "http://www.w3.org/2004/02/skos/core#definition", "http://www.w3.org/2004/02/skos/core#note", "http://www.w3.org/2004/02/skos/core#scopeNote", "https://w3id.org/polifonia/ontology/core/text"]'
 
+# Predicates whose text values are external identifiers, mapped to the URL of
+# the authority's page ($1 is the identifier). Every UI shows them as links.
+# Both backends get one value. These are the rfdb schema's VIAF and RISM IDs,
+# with Wikidata's formatter URLs; a fork lists its own here.
+x-external-id-links: &external_id_links '{"http://www.wikidata.org/prop/direct/P214": "https://viaf.org/en/viaf/$$1", "http://www.wikidata.org/prop/direct/P5504": "https://rism.online/$$1"}'
+
 # CORS origins, built from RFDB_DOMAIN rather than set a second time. The proxy
 # serves every frontend and API from that one origin, so a browser never makes a
 # cross-origin request and this value is never actually consulted. That holds
@@ -252,6 +258,7 @@ services:
       # UI (D11). Same anchor the curator uses.
       READ_ONLY_SHAPES: *read_only_shapes
       LONG_TEXT_PREDICATES: *long_text_predicates
+      EXTERNAL_ID_LINKS: *external_id_links
       CORS_ORIGINS: *cors_origins
       # No VOCAB_PATH / DATA_PATH / RESET_DATA_ON_STARTUP / SEED_* / READ_ONLY /
       # MAX_UPLOAD_MB: every one is a write concern, and this service's Settings
@@ -438,6 +445,7 @@ services:
       READ_ONLY: "${READ_ONLY:-false}"
       READ_ONLY_SHAPES: *read_only_shapes
       LONG_TEXT_PREDICATES: *long_text_predicates
+      EXTERNAL_ID_LINKS: *external_id_links
       MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-500}"
 
       CORS_ORIGINS: *cors_origins

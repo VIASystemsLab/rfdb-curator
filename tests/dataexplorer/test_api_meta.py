@@ -59,6 +59,14 @@ def test_get_schema_serves_the_configured_base_iris(monkeypatch: pytest.MonkeyPa
     assert body["schemaBaseUri"] == "https://example.org/kb/shapes/"
 
 
+def test_get_schema_serves_the_external_id_links() -> None:
+    """meta/schema serves the EXTERNAL_ID_LINKS map for clients that render IDs."""
+    from core.config import settings
+
+    body = TestClient(_make_meta_app()).get(SCHEMA_URL).json()
+    assert body["externalIdLinks"] == settings.external_id_links
+
+
 def test_get_prefixes_returns_200_with_prefixes_key() -> None:
     """Response is 200 and top-level JSON has a 'prefixes' key."""
     res = TestClient(_make_meta_app()).get(PREFIXES_URL)

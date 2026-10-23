@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI):
 
     try:
         app.state.schema_extractor = SchemaExtractor(
-            settings.schema_path, settings.long_text_predicates
+            settings.schema_path, settings.long_text_predicates, settings.external_id_links
         )
     except BadSyntax as exc:
         logger.error(

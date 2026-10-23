@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from rdflib import Literal, URIRef
 from rdflib.namespace import RDF, RDFS
 
+from rfdb_core.external_ids import external_id_url
 from rfdb_core.iri import iri_error
 
 router = APIRouter()
@@ -50,8 +51,10 @@ def relation_predicates(extractor) -> list[str]:
 
     A shape property is a relation when it links to another entity — i.e. it
     declares ``sh:node`` (``nestedShape``) or ``sh:class`` (``nodeClass``).
-    External-authority fields (``owl:sameAs``, ``wdt:P214``) are plain IRI inputs
-    with neither, so they are excluded and surfaced as ``externalLinks`` instead.
+    External-authority IRIs (``owl:sameAs``) declare neither, so they are
+    excluded and surfaced as ``externalLinks`` instead. Identifiers stored as
+    text (VIAF, RISM) are literals, with a ``url`` when ``EXTERNAL_ID_LINKS`` has
+    a template for their predicate.
     """
     preds: set[str] = set()
     for shape in extractor.get_all_shapes():
@@ -146,7 +149,7 @@ def get_node(
           "id": "<iri>",
           "label": "…" | null,
           "types": ["<classUri>", …],
-          "literals": [{"predicate","value","datatype","language"}, …],
+          "literals": [{"predicate","value","datatype","language","url"}, …],
           "externalLinks": [{"predicate","target"}, …],
           "edges": [{"direction":"out"|"in","predicate","neighbor":{id,label,types}}, …],
           "truncated": bool  # true when a direction hit `limit` and more neighbors exist
@@ -161,6 +164,7 @@ def get_node(
     extractor = request.app.state.schema_extractor
     store = request.app.state.store
     rel_preds = relation_predicates(extractor)
+    link_templates = extractor.external_id_links
 
     try:
         self_graph = store.construct(
@@ -189,6 +193,12 @@ def get_node(
                         "value": str(obj),
                         "datatype": str(obj.datatype) if obj.datatype else None,
                         "language": obj.language,
+                        # Set for an identifier stored as text, e.g. a VIAF ID.
+                        "url": (
+                            external_id_url(link_templates[pred], str(obj))
+                            if pred in link_templates
+                            else None
+                        ),
                     }
                 )
         elif isinstance(obj, URIRef) and pred not in rel_set:

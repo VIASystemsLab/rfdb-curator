@@ -81,7 +81,7 @@ restart is required.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from rdflib import BNode, Graph, Literal, URIRef
@@ -146,7 +146,12 @@ class SchemaExtractor:
     the parsed metadata.
     """
 
-    def __init__(self, schema_path: str, long_text_predicates: Iterable[str] = ()) -> None:
+    def __init__(
+        self,
+        schema_path: str,
+        long_text_predicates: Iterable[str] = (),
+        external_id_links: Mapping[str, str] | None = None,
+    ) -> None:
         """Parse the schema.
 
         Args:
@@ -154,8 +159,12 @@ class SchemaExtractor:
             long_text_predicates: Full IRIs of the predicates whose fields render
                 as a multi-line input (the ``LONG_TEXT_PREDICATES`` setting). SHACL
                 has no long-text hint, so the property's ``sh:path`` decides.
+            external_id_links: Predicate IRI → URL template for identifiers stored
+                as text (the ``EXTERNAL_ID_LINKS`` setting). A matching field
+                carries its template as ``linkTemplate``.
         """
         self.long_text_predicates = frozenset(long_text_predicates)
+        self.external_id_links: dict[str, str] = dict(external_id_links or {})
         self.graph = Graph()
         self.graph.parse(schema_path, format="turtle")
         # rdflib pre-binds 'schema' to https://schema.org/ (TLS variant), which
@@ -380,6 +389,7 @@ class SchemaExtractor:
             "description": str(description),
             "type": field_type,
             "longText": str(path) in self.long_text_predicates,
+            "linkTemplate": self.external_id_links.get(str(path)),
             "datatype": datatype_curie,
             "datatypeOptions": [_curie(dt, g) for dt in datatype_options],
             "languageTagPolicy": language_tag_policy,

@@ -17,6 +17,7 @@ For the conventions your schema must follow, see the data-model contract in
 | Controlled vocabularies and sample data | `VOCAB_PATH`, `DATA_PATH`, `SEED_VOCAB_ON_STARTUP`, `SEED_TEST_DATA_ON_STARTUP` | the rfdb vocabularies are seeded |
 | Read-only reference shapes | `READ_ONLY_SHAPES` | every shape is editable |
 | Long-text fields | `LONG_TEXT_PREDICATES` | the rfdb list applies; your other text fields get one line |
+| External identifiers shown as links | `EXTERNAL_ID_LINKS` | only VIAF and RISM IDs are linked |
 | File uploads | one shape targeting `schema:DigitalDocument` in your schema (see [data-model.md](data-model.md#digital-documents)) | no upload field; the cleanup script refuses to run while file nodes or stored files exist |
 | Welcome guide text | `curator-frontend/src/project/WelcomeGuideContent.jsx` | curators see the rfdb guide |
 | Production domain | `RFDB_DOMAIN` in `.env.prod` | production refuses to start |
@@ -32,9 +33,10 @@ Where settings go:
 - **A backend run outside Compose:** the service's own `.env`. Both
   `.env.example` files describe every setting.
 
-`READ_ONLY_SHAPES` and `LONG_TEXT_PREDICATES` are set once at the top of each
-compose file (`x-read-only-shapes`, `x-long-text-predicates`) and given to both
-backends from there.
+`READ_ONLY_SHAPES`, `LONG_TEXT_PREDICATES` and `EXTERNAL_ID_LINKS` are set once
+at the top of each compose file (`x-read-only-shapes`, `x-long-text-predicates`,
+`x-external-id-links`) and given to both backends from there. In a compose file
+a literal `$` is written `$$`, so a template's `$1` appears there as `$$1`.
 
 ## Your schema
 
@@ -107,6 +109,20 @@ LONG_TEXT_PREDICATES=["http://purl.org/dc/terms/description", "http://www.w3.org
 Set it in both compose files' `x-long-text-predicates`, or in each service's
 `.env`. A field not listed still saves its full text; it is only shown on one
 line.
+
+## External identifiers
+
+A schema can store an authority's identifier as plain text, the way Wikidata
+does, rather than as a link. `EXTERNAL_ID_LINKS` maps each such predicate to the
+URL of the authority's page, with `$1` where the identifier goes:
+
+```
+EXTERNAL_ID_LINKS={"http://www.wikidata.org/prop/direct/P214": "https://viaf.org/en/viaf/$1"}
+```
+
+Wikidata lists the template for most authorities as the property's formatter
+URL (P1630). The form, the graph explorer and the reader's HTML page then show
+the value as a link.
 
 ## The Welcome guide
 
