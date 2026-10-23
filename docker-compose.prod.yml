@@ -259,6 +259,7 @@ services:
       READ_ONLY_SHAPES: *read_only_shapes
       LONG_TEXT_PREDICATES: *long_text_predicates
       EXTERNAL_ID_LINKS: *external_id_links
+      PROJECT_NAME: "${PROJECT_NAME:-RossijskijFeatrDB}"
       CORS_ORIGINS: *cors_origins
       # No VOCAB_PATH / DATA_PATH / RESET_DATA_ON_STARTUP / SEED_* / READ_ONLY /
       # MAX_UPLOAD_MB: every one is a write concern, and this service's Settings
@@ -446,6 +447,7 @@ services:
       READ_ONLY_SHAPES: *read_only_shapes
       LONG_TEXT_PREDICATES: *long_text_predicates
       EXTERNAL_ID_LINKS: *external_id_links
+      PROJECT_NAME: "${PROJECT_NAME:-RossijskijFeatrDB}"
       MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-500}"
 
       CORS_ORIGINS: *cors_origins

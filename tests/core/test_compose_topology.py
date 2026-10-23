@@ -150,6 +150,7 @@ def test_both_backends_get_the_same_read_only_shapes(filename: str) -> None:
         "SCHEMA_BASE_URI",
         "LONG_TEXT_PREDICATES",
         "EXTERNAL_ID_LINKS",
+        "PROJECT_NAME",
     ],
 )
 @pytest.mark.parametrize("filename", COMPOSE_FILES)

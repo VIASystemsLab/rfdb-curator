@@ -59,6 +59,14 @@ def test_get_schema_serves_the_configured_base_iris(monkeypatch: pytest.MonkeyPa
     assert body["schemaBaseUri"] == "https://example.org/kb/shapes/"
 
 
+def test_get_schema_serves_the_project_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """meta/schema serves PROJECT_NAME for the editor's header."""
+    from core.config import settings
+
+    monkeypatch.setattr(settings, "project_name", "MovieDB")
+    assert TestClient(_make_meta_app()).get(SCHEMA_URL).json()["projectName"] == "MovieDB"
+
+
 def test_get_schema_serves_the_external_id_links() -> None:
     """meta/schema serves the EXTERNAL_ID_LINKS map for clients that render IDs."""
     from core.config import settings

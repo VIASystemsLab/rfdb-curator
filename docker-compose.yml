@@ -212,6 +212,7 @@ services:
       READ_ONLY_SHAPES: *read_only_shapes
       LONG_TEXT_PREDICATES: *long_text_predicates
       EXTERNAL_ID_LINKS: *external_id_links
+      PROJECT_NAME: "${PROJECT_NAME:-RossijskijFeatrDB}"
       # NOT needed by this stack's own frontends: they issue same-origin
       # requests through the Vite proxy, so nothing here has to be edited to
       # browse the stack from another host. This list is for clients that do go
@@ -326,6 +327,7 @@ services:
       READ_ONLY_SHAPES: *read_only_shapes
       LONG_TEXT_PREDICATES: *long_text_predicates
       EXTERNAL_ID_LINKS: *external_id_links
+      PROJECT_NAME: "${PROJECT_NAME:-RossijskijFeatrDB}"
       S3_ENDPOINT: "http://garage:3900"
       S3_REGION: garage
       S3_BUCKET: "${S3_BUCKET:-sources}"
@@ -476,7 +478,7 @@ services:
       # Vite dev-server proxy target (inside Docker → service name, not localhost).
       VITE_PROXY_TARGET: http://dataexplorer-backend:8001
       # Branding only — the graphexplorer-frontend code is domain-agnostic.
-      VITE_APP_TITLE: RFDB Explorer
+      VITE_APP_TITLE: "${VITE_APP_TITLE:-RFDB Explorer}"
     volumes:
       - ./graphexplorer-frontend:/app
       # Anonymous volume keeps the image's node_modules over the bind-mount

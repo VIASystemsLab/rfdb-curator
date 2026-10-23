@@ -91,6 +91,11 @@ class BaseServiceSettings(BaseSettings):
     Both services parse it: the curator for validation and form schemas, the
     reader for relation predicates and type/relation labels."""
 
+    project_name: str = "RossijskijFeatrDB"
+    """The name of the knowledge base this deployment serves, shown to users: the
+    reader's HTML page titles, the editor's header, the API documentation.
+    Supplied via ``PROJECT_NAME``."""
+
     # ------------------------------------------------------------------ #
     # Base IRIs                                                            #
     # ------------------------------------------------------------------ #

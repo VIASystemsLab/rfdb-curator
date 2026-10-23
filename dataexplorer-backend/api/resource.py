@@ -422,7 +422,7 @@ def _render_html(graph: Graph, iri: str, namespaces: list[tuple[str, str]]) -> s
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{escape(heading)} — RossijskijFeatrDB</title>
+<title>{escape(heading)} — {escape(settings.project_name)}</title>
 {head_links}
 <style>{_STYLE}</style>
 </head>

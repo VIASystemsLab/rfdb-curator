@@ -39,6 +39,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from rdflib.plugins.parsers.notation3 import BadSyntax
 
+import rfdb_core
 from api.data import router as data_router
 from api.files import router as files_router
 from api.shapes import router as shapes_router
@@ -94,7 +95,7 @@ async def lifespan(app: FastAPI):
        vocab plus optional test data.
     4. Store the returned seed report on ``app.state`` for ``/health``.
     """
-    logger.info("Starting up RossijskijFeatrDB backend…")
+    logger.info("Starting up %s curator backend…", settings.project_name)
 
     # -- 1. Schema services ------------------------------------------------
     try:
@@ -148,9 +149,9 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 
 app = FastAPI(
-    title="RossijskijFeatrDB Data Entry API",
-    description="SHACL-driven data entry backend for the Russian Theatre DB.",
-    version="0.1.0",
+    title=f"{settings.project_name} Data Entry API",
+    description="SHACL-driven data entry backend.",
+    version=rfdb_core.__version__,
     lifespan=lifespan,
 )
 

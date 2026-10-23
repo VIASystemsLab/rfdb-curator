@@ -28,16 +28,18 @@ def get_schema_info(request: Request):
     The base IRIs are served as explicit values rather than looked up by a prefix
     name, so a deployment can declare them under any prefix. The curator frontend
     reads ``dataBaseUri`` to tell this deployment's records from external IRIs.
+    ``projectName`` is the ``PROJECT_NAME`` setting, for the editor's header.
     ``externalIdLinks`` is the ``EXTERNAL_ID_LINKS`` map, predicate IRI → URL
     template, for clients that render identifiers stored as text.
 
     Returns:
-        ``{"version": "2.2.2", "dataBaseUri": "https://…/data/",
+        ``{"projectName": "…", "version": "2.2.2", "dataBaseUri": "https://…/data/",
         "schemaBaseUri": "https://…/schema/", "externalIdLinks": {…}}``.
         ``version`` is ``null`` when the
         schema states no ``owl:versionInfo``.
     """
     return {
+        "projectName": settings.project_name,
         "version": request.app.state.schema_extractor.version,
         "dataBaseUri": settings.data_base_uri,
         "schemaBaseUri": settings.schema_base_uri,

@@ -569,3 +569,9 @@ def test_html_links_an_identifier_stored_as_text() -> None:
     """
     page = _html(_StubStore(turtle=turtle))
     assert '<a href="https://viaf.org/en/viaf/293925180">293925180</a>' in page
+
+
+def test_html_title_names_the_configured_project(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The page title ends with PROJECT_NAME, not a fixed project name."""
+    monkeypatch.setattr(settings, "project_name", "MovieDB")
+    assert "<title>A source — MovieDB</title>" in _html()

@@ -19,6 +19,7 @@ For the conventions your schema must follow, see the data-model contract in
 | Long-text fields | `LONG_TEXT_PREDICATES` | the rfdb list applies; your other text fields get one line |
 | External identifiers shown as links | `EXTERNAL_ID_LINKS` | only VIAF and RISM IDs are linked |
 | File uploads | one shape targeting `schema:DigitalDocument` in your schema (see [data-model.md](data-model.md#digital-documents)) | no upload field; the cleanup script refuses to run while file nodes or stored files exist |
+| Project name | `PROJECT_NAME` (backends, editor); `VITE_APP_TITLE` (graph explorer, at build time) | pages and the editor say RossijskijFeatrDB; the explorer says RFDB Explorer |
 | Welcome guide text | `curator-frontend/src/project/WelcomeGuideContent.jsx` | curators see the rfdb guide |
 | Production domain | `RFDB_DOMAIN` in `.env.prod` | production refuses to start |
 

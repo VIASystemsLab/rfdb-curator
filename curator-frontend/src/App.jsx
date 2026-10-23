@@ -90,6 +90,7 @@ export default function App() {
   const [showContext, setShowContext] = useState(false) // read-only Data Context Panel in the main area
   const [toast, setToast] = useState('') // transient bottom-right confirmation (e.g. after save)
   const [dataBaseUri, setDataBaseUri] = useState(null) // DATA_BASE_URI, from /api/v1/dataexplorer/meta/schema
+  const [projectName, setProjectName] = useState('') // PROJECT_NAME, from the same route
   // Draft cache keyed by `shape::<shapeId>`. Single slot per shape form (last state wins),
   // so unsaved input survives shape/record navigation even though ShapeForm re-hydrates
   // via reset() on every shape/record change. Seeded from sessionStorage (with a 1h TTL)
@@ -208,11 +209,18 @@ export default function App() {
       )
     })
 
-    // The namespace that marks an IRI as one of our records. On failure the
-    // inspector shows record IRIs as plain text instead of links.
+    // The project's name, and the namespace that marks an IRI as one of our
+    // records. On failure the header stays blank and the inspector shows
+    // record IRIs as plain text instead of links.
     apiClient
       .getSchemaInfo()
-      .then((info) => setDataBaseUri(info.dataBaseUri || null))
+      .then((info) => {
+        setDataBaseUri(info.dataBaseUri || null)
+        if (info.projectName) {
+          setProjectName(info.projectName)
+          document.title = `${info.projectName} — Editor`
+        }
+      })
       .catch(() => {
         console.warn(
           'Failed to fetch schema info from /api/v1/dataexplorer/meta/schema; record links disabled.',
@@ -326,7 +334,7 @@ export default function App() {
       {/* ── Left navigation ── */}
       <nav className="app-nav">
         <div>
-          <p className="app-title">RossijskijFeatrDB</p>
+          <p className="app-title">{projectName}</p>
           <p className="app-subtitle">Data Editor</p>
           <div className="nav-actions">
             <button

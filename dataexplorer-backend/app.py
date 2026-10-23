@@ -37,6 +37,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from rdflib.plugins.parsers.notation3 import BadSyntax
 
+import rfdb_core
 from api.data import router as data_router
 from api.entities import router as entities_router
 from api.files import router as files_router
@@ -79,7 +80,7 @@ async def lifespan(app: FastAPI):
     route navigates by, so serving requests without it would return confidently
     wrong answers rather than errors.
     """
-    logger.info("Starting up RossijskijFeatrDB dataexplorer backend…")
+    logger.info("Starting up %s dataexplorer backend…", settings.project_name)
 
     try:
         app.state.schema_extractor = SchemaExtractor(
@@ -132,9 +133,9 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 
 app = FastAPI(
-    title="RossijskijFeatrDB Read API",
-    description="Read-only query and publishing backend for the Russian Theatre DB.",
-    version="0.1.0",
+    title=f"{settings.project_name} Read API",
+    description="Read-only query and publishing backend.",
+    version=rfdb_core.__version__,
     lifespan=lifespan,
 )
 
