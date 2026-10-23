@@ -171,3 +171,18 @@ def test_both_backends_get_the_same_schema_settings(filename: str, variable: str
         f"{filename}: {variable} reaches {sorted(values)}; both backends need it"
     )
     assert len(set(values.values())) == 1, f"{filename}: the two values have drifted: {values}"
+
+
+@pytest.mark.parametrize("filename", COMPOSE_FILES)
+def test_the_project_name_is_required_and_names_everything(filename: str) -> None:
+    """Every stack is named on purpose, and its containers and volumes carry that name.
+
+    The top-level ``name`` must come from ``COMPOSE_PROJECT_NAME`` with no default,
+    so Compose refuses to start an unnamed stack. No service may fix its own
+    ``container_name``: a fixed name stops two stacks running on one host and does
+    not say which stack a container belongs to.
+    """
+    parsed = yaml.safe_load((REPO_ROOT / filename).read_text(encoding="utf-8"))
+    assert parsed["name"].startswith("${COMPOSE_PROJECT_NAME:?"), parsed.get("name")
+    fixed = [name for name, svc in parsed["services"].items() if "container_name" in svc]
+    assert not fixed, f"{filename}: fixed container_name on {fixed}"

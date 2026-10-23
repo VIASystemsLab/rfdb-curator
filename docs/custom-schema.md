@@ -22,6 +22,7 @@ For the conventions your schema must follow, see the data-model contract in
 | Project name | `PROJECT_NAME` (backends, editor); `VITE_APP_TITLE` (graph explorer, at build time) | pages and the editor say RossijskijFeatrDB; the explorer says RFDB Explorer |
 | Welcome guide text | `curator-frontend/src/project/WelcomeGuideContent.jsx` | curators see the rfdb guide |
 | Production domain | `RFDB_DOMAIN` in `.env.prod` | production refuses to start |
+| Compose project name | `COMPOSE_PROJECT_NAME` in `.env` and `.env.prod`, e.g. `moviedb-dev` / `moviedb-prod` | Compose refuses to start; with the rfdb names, your stack and an rfdb stack on the same host would be treated as one |
 
 Where settings go:
 

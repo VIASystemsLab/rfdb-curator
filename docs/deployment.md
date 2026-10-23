@@ -52,6 +52,7 @@ an empty store or fail to find what the writer minted.
 
 | Variable | Service | Required | Description |
 |---|---|---|---|
+| `COMPOSE_PROJECT_NAME` | compose | Yes | Compose project name, required by both compose files: containers are `<name>-<service>-1`, volumes `<name>_<volume>`. `rfdb-dev` in the repo-root `.env` (written by `scripts/env-init.sh`), `rfdb-prod` in `.env.prod`. Each stack on a host needs its own; changing it on a running deployment starts new, empty volumes. |
 | `TRIPLESTORE` | both | No | Which `TripleStore` implementation to build. Only `oxigraph` ships today; the seam exists so a second one is a config change. Default: `oxigraph`. |
 | `OXIGRAPH_URL` | both | Yes | Base URL of the Oxigraph HTTP endpoint, no trailing slash. `http://localhost:7878` locally, `http://oxigraph:7878` inside Docker. Must match across services. |
 | `DATA_GRAPH_URI` | both | Yes | Named graph URI where instance data is stored and queried. Every SPARQL read uses `FROM <uri>`; every Turtle load targets `?graph=<uri>`. Must match across services. |
@@ -357,10 +358,14 @@ unreachable.
   tolerance. Separately is worse than useless: triples restored without their blobs leave
   records pointing at files that do not exist.
 
+  Each volume is named `<COMPOSE_PROJECT_NAME>_<volume>`, and the project name is in
+  `.env.prod` (`rfdb-prod` unless changed), so the loop reads it from there:
+
   ```bash
+  PROJECT=$(grep '^COMPOSE_PROJECT_NAME=' .env.prod | cut -d= -f2)
   for v in oxigraph_data garage_data garage_meta; do
-    docker run --rm -v "rfdb_$v:/data" -v "$(pwd):/backup" \
-      alpine tar czf "/backup/${v}_$(date +%F).tar.gz" -C /data .
+    docker run --rm -v "${PROJECT}_$v:/data" -v "$(pwd):/backup" \
+      alpine tar czf "/backup/${PROJECT}_${v}_$(date +%F).tar.gz" -C /data .
   done
   ```
 

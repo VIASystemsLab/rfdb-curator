@@ -77,8 +77,8 @@ jobs:
         working-directory: .
         run: |
           set -euo pipefail
-          GARAGE_RPC_SECRET=ci docker compose config -q
-          GARAGE_RPC_SECRET=ci docker compose --profile full config -q
+          COMPOSE_PROJECT_NAME=rfdb-dev GARAGE_RPC_SECRET=ci docker compose config -q
+          COMPOSE_PROJECT_NAME=rfdb-dev GARAGE_RPC_SECRET=ci docker compose --profile full config -q
           PROD=(docker compose -f docker-compose.prod.yml --env-file .env.prod.example)
           COMPOSE_PROFILES= "${PROD[@]}" config -q
           COMPOSE_PROFILES=full "${PROD[@]}" config -q

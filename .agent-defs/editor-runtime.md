@@ -71,7 +71,10 @@ docker compose exec <service> printenv <VAR>   # is the container seeing the con
 **The editor is behind the `full` profile.** A bare `docker compose up` starts the read-only
 stack (Oxigraph, Garage, `dataexplorer-backend`, `graphexplorer-frontend`) and **no editor**.
 Getting it requires `COMPOSE_PROFILES=full` in `.env`, which `scripts/env-init.sh` writes
-but never adds to an existing `.env`, or `--profile full` per invocation.
+but never adds to an existing `.env`, or `--profile full` per invocation. The same `.env`
+must set `COMPOSE_PROJECT_NAME` (`rfdb-dev`), or Compose refuses to start; containers are
+then `rfdb-dev-<service>-1`, so use `docker compose exec <service>`, not a fixed container
+name.
 
 Diagnose this before anything else when `:5173` refuses connections: `docker compose ps`
 showing four containers rather than six is the whole answer, and it is not a broken editor.

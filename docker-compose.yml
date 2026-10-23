@@ -38,6 +38,13 @@
 # depending on `curator-backend` is fine (both `full`); nothing base may depend
 # on anything `full`.
 
+# Project name. Compose names every container <project>-<service>-1 and
+# every volume <project>_<volume>, so the name says which stack each belongs
+# to, and stacks with different names run side by side. Required, read from
+# the repo-root .env (COMPOSE_PROJECT_NAME=rfdb-dev). Two checkouts with the same name are
+# one stack to Compose, so give each its own (a fork: e.g. moviedb-dev).
+name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME in .env, e.g. rfdb-dev}
+
 # ---------------------------------------------------------------------------
 # Shared values, defined once and aliased into each service that needs them.
 # ---------------------------------------------------------------------------
@@ -83,7 +90,6 @@ services:
     # breaks the SPARQL / Graph Store Protocol API contract.
     # Update deliberately and re-run `docker compose up --build`.
     image: oxigraph/oxigraph:0.5.7
-    container_name: rfdb-oxigraph
     restart: unless-stopped
     ports:
       - "7878:7878"
@@ -119,7 +125,6 @@ services:
     # API out from under curator-backend. This image is distroless (only the
     # /garage binary, no shell) — that's why bootstrap runs from the host.
     image: dxflrs/garage:v1.0.1
-    container_name: rfdb-garage
     restart: unless-stopped
     environment:
       # Read by Garage because garage.toml omits `rpc_secret` (no secret in git).
@@ -154,7 +159,6 @@ services:
     build:
       context: .
       dockerfile: curator-backend/Dockerfile
-    container_name: rfdb-curator-backend
     profiles: ["full"]
     restart: unless-stopped
     depends_on:
@@ -292,7 +296,6 @@ services:
     build:
       context: .
       dockerfile: dataexplorer-backend/Dockerfile
-    container_name: rfdb-dataexplorer-backend
     restart: unless-stopped
     depends_on:
       oxigraph:
@@ -381,7 +384,6 @@ services:
       # Explicit, because this Dockerfile also has a `production` stage and
       # Docker defaults to the LAST stage when no target is given.
       target: development
-    container_name: rfdb-curator-frontend
     profiles: ["full"]
     restart: unless-stopped
     depends_on:
@@ -461,7 +463,6 @@ services:
       dockerfile: graphexplorer-frontend/Dockerfile
       # See curator-frontend: the Dockerfile has a `production` stage as well.
       target: development
-    container_name: rfdb-graphexplorer-frontend
     restart: unless-stopped
     depends_on:
       dataexplorer-backend:

@@ -85,12 +85,14 @@ docker compose up
 **Which services start is a mode**, not a fixed list. Base services (Oxigraph, Garage, the
 read backend, the graph explorer) run in every mode, and the two curator services are gated
 behind the `full` profile — so a bare `docker compose up` is the read-only stack a public
-instance would run. `scripts/env-init.sh` writes `COMPOSE_PROFILES=full` into `.env`, so
+instance would run. `scripts/env-init.sh` writes `COMPOSE_PROJECT_NAME=rfdb-dev` (required: it
+names the containers and volumes) and `COMPOSE_PROFILES=full` into `.env`, so
 development gets the whole six-service stack by default.
 
 `env-init.sh` refuses to overwrite an existing `.env`, so an `.env` written another way
-needs `COMPOSE_PROFILES=full` added by hand, or `--profile full` on each invocation. Without
-it the editor on `:5173` does not start. See
+needs both lines added by hand. Without `COMPOSE_PROJECT_NAME`, Compose refuses to start;
+without `COMPOSE_PROFILES=full` (or `--profile full` on each invocation), the editor on
+`:5173` does not start. See
 [docs/deployment.md](docs/deployment.md#deploy-modes--read-vs-full).
 
 Stop services:

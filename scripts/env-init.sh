@@ -51,6 +51,10 @@ cat > .env <<EOF
 # public instance would run (or pass --profile full per invocation).
 COMPOSE_PROFILES=full
 
+# Project name: containers are rfdb-dev-<service>-1, volumes rfdb-dev_<volume>.
+# Required by docker-compose.yml. Give another checkout on this machine its own.
+COMPOSE_PROJECT_NAME=rfdb-dev
+
 # Garage inter-node RPC secret (openssl rand -hex 32)
 GARAGE_RPC_SECRET=$GARAGE_RPC_SECRET
 

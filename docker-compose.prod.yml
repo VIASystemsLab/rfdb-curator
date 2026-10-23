@@ -55,6 +55,13 @@
 #   docker compose -f docker-compose.prod.yml down          # keeps volumes
 #   docker compose -f docker-compose.prod.yml down -v       # destroys data too
 
+# Project name. Compose names every container <project>-<service>-1 and
+# every volume <project>_<volume>, so the name says which stack each belongs
+# to, and stacks with different names run side by side. Required, read from
+# .env.prod (COMPOSE_PROJECT_NAME=rfdb-prod). Two checkouts with the same name are
+# one stack to Compose, so give each its own (a fork: e.g. moviedb-prod).
+name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME in .env.prod, e.g. rfdb-prod}
+
 # ---------------------------------------------------------------------------
 # Shared values, defined once and aliased into each service that needs them.
 # ---------------------------------------------------------------------------
@@ -136,7 +143,6 @@ services:
   # --------------------------------------------------------------------------
   oxigraph:
     image: oxigraph/oxigraph:0.5.7
-    container_name: rfdb-oxigraph
     restart: unless-stopped
     # No `ports:` — unauthenticated triple store, must stay
     # unreachable from outside the Docker network.
@@ -185,7 +191,6 @@ services:
   #   COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env.prod scripts/garage-init.sh
   garage:
     image: dxflrs/garage:v1.0.1
-    container_name: rfdb-garage
     restart: unless-stopped
     # `internal` ONLY, never `edge`. Garage has no auth at the S3 layer, so a
     # browser must never be able to reach it; blobs leave only through the
@@ -238,7 +243,6 @@ services:
     build:
       context: .
       dockerfile: dataexplorer-backend/Dockerfile
-    container_name: rfdb-dataexplorer-backend
     restart: unless-stopped
     depends_on:
       # Store and blob-storage health ONLY — never a seed or import step. This
@@ -322,7 +326,6 @@ services:
         # Served under a path, and Vite bakes asset URLs against `base`. Set to
         # "/" for a read-only host that serves the explorer at the root.
         VITE_BASE_PATH: "${VITE_EXPLORER_BASE_PATH:-/explorer/}"
-    container_name: rfdb-graphexplorer-frontend
     restart: unless-stopped
     depends_on:
       dataexplorer-backend:
@@ -359,7 +362,6 @@ services:
   # /api/v1/curator/* → writer, /api/v1/dataexplorer/* and /rdf/* → reader.
   proxy:
     image: caddy:2-alpine
-    container_name: rfdb-proxy
     restart: unless-stopped
     depends_on:
       # Base services only — a `full`-profile dependency here would make the
@@ -410,7 +412,6 @@ services:
     build:
       context: .
       dockerfile: curator-backend/Dockerfile
-    container_name: rfdb-curator-backend
     profiles: ["full"]
     restart: unless-stopped
     depends_on:
@@ -505,7 +506,6 @@ services:
         # Browser-facing deep link ("Open in Explorer"), so an absolute URL on
         # the public domain — not a service name.
         VITE_EXPLORER_BASE: "https://${RFDB_DOMAIN:?Set RFDB_DOMAIN in .env.prod}/explorer"
-    container_name: rfdb-curator-frontend
     profiles: ["full"]
     restart: unless-stopped
     depends_on:

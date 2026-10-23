@@ -57,6 +57,11 @@ Both scripts are idempotent. After setup, ordinary runs need only:
 docker compose up --build
 ```
 
+`env-init.sh` also writes `COMPOSE_PROJECT_NAME=rfdb-dev` into `.env`. Compose requires it
+and names every container `rfdb-dev-<service>-1` and every volume `rfdb-dev_<volume>` after
+it. Another checkout on the same machine (a fork, a second clone) needs its own name, or
+Compose treats both as one stack.
+
 `env-init.sh` writes `COMPOSE_PROFILES=full` into `.env`, which is what makes that command
 bring up all six services. Without it (an `.env` written by hand, for instance) you get the
 read-only four and no editor on `:5173`. See
@@ -197,7 +202,7 @@ When the RFDB namespaces change, update these locations together:
 Quick check from repo root:
 
 ```bash
-rg -n 'https://rosfeatr\.eu/rdf/|https://rfdb\.it/data/' schema data curator-backend rfdb-core tests docs AGENTS.md .agent-defs
+rg -n 'https://rosfeatr\.eu/rdf/' schema data curator-backend rfdb-core tests docs AGENTS.md .agent-defs
 ```
 
 ---
@@ -294,40 +299,44 @@ A good PR description covers: what changed, whether the SHACL schema changed, wh
 ## 8. Quick Regex Log Checks (when UI submit appears to do nothing)
 
 Backend structured logs are written to `/app/logs/app.jsonl` inside the
-`curator_backend_logs` volume (the reader has its own, `dataexplorer_backend_logs` —
-swap the volume name in the commands below to inspect it). You can query them without
-entering a container:
+`<project>_curator_backend_logs` volume (the reader has its own,
+`<project>_dataexplorer_backend_logs`: swap the volume name in the commands below to
+inspect it). `<project>` is `COMPOSE_PROJECT_NAME` from the repo-root `.env` (`rfdb-dev` by
+default), so read it from there first. You can then query the logs without entering a
+container, even with the backend stopped:
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine ls -l /logs
+PROJECT=$(grep '^COMPOSE_PROJECT_NAME=' .env | cut -d= -f2)
+LOGS="${PROJECT}_curator_backend_logs"
+docker run --rm -v "$LOGS:/logs" alpine ls -l /logs
 ```
 
 Start with broad error scan:
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine sh -lc \
-	"rg -n -i 'error|exception|traceback|validation|shacl|httpexception' /logs/app.jsonl"
+docker run --rm -v "$LOGS:/logs" alpine \
+	grep -n -i -E 'error|exception|traceback|validation|shacl|httpexception' /logs/app.jsonl
 ```
 
 Check whether POST `/api/v1/curator/entities` was hit at all:
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine sh -lc \
-	"rg -n 'POST|/api/v1/curator/entities|create_or_update_entity|validationReport' /logs/app.jsonl"
+docker run --rm -v "$LOGS:/logs" alpine \
+	grep -n -E 'POST|/api/v1/curator/entities|create_or_update_entity|validationReport' /logs/app.jsonl
 ```
 
 Target your example payload text (`Expression 1`, `en`):
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine sh -lc \
-	"rg -n -i 'Expression 1|\"en\"|rdfs:label|core:text|langString' /logs/app.jsonl"
+docker run --rm -v "$LOGS:/logs" alpine \
+	grep -n -i -E 'Expression 1|"en"|rdfs:label|core:text|langString' /logs/app.jsonl
 ```
 
 Live-tail only relevant lines while retrying submit in UI:
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine sh -lc \
-	"tail -f /logs/app.jsonl" | rg --line-buffered -i 'POST|/api/v1/curator/entities|Expression 1|validation|error|exception|shacl'
+docker run --rm -v "$LOGS:/logs" alpine tail -f /logs/app.jsonl \
+	| grep --line-buffered -i -E 'POST|/api/v1/curator/entities|Expression 1|validation|error|exception|shacl'
 ```
 
 If using Docker and file logs look empty, check container logs too:
