@@ -171,6 +171,22 @@ are deletions and need the same explicit approval, plus a check of what is
 about to go (run the equivalent `SELECT` and report the count first). See
 `build-commands.md` → "Seeding and Data Reset".
 
+## Versioning
+
+Decided by the user on 2026-10-23. The whole repository carries one version.
+
+- Semantic versioning, MAJOR.MINOR.PATCH. The project stays at 0.x until the
+  user declares it stable: until then a breaking change bumps MINOR, and a
+  feature or fix bumps PATCH.
+- Every bump is its own commit, `chore: bump the version to X.Y.Z [BOT]`,
+  made after the changes it releases. It sets the same number in all five
+  manifests (`rfdb-core/`, `curator-backend/` and `dataexplorer-backend/`
+  `pyproject.toml`; `curator-frontend/` and `graphexplorer-frontend/`
+  `package.json`) and in their lockfiles.
+- That commit carries an annotated tag, `vX.Y.Z`.
+- The bump and the tag each need the exact number confirmed first, as
+  `code-style.md` requires.
+
 ## Commits
 
 ### Shared files across commits
