@@ -2,13 +2,13 @@
 
 Mounted as ``GET /rdf/data/{file_id}/content`` — inside the stable data space, not
 under ``/api``, because the bytes are a **representation of the resource** whose
-IRI is ``/rdf/data/{file_id}`` (D8). This is the URL that ``schema:contentUrl``
-points at, so it is a persisted identifier and must never move again.
+IRI is ``/rdf/data/{file_id}``. This is the URL that ``schema:contentUrl``
+points at, so it is a persisted identifier and must never move.
 
 The read half of the upload-first digital-copy flow. Staging (``POST
 /files/staged``), the server-side metadata re-derivation and the promotion to
-``registered/`` all stayed in curator-backend — this service only ever hands
-bytes out.
+``registered/`` belong to curator-backend; this service only ever hands bytes
+out.
 
 Two questions get answered here, and keeping them apart is the whole design:
 
@@ -23,13 +23,13 @@ Two questions get answered here, and keeping them apart is the whole design:
    first, then ``staged/``, because a promotion can fail *after* the entity
    write succeeds (the write path logs a warning and leaves the object for
    ``curator-backend/scripts/cleanup_files.py``). Such a file is published and
-   must download — but it is also a fault, so it is served with
-   ``X-RFDB-File-State: awaiting-promotion`` and a warning rather than silently,
-   which is how a stalled reconciler used to stay invisible.
+   must download, but it is also a fault, so it is served with
+   ``X-RFDB-File-State: awaiting-promotion`` and a logged warning rather than
+   silently, which keeps a stalled reconciler visible.
 
-Deciding (1) on the storage prefix instead of on RDF is what made those two
-states indistinguishable: a legitimately-staged file and one whose promotion had
-broken both answered plain ``200``.
+(1) is decided on RDF, never on the storage prefix, because the prefix cannot
+tell those two states apart: an unsubmitted upload and a published file whose
+promotion broke both sit under ``staged/``.
 
 Downloads are proxied through the backend (never a direct browser→Garage path)
 so Garage can stay on the internal network in production.

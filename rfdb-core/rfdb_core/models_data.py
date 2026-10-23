@@ -7,7 +7,7 @@ FastAPI), and the curator's record list is generated from the same schema. A
 copy per service would let the two drift silently — the frontend talks to both.
 
 The write-path models (``EntityData``, ``DataCreateResponse``,
-``ValidationResult``, ``TripleObject``) stay in the curator: they describe
+``ValidationResult``, ``TripleObject``) live in the curator: they describe
 mutations, which only that service performs.
 """
 

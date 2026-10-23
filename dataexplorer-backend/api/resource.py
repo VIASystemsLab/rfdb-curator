@@ -2,11 +2,10 @@
 
 This is what makes RFDB's persisted IRIs *cool*: an entity's IRI is
 ``https://rosfeatr.eu/rdf/data/{local_name}``, production serves that host, so
-visiting the identifier returns the resource (D9). No ``?iri=`` parameter, which an
-earlier sketch of this endpoint had — once the IRI *is* the URL, there is nothing
-to pass.
+visiting the identifier returns the resource. There is no ``?iri=`` parameter:
+once the IRI *is* the URL, there is nothing to pass.
 
-Two things follow from being a data space rather than an application surface (D8):
+Two things follow from being a data space rather than an application surface:
 
   * **Unversioned.** Versioning an identifier that is persisted inside triples is a
     contradiction; the ``/api/v1/…`` routes carry the version instead.
@@ -20,7 +19,7 @@ Two things follow from being a data space rather than an application surface (D8
 Five representations, none of them costing a dependency: four are rdflib
 serializations, and the HTML one is an f-string. Deliberately *not* a template
 engine — ``jinja2`` does not resolve transitively here (Starlette's
-``Jinja2Templates`` is an optional extra), so one page would have meant adding a
+``Jinja2Templates`` is an optional extra), so one page would mean adding a
 dependency, and this page has no sibling to share a layout with.
 
 So a browser gets HTML on ``/rdf/data/{id}``. ``/rdf/schema/{name}`` stays
@@ -76,8 +75,8 @@ DEFAULT_MEDIA_TYPE = "text/turtle"
 #   ``rfdb`` — the default view: every triple that mentions the resource.
 #   ``alt``  — the alternates listing (which representations exist).
 # Tokens rather than profile URIs, deliberately: a profile URI minted under
-# ``/rdf/`` would be a permanent public identifier we then owe a representation
-# (D8), and no client has asked for one. For the same reason no
+# ``/rdf/`` would be a permanent public identifier we then owe a representation,
+# and no client has asked for one. For the same reason no
 # ``Link: rel="profile"`` header is emitted — the alternates it would advertise
 # are already carried by ``rel="alternate"``, which needs no vocabulary of ours.
 PROFILES = ("rfdb", "alt")
@@ -160,8 +159,8 @@ def _variant_url(media_type: str, iri: str = "") -> str:
 
     ``quote`` is load-bearing rather than defensive: a query string is
     form-encoded, so the ``+`` in ``application/ld+json`` would reach the handler
-    as a space. Emitting it raw — which the first cut of this endpoint did in
-    ``Content-Location`` — advertises a URL that answers 400. Relative when
+    as a space. Emitting it raw, in ``Content-Location`` or a ``Link`` header,
+    would advertise a URL that answers 400. Relative when
     ``iri`` is omitted, which is what the HTML page's own links want so they
     resolve against whichever host is serving.
     """
@@ -175,8 +174,8 @@ def _alternates(iri: str, supported: tuple[str, ...]) -> Graph:
     resource that is substantially the same as the described resource, but in
     another format", which is precisely an alternate representation — rather than
     with the ALTR vocabulary Prez uses. ``dcterms:`` is already one of the
-    project's prefixes, and following the ConnegP *convention* without adopting
-    its stack is this refactor's recorded non-goal.
+    project's prefixes, and this service follows the ConnegP *convention*
+    without adopting the Prez stack.
 
     devnote: the ceiling is a client that insists on literal ALTR predicates. The
     upgrade is to add those triples alongside these, not to restructure — the
@@ -236,8 +235,8 @@ def _respond(
 # The path each served namespace lives at, derived from the namespace rather than
 # written out: ``DATA_BASE_URI`` is ``https://rosfeatr.eu/rdf/data/`` and this router
 # is mounted at ``/rdf``, so the namespace's path component *is* the route. That
-# identity is the whole of D9, and deriving it keeps these links correct if the
-# namespace ever moves.
+# identity is what makes a persisted IRI dereferenceable, and deriving it keeps
+# these links correct if the namespace ever moves.
 #
 # Links are emitted path-only for a second reason: a persisted IRI names
 # rosfeatr.eu, but the reader may answer on any non-production host, so an
@@ -253,8 +252,8 @@ _IMPLICIT_DATATYPE = str(XSD.string)
 
 # The datatype that says a literal's text is a URL. ``schema:contentUrl`` carries
 # it, and must stay a literal rather than an IRI: the shipped schema declares
-# ``sh:datatype xsd:anyURI``, so the IRI form dereferences perfectly and fails
-# SHACL (D9, the way that was learned).
+# ``sh:datatype xsd:anyURI``, so the IRI form would dereference perfectly and
+# fail SHACL.
 _URI_DATATYPE = str(XSD.anyURI)
 
 _TYPE = str(RDF.type)
@@ -331,11 +330,10 @@ def _term(term: object, namespaces: list[tuple[str, str]], link_template: str | 
 
         datatype = str(term.datatype) if term.datatype else ""
         # An xsd:anyURI literal *is* a URL, and on a digital copy it is the one
-        # that matters: schema:contentUrl, which D9 made absolute and
-        # dereferenceable. Linking it through _href re-bases it onto the serving
-        # host, so the page a developer is reading reaches that stack's bytes
-        # rather than production's. Left as text before it was clear _href already
-        # solved that — the page it appears on is otherwise a dead end.
+        # that matters: schema:contentUrl, which is absolute and dereferenceable.
+        # Linking it through _href re-bases it onto the serving host, so the page
+        # a developer is reading reaches that stack's bytes rather than
+        # production's. Left as text, it would make the page a dead end.
         if datatype == _URI_DATATYPE and (href := _href(str(term))):
             value = f'<a href="{escape(href, quote=True)}">{value}</a>'
         if datatype and datatype != _IMPLICIT_DATATYPE:

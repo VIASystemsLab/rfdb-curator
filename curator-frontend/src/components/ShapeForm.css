@@ -101,8 +101,8 @@
   transition:
     border-color var(--transition-fast),
     box-shadow var(--transition-fast);
-  /* width: 100% is intentionally omitted here — grid cells size the input.
-     Full width is only needed for standalone inputs outside a grid context. */
+  /* Fill the grid cell or container; border-box keeps padding and border
+     inside that width. */
   width: 100%;
   box-sizing: border-box;
 }

@@ -1,7 +1,7 @@
 """Read-side view of digital-copy state: RDF vs. object storage.
 
-Everything here is read-only, and it is needed on both sides of the writer/reader
-split, which is why it lives in the shared library:
+Everything here is read-only, and both the writer and the reader need it, which
+is why it lives in the shared library:
 
   * the reader's ``GET /api/v1/dataexplorer/meta/files`` renders these counts in the Data
     Context Panel;
@@ -42,12 +42,10 @@ def file_content_url(file_id: str, data_base: str) -> str:
     *representation of the resource*:
     ``https://rosfeatr.eu/rdf/data/File_x/content``.
 
-    Absolute on purpose, which **reverses** this function's earlier reasoning
-    that a persisted value "must not bake in a host" (decision D9). That was
-    right while the value was an application path and the host was a deployment
-    detail; it is wrong for a published identifier, where the host is part of the
-    identity. The payoff: an exported graph is self-contained and correct with no
-    base-URL side channel, and the URL resolves by being visited.
+    Absolute on purpose: persisted IRIs and ``contentUrl`` values are published
+    identifiers, and for a published identifier the host is part of the identity.
+    An exported graph is therefore self-contained and correct with no base-URL
+    side channel, and the URL resolves by being visited.
 
     Note for clients: this is the **identifier**. Any deployment whose reader is
     not on ``data_base``'s host — every dev stack — must re-base the path onto
@@ -72,11 +70,11 @@ def staged_content_url(file_id: str) -> str:
     path re-derives ``schema:contentUrl`` with :func:`file_content_url`, so what
     lands in RDF is always the published path.
 
-    Still **relative**, deliberately, now that :func:`file_content_url` is
-    absolute: a staged file is not a published resource and has no identity to
-    publish — it is one curator's working state on one service. That contrast is
-    now load-bearing on the client, which picks a base by whether the value is
-    absolute (published → the read origin) or relative (staged → this writer).
+    **Relative**, deliberately, unlike :func:`file_content_url`: a staged file is
+    not a published resource and has no identity to publish; it is one curator's
+    working state on one service. The client relies on that contrast, picking a
+    base by whether the value is absolute (published → the read origin) or
+    relative (staged → this writer).
     """
     return f"/api/v1/curator/files/staged/{file_id}"
 

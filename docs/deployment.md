@@ -18,12 +18,11 @@ The development and testing stack is the `docker-compose.yml` at the repository 
 it running with the [Quick Start](../README.md#quick-start); the sections below document
 the configuration knobs, the data-reset modes, and the seed sources it uses.
 
-> ⚠ **`docker compose up` no longer starts the editor.** Read mode is now the default in
+> ⚠ **A bare `docker compose up` does not start the editor.** Read mode is the default in
 > both compose files (see [Deploy modes](#deploy-modes--read-vs-full)). For the whole
-> stack, add `COMPOSE_PROFILES=full` to your repo-root `.env` — that is what
-> `scripts/env-init.sh` writes for a fresh checkout, and it refuses to overwrite an
-> existing `.env`, so on an existing clone this is a one-line manual addition. Or pass
-> `--profile full` on each invocation.
+> stack, set `COMPOSE_PROFILES=full` in the repo-root `.env`, which `scripts/env-init.sh`
+> writes; it refuses to overwrite an existing `.env`, so an `.env` written another way
+> needs the line added by hand. Or pass `--profile full` on each invocation.
 
 ### Configuration
 
@@ -66,31 +65,29 @@ an empty store or fail to find what the writer minted.
 | `CORS_ORIGINS` | both | Yes | JSON array string of allowed CORS origins, e.g. `["http://localhost:5173"]`. Must not contain `"*"` — the app aborts at import time if it does. The reader needs **both** frontend origins. In production it is not set by hand: `docker-compose.prod.yml` builds it from `RFDB_DOMAIN`. |
 | `S3_ENDPOINT` | both | No | Object-storage endpoint for digital copies. Empty disables it: `GET /api/v1/dataexplorer/meta/files` then reports `configured: false` instead of erroring. |
 | `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | both | No | Object-storage credentials. The writer stages and promotes objects; the reader streams them out. |
-| `LOG_FILE`, `LOG_LEVEL`, `TRUNCATE_LOG_ON_STARTUP`, `TRUNCATE_LOG_ON_FRESH_CONTAINER_START` | both | Yes / No | Structured JSON-lines logging. Each service writes to its own volume. |
+| `LOG_FILE`, `LOG_LEVEL`, `TRUNCATE_LOG_ON_STARTUP`, `TRUNCATE_LOG_ON_FRESH_CONTAINER_START` | both | Yes / No | Structured JSON-lines logging. Each service writes to its own volume. `LOG_LEVEL` is one of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; default `INFO`. |
 | `VOCAB_PATH` | **curator** | Yes | JSON array of controlled-vocabulary Turtle files (`data/rfdb_vocab.ttl` and the Glottolog languages in this repository). Loaded at startup when `SEED_VOCAB_ON_STARTUP=true`. |
 | `DATA_PATH` | **curator** | Yes | Path to the sample-data Turtle file (`data/rfdb_data.ttl` in this repository). Loaded at startup only when `SEED_TEST_DATA_ON_STARTUP=true`. |
 | `RESET_DATA_ON_STARTUP` | **curator** | Yes | `true`/`false`. Destructive: wipes every graph in the store before seeding on every startup. Must be `false` in production. |
 | `SEED_VOCAB_ON_STARTUP` | **curator** | Yes | `true`/`false`. Load `VOCAB_PATH` on every startup. Should be `true` in all environments. |
 | `SEED_TEST_DATA_ON_STARTUP` | **curator** | Yes | `true`/`false`. Load `DATA_PATH` on startup. `true` in dev/test only. |
-| `READ_ONLY` | **curator** | No | `true`/`false`. When `true`, rejects `POST /api/v1/curator/entities` and `DELETE /api/v1/curator/entities/{entityId}` with HTTP 403. Reads are unaffected — they are on the other service. Default: `false`. |
+| `READ_ONLY` | **curator** | No | `true`/`false`. When `true`, rejects `POST /api/v1/curator/entities` and `DELETE /api/v1/curator/entities?id=<iri>` with HTTP 403. Reads are unaffected — they are on the other service. Default: `false`. |
 | `READ_ONLY_SHAPES` | **both** | No | JSON array string of shape IRIs to protect from create/update/delete even when `READ_ONLY` is `false`, e.g. `["https://rosfeatr.eu/rdf/schema/LanguageShape"]`. Also drives the `readOnly` flag on both services' shapes route. **Give both backends the same value** — `docker-compose.yml` uses a single YAML anchor for exactly this reason; if they drift, clients get different flags depending on which service they asked. Default: `[]`. |
 | `MAX_UPLOAD_MB` | **curator** | No | Per-file ceiling for staged uploads; `0` disables the cap. |
 
 Seeding does not require a running web server: `python curator-backend/scripts/seed.py`
 performs the same readiness-poll → optional-reset → seed sequence as the lifespan, so a
 deployment can populate the store as a one-shot job.
-| `LOG_LEVEL` | No | Minimum log level for file and console handlers. Default: `INFO`. One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
 
 The S3/object-storage (`S3_*`) and Garage (`GARAGE_RPC_SECRET`) variables consumed by the
 compose file are generated into `.env` by `scripts/env-init.sh`; see the
 [Quick Start](../README.md#quick-start). Backend log/troubleshooting details are in
 [development.md](development.md).
 
-`LOG_FILE` (the JSON-lines log path) isn't listed above: it's pinned to the
-`curator_backend_logs` / `dataexplorer_backend_logs` volume mounts in the compose
-files and isn't meant to be
-overridden in the supported deployments — changing it without also updating
-the volume mount would write logs outside the persisted volume.
+`LOG_FILE` (the JSON-lines log path) is pinned to the `curator_backend_logs` /
+`dataexplorer_backend_logs` volume mounts in the compose files. Leave it as set there:
+changing it without also updating the volume mount would write logs outside the
+persisted volume. The application rotates that file itself (10 MB, five backups).
 
 ### Data reset modes
 
@@ -146,8 +143,8 @@ are gated. Set `COMPOSE_PROFILES=full` in `.env` / `.env.prod` to make full mode
 default for an instance.
 
 In read mode a public deployment omits the **entire `/api/v1/curator/*` namespace** rather
-than deploying a service that refuses each route with a 403. That works because
-[D8](architecture.md#api-reference) names every prefix after the service that owns it — see
+than deploying a service that refuses each route with a 403. That works because every
+prefix is named after the service that owns it ([API reference](architecture.md#api-reference)) — see
 [the proxy section](#the-proxy) for what the edge does with those paths when nothing is
 behind them.
 
@@ -212,14 +209,11 @@ That loads vocab/fixtures only — never curated data or blobs. (It is
 
 ## Production Deployment
 
-> **Status — complete but never deployed.** Every piece the stack needs now exists and the
-> whole topology has been exercised locally: both frontend production images build, and the
-> real `proxy/Caddyfile` was run against them plus live backends, checking each route (see
-> [Verify](#5-verify)). What has *not* happened is a real deployment — no host, no domain,
-> no certificate, no data. Treat the procedure below as tested-in-parts rather than
-> battle-worn, and expect the first run to surface something about DNS, TLS or file
-> ownership that a local run cannot. **One known gap remains:** log rotation, at the end of
-> this section.
+> **Status: complete, not yet deployed.** The whole topology runs locally: both frontend
+> production images build, and `proxy/Caddyfile` serves each route in [Verify](#5-verify)
+> against live backends. There is no host, domain, certificate or data yet, so treat the
+> procedure below as tested in parts, and expect the first real deployment to surface
+> something about DNS, TLS or file ownership that a local run cannot.
 
 ### Target topology
 
@@ -257,11 +251,9 @@ in read mode:
 | `/explorer/*` | `graphexplorer-frontend:80` (prefix stripped) |
 | everything else | `$RFDB_ROOT_UPSTREAM`, default `curator-frontend:80` |
 
-That it *can* be a prefix table is the payoff of [D8](architecture.md#api-reference). Before the
-URL re-cut, `GET /api/data/{id}` was the reader and `DELETE /api/data/{id}` the writer — the
-same path on two services, which no prefix-keyed proxy can split. This document used to say
-"the proxy must also learn to split `/api` by route ... This is new work in prod." It is not
-work any more; it is five `handle` blocks.
+It can be a prefix table because every prefix names the service that owns it
+([API reference](architecture.md#api-reference)): no path is served by two services, so
+nothing needs splitting by method.
 
 Three details that are load-bearing rather than stylistic:
 
@@ -308,8 +300,9 @@ cp .env.prod.example .env.prod && chmod 600 .env.prod
 Fill in real values. Every `${VAR:?…}` in the compose file must be set or the stack refuses
 to start — that is deliberate, so a missing value fails immediately instead of deploying a
 dev default. `.env.prod.example` documents each one, including which variables are
-intentionally *not* env knobs (`READ_ONLY_SHAPES` is one YAML anchor per compose file, per
-`D11`; `S3_ENDPOINT`/`S3_REGION` are fixed by the topology).
+intentionally *not* env knobs (`READ_ONLY_SHAPES` is one YAML anchor per compose file, so
+both backends serve the same `readOnly` flags; `S3_ENDPOINT`/`S3_REGION` are fixed by the
+topology).
 
 Set `COMPOSE_PROFILES` to pick the [mode](#deploy-modes--read-vs-full) for this instance.
 

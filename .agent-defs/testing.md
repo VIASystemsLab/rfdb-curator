@@ -22,7 +22,7 @@ member picks up the right suite.
 top-level `api` package. In a single process `from api.data import …` resolves to
 whichever service was imported first and `sys.modules` caches it, so half the suite
 would silently test the wrong service. Separate processes make that impossible
-rather than merely unlikely. (Decision D2 in the modular-services refactor plan.)
+rather than merely unlikely.
 CI mirrors this with one job per member.
 
 ## Test Structure

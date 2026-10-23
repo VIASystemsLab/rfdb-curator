@@ -92,7 +92,7 @@ that fetches an IRI:
 
 - visiting a record's IRI returns 404;
 - links on the reader's HTML record pages point at paths nothing serves;
-- uploaded PDFs no longer open from the editor, because their
+- uploaded PDFs do not open from the editor, because their
   `schema:contentUrl` is `<DATA_BASE_URI>File_…/content`.
 
 Making these routes follow the settings is planned (see `TODO.md`, "Platform &

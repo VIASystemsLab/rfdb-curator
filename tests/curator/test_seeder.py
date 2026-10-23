@@ -1,6 +1,6 @@
 """Unit tests for the startup data seeder.
 
-Covers the vocab_paths list handling added in the Glottolog language dropdown feature:
+Covers the ``vocab_paths`` list handling:
 - bare string VOCAB_PATH is auto-wrapped in a list by the config validator
 - JSON array with one path seeds one file
 - JSON array with two paths seeds both files

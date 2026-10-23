@@ -11,7 +11,7 @@ jobs:
   # because both services own a top-level `api` package: in a single pytest
   # process `from api.data import …` resolves to whichever service was imported
   # first. Separate jobs mean separate interpreters, so the ambiguity cannot
-  # arise. See decision D2 in the modular-services refactor plan.
+  # arise.
   #
   # The repo-wide checks (ruff, schema parse, prefix map) live on the
   # rfdb-core job so they run exactly once.

@@ -1,10 +1,9 @@
 # proxy/spa.Caddyfile — the static server inside each frontend's production image.
 #
 # ONE file, COPYed into BOTH frontend images (their build context is the repo
-# root, so both can reach it). Two near-identical copies would drift, and the
-# whole point of the anchor discipline elsewhere in this repo — the
-# READ_ONLY_SHAPES anchor, the single-sourced shape catalogue — is that a value
-# needed in two places should exist in one.
+# root, so both can reach it). Two near-identical copies would drift. A value
+# needed in two places exists in one, as with the READ_ONLY_SHAPES anchor in the
+# compose files and the one shape-catalogue implementation both backends serve.
 #
 # This is NOT the edge config. That is proxy/Caddyfile: it terminates TLS,
 # routes the API prefixes, and reverse-proxies to the two servers this file

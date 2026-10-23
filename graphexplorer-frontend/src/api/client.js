@@ -7,12 +7,11 @@
  * service; the explorer never needs the curator, which is what lets it keep
  * working with the write tier stopped.
  *
- * Routes are namespaced by owning service (`/api/v1/dataexplorer/…`, per D8), so a
- * misconfigured base fails with a clean 404 instead of a 405 from a path that
- * happens to exist on the writer for a different method.
+ * Each URL prefix names the service that owns it (`/api/v1/dataexplorer/…` here),
+ * and no path exists on both services, so a misconfigured base fails with a 404.
  *
  * `getShapes` returns the same payload the curator serves, `readOnly` flags
- * included (D11). This app ignores those flags: nothing here writes.
+ * included. This app ignores those flags: nothing here writes.
  *
  * Every method returns the unwrapped response body.
  */

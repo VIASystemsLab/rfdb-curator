@@ -161,10 +161,11 @@ app = FastAPI(
 # note; it is load-bearing.
 configure_app(app, cors_origins=settings.cors_origins)
 
-# Writer surface only, under a prefix that names its owner (D8). Entity search,
-# graph neighbourhoods and the meta routes are reads served by
-# dataexplorer-backend; the shapes route is served here *and* there, now with an
-# identical payload from one shared implementation (D11).
+# Writer surface only, under a prefix that names the service owning it. Entity
+# search, graph neighbourhoods and the meta routes are reads served by
+# dataexplorer-backend; the shapes route is served here *and* there, with an
+# identical payload from one shared implementation, so the editor can list shapes
+# with the writer down.
 #
 # Naming the service in the path is what makes wrong-service requests legible and
 # read-only deployments trivial — the whole namespace is simply absent rather than

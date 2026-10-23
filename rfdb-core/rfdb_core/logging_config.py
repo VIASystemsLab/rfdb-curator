@@ -120,13 +120,12 @@ def configure_logging(
     # Replace whatever is on root rather than stacking a second pair, which
     # uvicorn --reload would otherwise do on every module re-import.
     #
-    # close() on the way out is the part that matters: this used to be
-    # `root.handlers.clear()`, which drops the reference to an already-open
-    # RotatingFileHandler without releasing its file descriptor — one leaked
-    # handle per reconfiguration. Python ignores ResourceWarning by default, so
-    # it was invisible until the warning filters were turned off. Closing a
-    # StreamHandler is safe: only FileHandler.close() touches the stream, so
-    # sys.stderr (and pytest's capture buffers) survive this.
+    # close() on the way out is the part that matters: `root.handlers.clear()`
+    # alone would drop the reference to an open RotatingFileHandler without
+    # releasing its file descriptor, leaking one handle per reconfiguration.
+    # Python ignores ResourceWarning by default, so the leak would go unreported.
+    # Closing a StreamHandler is safe: only FileHandler.close() touches the
+    # stream, so sys.stderr (and pytest's capture buffers) survive this.
     for existing in root.handlers[:]:
         root.removeHandler(existing)
         existing.close()

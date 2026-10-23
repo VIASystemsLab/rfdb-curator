@@ -108,7 +108,8 @@ class Settings(BaseServiceSettings):
     whereas mode decides whether the curator is deployed at all."""
 
     # ``read_only_shapes`` is inherited: besides gating writes, it tells any
-    # client which shapes are editable, so the reader needs it too (D11).
+    # client which shapes are editable, so the reader needs it too: both services
+    # serve the same shape list, and the editor works with the writer down.
 
     max_upload_mb: int = 500
     """Per-file upload ceiling in megabytes. Uploads exceeding this are

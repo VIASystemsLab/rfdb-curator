@@ -15,9 +15,6 @@ source .venv/bin/activate       # the venv is at the ROOT, not curator-backend/.
 `cd curator-backend && uv sync …` works identically — uv walks up to the workspace root — so
 either is fine. Use this one environment for all Python checks.
 
-> If you have a stale `curator-backend/.venv` or `curator-backend/uv.lock` from before the workspace
-> existed, they are dead weight; uv ignores both. Delete them at your leisure.
-
 ## Frontend Environment Setup
 
 Node never runs on the host ([platform.md](platform.md)). Each frontend image runs `npm ci`
@@ -106,7 +103,7 @@ docker run --rm \
 	--platform=linux/amd64 \
 	-v "$PWD":/data \
 	stain/jena:5.1.0 \
-	riot --validate /data/data/corporate/prod-inst.ttl
+	riot --validate /data/data/rfdb_vocab.ttl
 ```
 
 Batch (all `.ttl` / `.nt` under `data/`):
@@ -146,7 +143,7 @@ raises a real question.
 5. Only if something looks structurally wrong (cardinality, datatype, class mismatch), run real
    pySHACL — scoped to just the one file plus `schema/rfdb_schema.ttl`, no `inference="rdfs"` unless
    the check specifically needs subclass entailment, and never with `glottolog_language.ttl`
-   merged in (rdfs inference over 38MB is why this used to take minutes).
+   merged in (rdfs inference over 38MB takes minutes).
 
 ## Linting and Formatting
 
@@ -155,7 +152,7 @@ library), `curator-backend/` (writes) and `dataexplorer-backend/` (reads). Ruff 
 pinned in **each member's `[dependency-groups] dev`** (the workspace resolves one
 version for all three), but **its config lives in the root `pyproject.toml`** — one
 `[tool.ruff]` for every member, plus `tests/`. The version is deliberately not repeated
-here: this file said `ruff==0.14.5` for two releases after the pin moved on.
+here, so the pin stays its only copy.
 
 Run ruff **from the repo root**, which is what CI does:
 
@@ -188,12 +185,7 @@ the workspace environment:
   `VIRTUAL_ENV does not match` warning; uv ignores it. Run `deactivate` to clear it.
 - `uv run ruff check .` needs no manual `source .venv/bin/activate` — uv resolves
   the environment itself. If it still fails, run `uv sync --all-extras --dev`.
-- Historical note: ruff genuinely could not run from the repo root before the
-  workspace existed, because there was no project there. That is no longer true, and
-  running from the root is now the *correct* invocation — it is the only one that
-  also checks `rfdb-core/`.
 
 ## Notes
 
-- Do not rely on a root Python package named `rfdbtools`; this repository is a standalone editor stack.
-- The `graphexplorer-frontend/` app (read-only graph visualizer) is an active, first-class frontend — set it up, lint, and build it alongside `curator-frontend/` (see the sections above). Treat only commands referencing Excel generation or ontology download pipelines as legacy unless explicitly reintroduced.
+- The `graphexplorer-frontend/` app (read-only graph visualizer) is a first-class frontend: set it up, lint, and build it alongside `curator-frontend/` (see the sections above).

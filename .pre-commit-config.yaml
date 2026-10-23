@@ -14,7 +14,7 @@
 # The hooks run ruff FROM THE REPO ROOT, matching CI. [tool.ruff] lives in the
 # root pyproject.toml, and its explicit
 # src = ["curator-backend", "dataexplorer-backend", "rfdb-core"] means first-party
-# import detection no longer depends on the working directory — so
+# import detection does not depend on the working directory — so
 # there is nothing to keep in sync by cd-ing into a member. Running from the root
 # is also what brings rfdb-core/ and tests/ into scope.
 #
@@ -54,8 +54,8 @@ repos:
         files: ^((curator|dataexplorer)-backend|rfdb-core|tests)/.*\.py$
       # Every @prefix across the schema/data TTL files must be declared in the
       # schema's sh:declare, which is the prefix map served by
-      # /api/v1/dataexplorer/meta/prefixes. Fires only when a TTL or the reader
-      # changes; the script picks the files.
+      # /api/v1/dataexplorer/meta/prefixes. Fires only when a TTL or
+      # rfdb-core's prefixes.py changes; the script picks the files.
       - id: prefix-map-check
         name: prefix-map coverage (schema sh:declare vs TTL files)
         language: system

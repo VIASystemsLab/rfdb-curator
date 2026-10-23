@@ -12,13 +12,12 @@ mostly negative, and the absences are the design:
 
 Startup sequence (lifespan context manager):
   1. Parse ``schema/rfdb_schema.ttl`` into a ``SchemaExtractor``.
-  2. Build a ``TripleStore`` via ``build_triplestore(settings)`` (Oxigraph today).
+  2. Build a ``TripleStore`` via ``build_triplestore(settings)`` (Oxigraph by default).
   3. Build the object-storage client for digital-copy downloads.
 
-Exactly three objects land on ``app.state`` — ``schema_extractor``, ``store``,
-``storage`` — which is what the requirement matrix in the modular-services plan
-measured across the six read routers. Anything a handler needs beyond those three
-is a sign it belongs in the writer.
+Exactly three objects land on ``app.state`` (``schema_extractor``, ``store``,
+``storage``), and they are everything the read routers use. Anything a handler
+needs beyond those three is a sign it belongs in the writer.
 
 Note — no readiness poll here, unlike curator-backend:
     The writer polls ``health()`` at startup because it is about to clear and
@@ -144,7 +143,7 @@ app = FastAPI(
 # identically at the edges.
 configure_app(app, cors_origins=settings.cors_origins)
 
-# Two URL spaces with different contracts (D8).
+# Two URL spaces with different contracts.
 #
 #   /rdf/…                     THE DATA. Stable forever, unversioned, public
 #                              identifiers — this is what schema:contentUrl and
@@ -163,13 +162,11 @@ app.include_router(files_router, prefix=RDF_PREFIX, tags=["data"])
 app.include_router(resource_router, prefix=RDF_PREFIX, tags=["data"])
 
 # ---- the operational surface ----------------------------------------------
-# Order is NOT load-bearing here any more, and that is the point. It used to be:
-# data_router owned a greedy `/entities/{entity_id:path}` that swallowed
-# entities_router's `/entities/search` unless this block registered them in
-# exactly this sequence — an invariant expressed three files from either route.
-# Task 11 replaced the greedy parameter with `?id=`, and
-# test_app_contract.py::test_no_route_uses_a_greedy_path_parameter now fails on
-# any future one, so the collision is impossible rather than merely avoided.
+# Order is NOT load-bearing here, and that is the point. Entity IRIs travel as
+# `?id=`, so no route has a greedy `{...:path}` parameter that could swallow a
+# literal sibling such as `/entities/search` depending on registration order.
+# test_app_contract.py::test_no_route_uses_a_greedy_path_parameter fails on any
+# such parameter, so the collision is impossible rather than merely avoided.
 app.include_router(entities_router, prefix=API_PREFIX, tags=["entities"])
 app.include_router(data_router, prefix=API_PREFIX, tags=["entities"])
 app.include_router(shapes_router, prefix=API_PREFIX, tags=["shapes"])
@@ -199,10 +196,9 @@ def health():
           ``"down"`` otherwise.
 
     No ``seed`` key, unlike curator-backend's ``/health``: this service never
-    seeds, so it has no seed report to report. The store-status key is also named
-    ``store`` here rather than the curator's legacy ``oxigraph`` — nothing
-    consumes either one today, and naming it after the seam rather than the
-    implementation is the direction the rest of the code already went.
+    seeds, so it has no seed report to report. The store-status key is named
+    ``store`` (curator-backend calls it ``oxigraph``), after the triplestore seam
+    rather than the implementation behind it.
     """
     return {
         "status": "ok",

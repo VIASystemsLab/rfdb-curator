@@ -382,8 +382,8 @@ def test_delete_rejects_read_only_shape(monkeypatch: pytest.MonkeyPatch) -> None
 def test_shapes_endpoint_stamps_read_only_flag() -> None:
     """The curator's shapes route flags shapes listed in READ_ONLY_SHAPES.
 
-    The stamp itself now lives in ``rfdb_core.shapes`` and is shared with the
-    reader (D11), so the pure-function behaviour is covered once in
+    The stamp itself is in ``rfdb_core.shapes``, shared with the reader so both
+    services serve identical flags, and its pure-function behaviour is covered in
     ``tests/core/test_shapes_stamp.py``. What matters *here* is the curator-side
     wiring: that this service still applies the flag, and applies it from its own
     settings rather than from a hardcoded list.

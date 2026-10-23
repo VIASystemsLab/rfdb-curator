@@ -38,7 +38,7 @@ from rfdb_core.triplestore import build_triplestore  # noqa: E402
 
 def main() -> int:
     # Same structured logging as the service, so a one-shot run lands in the
-    # same JSON-lines file as the startup seed it replaces.
+    # same JSON-lines file as the seed the service runs on startup.
     configure_logging(settings.log_file, settings.log_level)
 
     store = build_triplestore(settings)

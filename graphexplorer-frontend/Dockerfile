@@ -52,9 +52,9 @@ FROM development AS build
 # `environment:` entries. Empty API base = same origin, which is what the edge
 # proxy provides.
 ARG VITE_API_BASE=""
-# Entity-page link base — see the client.js devnote. Empty = same origin, which
-# is what the edge proxy provides; set it only for a build whose reader sits on
-# another origin.
+# Entity-page link base, read as READ_BASE in src/api/client.js. Empty = same
+# origin, which is what the edge proxy provides; set it only for a build whose
+# reader sits on another origin.
 ARG VITE_READ_API_BASE=""
 ARG VITE_APP_TITLE="RFDB Explorer"
 

@@ -12,8 +12,8 @@
 # WHY THIS FILE IS BORING, WHICH IS THE POINT
 # ---------------------------------------------------------------------------
 # Every rule below is a plain path prefix. No method awareness, no per-route
-# tables, no rewriting to disambiguate. That is the whole payoff of D8: the URL
-# space is partitioned by the service that owns it, so routing is a prefix match.
+# tables, no rewriting to disambiguate. The URL space is partitioned by the
+# service that owns it, so routing is a prefix match.
 # Keep it that way: a path served by two services, split only by method, is
 # something a prefix-keyed proxy cannot route.
 #
@@ -110,15 +110,14 @@
 	# client-side routing work, and it is why /entity/Src1 is not a 404. But it
 	# also means anything not routed above gets a 200 and an HTML body:
 	#
-	#   /health          would look healthy to an uptime check with both backends
-	#                    down. Verified: it returned "200 text/html" before this
-	#                    block existed. A monitor cannot tell that apart from a
-	#                    working service, which is worse than not exposing health
-	#                    at all — see the note at the end of this file for why it
-	#                    is not exposed.
+	#   /health          would answer "200 text/html" and look healthy to an
+	#                    uptime check with both backends down. A monitor cannot
+	#                    tell that apart from a working service, which is worse
+	#                    than not exposing health at all — see the note at the end
+	#                    of this file for why it is not exposed.
 	#   /api/v2/…        a wrong version or a typo'd service name would answer 200
-	#                    with a web page, defeating the D8 property that a
-	#                    misdirected API call fails as a legible 404.
+	#                    with a web page, where a misdirected API call should fail
+	#                    as a legible 404.
 	#
 	# Caddy orders `handle` blocks by matcher specificity, not by position, so
 	# these lose to the exact prefixes above and win against the bare fallback.
@@ -135,11 +134,10 @@
 	# RFDB_ROOT_UPSTREAM=graphexplorer-frontend:80 in .env.prod and build that
 	# image with VITE_EXPLORER_BASE_PATH=/ — then the explorer is the site root
 	# and /explorer/* above becomes a harmless second address for it.
-	# The default is not belt-and-braces — it is the fix for a silent failure.
-	# An unset {$VAR} in a Caddyfile is an *empty token*, not an error, so
-	# `reverse_proxy` adapts to a handler with **zero upstreams**: Caddy starts
-	# clean, logs nothing, and answers every request `200` with an empty body.
-	# Observed while verifying this file, and it is indistinguishable from a
+	# The default guards against a silent failure. An unset {$VAR} in a
+	# Caddyfile is an *empty token*, not an error, so `reverse_proxy` adapts to
+	# a handler with **zero upstreams**: Caddy starts clean, logs nothing, and
+	# answers every request `200` with an empty body, indistinguishable from a
 	# working deploy until someone opens the site. With a default, the same
 	# mistake serves the editor instead of nothing.
 	handle {
@@ -153,8 +151,8 @@
 # Both backends serve /health, and neither is exposed here. Two reasons:
 #
 #  1. It would be the one path that means different things on the two services —
-#     exactly what D8 partitioned the URL space to prevent. Exposing it would
-#     need an invented public name for each.
+#     exactly what partitioning the URL space by owning service prevents.
+#     Exposing it would need an invented public name for each.
 #  2. The curator's payload includes a seed report (paths and counts). That is
 #     operator information, not public information.
 #

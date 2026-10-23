@@ -1,8 +1,8 @@
 """Field and shape labels prefer English when the schema gives several languages.
 
 The schema names every field in English and Italian (``sh:name``). Reading one
-value with ``Graph.value`` returned an arbitrary language, so an English UI could
-show "Identificativo RISM".
+value with ``Graph.value`` returns an arbitrary language, so without a preference
+an English UI could show "Identificativo RISM".
 """
 
 from __future__ import annotations

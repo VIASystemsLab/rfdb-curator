@@ -1,7 +1,7 @@
 """Tests for shape resolution in GET /api/v1/dataexplorer/entities/search.
 
 ``?shape=`` takes the full shape URI or its exact local name. A suffix match
-used to resolve "RoleShape" to whichever of RoleShape and AgentRoleShape came
+would resolve "RoleShape" to whichever of RoleShape and AgentRoleShape comes
 first in rfdb_schema.ttl, so these tests run with the shapes in both orders.
 """
 

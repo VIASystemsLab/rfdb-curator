@@ -4,11 +4,11 @@ The anchor shape plus the schema.org terms written for each file node. How a nod
 links to a parent (predicate + parent class) is resolved from the SHACL schema at
 runtime — never hardcoded.
 
-Split out of ``models/files.py`` because these are plain vocabulary constants, not
-response models, and three separate layers need them: ``schema_extractor`` (which
-lives here in rfdb-core), the curator's write path, and the reader's download and
-file-stats routes. Keeping them in a service's ``models/`` package would have made
-this shared library import from that service.
+These are plain vocabulary constants, not response models, and three separate
+layers need them: ``schema_extractor`` (which lives here in rfdb-core), the
+curator's write path, and the reader's download and file-stats routes. Keeping
+them in a service's ``models/`` package would make this shared library import
+from that service.
 """
 
 SCHEMA_NS = "http://schema.org/"

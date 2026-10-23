@@ -36,15 +36,14 @@ dev = [
     "httpx2==2.9.1",
 ]
 
-# NOTE: [tool.ruff] moved to the repo-root pyproject.toml when rfdb-core became a
-# second workspace member — one lint config for every member. Ruff still finds it
-# by walking up from this directory.
+# [tool.ruff] lives in the repo-root pyproject.toml: one lint config for every
+# workspace member. Ruff finds it by walking up from this directory.
 
 [tool.pytest.ini_options]
 # One testpaths per service: both services own a top-level `api` package, so
 # `from api.data import …` is ambiguous in a single pytest process (whichever
 # service is imported first wins sys.modules). Separate runs, separate
-# interpreters, no ambiguity. See decision D2 in the refactor plan.
+# interpreters, no ambiguity.
 testpaths = ["../tests/curator"]
 filterwarnings = [
     'ignore:ConjunctiveGraph is deprecated, use Dataset instead\.:DeprecationWarning:rdflib.plugins.parsers.jsonld',

@@ -98,8 +98,8 @@ RUN npm run build
 FROM caddy:2-alpine AS production
 
 COPY --from=build /app/dist /srv
-# Shared with graphexplorer-frontend — see that file's header for why it is one
-# file rather than two copies.
+# Shared with graphexplorer-frontend; the header of proxy/spa.Caddyfile says why
+# it is one file rather than two copies.
 COPY proxy/spa.Caddyfile /etc/caddy/Caddyfile
 
 EXPOSE 80

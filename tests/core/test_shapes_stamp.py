@@ -1,10 +1,11 @@
-"""The ``readOnly`` stamp is single-sourced — decision D11's required guard.
+"""The ``readOnly`` stamp is single-sourced.
 
-Both services serve a shape catalogue, and the two payloads must be identical. The
-catalogue itself was always shared (one ``SchemaExtractor``, one ``rfdb_schema.ttl``);
-the *flag* was not, and that single divergence produced C20 — the editor could only
-get the flags from the writer, so it rendered an empty sidebar whenever the writer
-was down.
+Both services serve a shape catalogue, and the two payloads must be identical,
+``readOnly`` flags included, so the editor can take the catalogue from the reader
+and keep working with the writer down. The catalogue is shared through one
+``SchemaExtractor`` over one ``rfdb_schema.ttl``; the *flag* must be shared too, or
+the editor depends on the writer for it and shows an empty sidebar whenever the
+writer is down.
 
 The invariant is maintained by sharing the implementation, not by two copies that
 agree today. So this module tests the shared function's behaviour, and then asserts

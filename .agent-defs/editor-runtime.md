@@ -70,9 +70,8 @@ docker compose exec <service> printenv <VAR>   # is the container seeing the con
 
 **The editor is behind the `full` profile.** A bare `docker compose up` starts the read-only
 stack (Oxigraph, Garage, `dataexplorer-backend`, `graphexplorer-frontend`) and **no editor**.
-Getting it requires `COMPOSE_PROFILES=full` in `.env` — which `scripts/env-init.sh` writes,
-but which an `.env` created before the profiles existed will not have — or `--profile full`
-per invocation.
+Getting it requires `COMPOSE_PROFILES=full` in `.env`, which `scripts/env-init.sh` writes
+but never adds to an existing `.env`, or `--profile full` per invocation.
 
 Diagnose this before anything else when `:5173` refuses connections: `docker compose ps`
 showing four containers rather than six is the whole answer, and it is not a broken editor.
@@ -164,10 +163,10 @@ browser — same rule as Browser Verification above.
 - **A 404 on a route you expect to exist:** most likely you asked the wrong service, and the
   path says which one — `/api/v1/curator/*` is the writer (:8000), `/api/v1/dataexplorer/*`
   and all of `/rdf/*` are the reader (:8001). `shapes` is the only route both serve, with an
-  identical payload. A bare `/api/data`, `/api/shapes` etc. is a pre-redesign path and will
-  404 everywhere.
-- **The editor's sidebar is empty while the explorer works:** this used to be expected with
-  `curator-backend` down and is now a **real bug**. The editor fetches its shape catalogue
+  identical payload. A bare `/api/data`, `/api/shapes` etc. is not a route on either
+  service and 404s everywhere.
+- **The editor's sidebar is empty while the explorer works:** this is a **real bug**, even
+  with `curator-backend` down. The editor fetches its shape catalogue
   from the *reader*, which serves the same flags the writer does, so a writer outage should
   cost you editing only — browsing, listing and searching keep working. If the sidebar is
   empty, check that `dataexplorer-backend` is up and that both services received

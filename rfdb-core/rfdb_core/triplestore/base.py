@@ -1,19 +1,17 @@
 """The ``TripleStore`` seam — what both backends may assume of a triplestore.
 
-Mirrors the ``file_storage`` seam that already isolates Garage: routes and seeders
+Mirrors the ``file_storage`` seam that isolates Garage: routes and seeders
 talk to this interface, never to a store's HTTP API, so another store (Fuseki/Jena,
 GraphDB, Qlever, RDF4J, an embedded library, …) can be dropped in via the
 ``TRIPLESTORE`` setting.
 
 Two things to know about the shape of this Protocol:
 
-**The names are today's names, deliberately.** Every signature here is transcribed
-from the pre-existing Oxigraph client rather than redesigned — see decision D6 in
-the refactor plan. Renaming ``query`` → ``query_select`` and ``construct`` →
-``query_construct`` would have touched ~20 call sites and the ~12 test modules that
-hand-roll fake clients, for no behavioural gain, and would have made a
-behaviour-neutral extraction unreviewable. A naming review is queued in ``TODO.md``
-for when a second implementation actually exists to test the names against.
+**The method names follow the Oxigraph client's, deliberately.** Renaming ``query``
+to ``query_select`` and ``construct`` to ``query_construct`` would touch ~20 call
+sites and the ~12 test modules that hand-roll fake clients, for no behavioural
+gain. A naming review is queued in ``TODO.md`` for when a second implementation
+exists to test the names against.
 
 **The graph-scoping members are part of the contract, not an implementation
 detail.** Route handlers build SPARQL strings *around* :meth:`from_clause` and

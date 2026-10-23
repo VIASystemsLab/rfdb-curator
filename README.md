@@ -88,9 +88,9 @@ behind the `full` profile — so a bare `docker compose up` is the read-only sta
 instance would run. `scripts/env-init.sh` writes `COMPOSE_PROFILES=full` into `.env`, so
 development gets the whole six-service stack by default.
 
-*On an existing clone,* `env-init.sh` will not overwrite your `.env` — add
-`COMPOSE_PROFILES=full` to it yourself, or pass `--profile full` per invocation. Without it
-the editor on `:5173` simply will not start. See
+`env-init.sh` refuses to overwrite an existing `.env`, so an `.env` written another way
+needs `COMPOSE_PROFILES=full` added by hand, or `--profile full` on each invocation. Without
+it the editor on `:5173` does not start. See
 [docs/deployment.md](docs/deployment.md#deploy-modes--read-vs-full).
 
 Stop services:
@@ -136,7 +136,7 @@ The loaded SHACL schema is the source of truth: every record type, form field, c
 
 ### Data Model
 
-The active model uses [LRMoo](https://cidoc-crm.org/lrmoo/) (rather than the older FRBR/FaBiO model) and draws on [LRMoo](https://cidoc-crm.org/lrmoo/), [CIDOC CRM](https://cidoc-crm.org/), the Polifonia [Core](https://github.com/polifonia-project/core-ontology) / [Music Meta](https://github.com/polifonia-project/music-meta-ontology) / [Source](https://github.com/polifonia-project/source-ontology) ontologies, [Dublin Core Terms](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/), [PRISM](https://www.w3.org/submissions/prism/), [SKOS](https://www.w3.org/TR/skos-reference/), [FOAF](http://xmlns.com/foaf/spec/), [Schema.org](https://schema.org/), [Wikidata](https://www.wikidata.org/) direct properties, and RDF/RDFS/OWL/XSD.
+The rfdb model draws on [LRMoo](https://cidoc-crm.org/lrmoo/), [CIDOC CRM](https://cidoc-crm.org/), the Polifonia [Core](https://github.com/polifonia-project/core-ontology) / [Music Meta](https://github.com/polifonia-project/music-meta-ontology) / [Source](https://github.com/polifonia-project/source-ontology) ontologies, [Dublin Core Terms](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/), [PRISM](https://www.w3.org/submissions/prism/), [SKOS](https://www.w3.org/TR/skos-reference/), [FOAF](http://xmlns.com/foaf/spec/), [Schema.org](https://schema.org/), [Wikidata](https://www.wikidata.org/) direct properties, and RDF/RDFS/OWL/XSD.
 
 LRMoo hierarchy: a **Musical Work** is the abstract work; an **Expression** is an intellectual realization (e.g. a libretto); a **Manifestation** is an edition or product type; a **Source / Item** is a specific physical or documentary copy. Each level refines the one above it, from Work through Expression and Manifestation to Source/Item, and every WEMI link points from the more concrete record up to its parent — so create parents before children.
 
@@ -176,7 +176,7 @@ All settings are loaded from environment variables; each service fails fast if a
 
 Both services share a base (`rfdb-core/rfdb_core/config.py`: store connection, schema path, CORS, logging, S3). `curator-backend/core/config.py` extends it with the write-side surface — seeding, data reset, `READ_ONLY`, `READ_ONLY_SHAPES`, `MAX_UPLOAD_MB`. `dataexplorer-backend` adds nothing: everything a reader needs is already in the base. Because the base ignores unknown variables, one shared `.env` across both services is safe — the writer-only values are simply invisible to the reader.
 
-The full environment-variable reference, data-reset modes, and seed sources (controlled vocabulary + Glottolog languages) are documented in the [development & testing deployment guide](docs/deployment.md#development--testing-deployment). The production stack is **complete but has never been deployed** — every piece exists and the whole topology has been exercised locally, but there is no host, domain or certificate yet. Runbook and the one remaining gap: [docs/deployment.md](docs/deployment.md#production-deployment).
+The full environment-variable reference, data-reset modes, and seed sources (controlled vocabulary + Glottolog languages) are documented in the [development & testing deployment guide](docs/deployment.md#development--testing-deployment). The production stack is complete but not yet deployed to a host. Runbook: [docs/deployment.md](docs/deployment.md#production-deployment).
 
 ---
 
@@ -213,7 +213,7 @@ The root README is the entry point (overview, setup, schema, API, configuration)
 | [docs/data-model.md](docs/data-model.md) | The data-model contract: what any schema must provide for this application, and the rfdb schema this repository runs. Per-shape fields live in `schema/rfdb_schema.ttl`. |
 | [docs/architecture.md](docs/architecture.md) | System design: the schema-driven pipeline, the writer/reader service split and what each owns, the API endpoint reference, SHACL extraction, validation and delete behavior, the metadata API, and the storage stack. |
 | [docs/development.md](docs/development.md) | Development workflow: environment setup, code quality, CI, schema and data change workflows, troubleshooting, and the commit checklist. |
-| [docs/deployment.md](docs/deployment.md) | Deployment & operations: the development/testing configuration, data-reset modes, and seed sources; the read-vs-full deploy modes; plus the production runbook and its complete-but-never-deployed status. |
+| [docs/deployment.md](docs/deployment.md) | Deployment & operations: the development/testing configuration, data-reset modes, and seed sources; the read-vs-full deploy modes; plus the production runbook. |
 | [docs/custom-schema.md](docs/custom-schema.md) | Running your own deployment: the checklist of what a fork sets (schema, base IRIs, graph, seed data, long-text fields, Welcome guide) and where. |
 
 The live task list lives in the root `TODO.md`.

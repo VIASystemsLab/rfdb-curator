@@ -25,7 +25,7 @@ Abandoned staged files and unreferenced registered ones are collected by
 ``scripts/cleanup_files.py`` — RDF is the source of truth; storage is
 reconciled against it, never the other way around. The read-only snapshot both
 that script and ``/api/v1/dataexplorer/meta/files`` work from lives in
-``rfdb_core.files_state``, since it is needed on both sides of the split.
+``rfdb_core.files_state``, since both the writer and the reader need it.
 """
 
 from __future__ import annotations

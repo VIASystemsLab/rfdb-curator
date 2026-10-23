@@ -1,10 +1,9 @@
 """Read routes for data: list, counts, fetch one.
 
-Split out of the curator's data suite when these three handlers moved to the read
-service. The emphasis here is the invariant the read-only deploy mode depends on: **a read service
-pointed at an empty or unseeded store must return empty results, not 500s.** The
-read-only deploy mode brings the reader up with no writer around to seed, so
-"nothing there yet" has to be an ordinary answer rather than an outage.
+The emphasis here is the invariant the read-only deploy mode depends on: **a read
+service pointed at an empty or unseeded store must return empty results, not
+500s.** The read-only deploy mode brings the reader up with no writer around to
+seed, so "nothing there yet" has to be an ordinary answer rather than an outage.
 
 Handlers are called directly with a stubbed store, matching the other unit-level
 suites.

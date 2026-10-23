@@ -2,15 +2,14 @@
 
 Which kind of instance this is, read or full, is a deploy-time choice: base services
 carry no ``profiles:`` key and run in every mode, while ``curator-backend`` and
-``curator-frontend`` are ``full``-only. The plan attached a warning to that —
-*"re-check after any compose edit"* — because Compose versions **disagree** about
-what a ``depends_on`` pointing into an inactive profile does: some silently
-activate that profile (so read mode quietly starts the editor), some hard-error
-(so read mode will not start at all). Either way the failure appears at deploy
-time, on someone else's machine, from an edit that looked local.
+``curator-frontend`` are ``full``-only. Compose versions **disagree** about what a
+``depends_on`` pointing into an inactive profile does: some silently activate that
+profile (so read mode quietly starts the editor), some hard-error (so read mode
+will not start at all). Either way the failure appears at deploy time, on someone
+else's machine, from an edit that looked local, so every compose edit is checked
+here.
 
-An instruction to re-check is the weakest form of an invariant, so it is checked
-here. These tests read the compose files directly rather than shelling out to
+These tests read the compose files directly rather than shelling out to
 ``docker compose config`` — the assertions are about what the files declare, and
 they should hold on a machine with no Docker daemon. ``docker compose config``
 validation is a separate CI step, which catches the different class of problem
@@ -119,13 +118,13 @@ def test_the_reader_never_waits_on_the_writer(filename: str) -> None:
 
 @pytest.mark.parametrize("filename", COMPOSE_FILES)
 def test_both_backends_get_the_same_read_only_shapes(filename: str) -> None:
-    """One YAML anchor, two services — the required mitigation for D11.
+    """One YAML anchor gives both backends the same ``READ_ONLY_SHAPES``.
 
     Both services serve the same shape catalogue with the same ``readOnly``
     flags, and the editor fetches it from the reader so it can start with the
     writer down. Two literals that could be edited apart would hand clients
-    different flags depending on which service answered: C20 again, but quieter,
-    because each service would be internally consistent.
+    different flags depending on which service answered, and no single-service
+    test would notice, because each service would be internally consistent.
 
     The anchor makes them one value; this asserts the *resolved* values match, so
     it fails whether the anchor was replaced by a literal or simply forgotten.

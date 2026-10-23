@@ -224,8 +224,8 @@ def test_download_staged_serves_the_staged_bytes(env):
 def test_download_staged_matches_the_url_staging_handed_back(env):
     """The staging response's contentUrl is the path this route actually serves.
 
-    The point of C18's fix: a client joining ``contentUrl`` to the origin it just
-    POSTed to must land on real bytes, with no cross-service knowledge.
+    A client joining ``contentUrl`` to the origin it just POSTed to must land on
+    real bytes, with no cross-service knowledge.
     """
     node = stage_file(env.request, _upload("a.pdf", _make_pdf()))
     assert node.contentUrl == f"/api/v1/curator/files/staged/{node.fileId}"
@@ -299,7 +299,7 @@ def test_reconcile_rederives_staged_metadata(env):
     assert str(len(pdf)) in values and "999" not in values
     # contentUrl recomputed to the *published* absolute URL, replacing the staged
     # preview path staging handed back: on persist the file stops being working
-    # state and acquires a published identity (D9).
+    # state and acquires a published identity, absolute and dereferenceable.
     assert file_content_url(node.fileId, RFDB) in values
     assert f"/api/v1/curator/files/staged/{node.fileId}" not in values
 
@@ -307,10 +307,10 @@ def test_reconcile_rederives_staged_metadata(env):
 def test_reconciled_copy_passes_shacl_validation(env):
     """The graph the write path produces must **validate**, not merely look right.
 
-    This is the guard that matters, and the one whose absence let a bug through: an
-    absolute ``contentUrl`` stored as an IRI dereferences perfectly, returns 200, and
-    violates ``sh:datatype xsd:anyURI`` — which admits only literals. Nothing about
-    the response or the URL would tell you. Only pyshacl does.
+    This is the guard that matters: an absolute ``contentUrl`` stored as an IRI
+    dereferences perfectly, returns 200, and violates ``sh:datatype xsd:anyURI``,
+    which admits only literals. Nothing about the response or the URL would tell
+    you. Only pyshacl does.
 
     Asserting the *outcome* (this graph conforms) rather than the mechanism (the term
     is a literal) is deliberate: it stays true if the shape's constraints change, and
@@ -345,8 +345,8 @@ def test_persisted_content_url_is_an_any_uri_literal(env):
     ``rfdb_schema.ttl`` declares ``sh:datatype xsd:anyURI`` on ``schema:contentUrl``, and
     ``sh:datatype`` is satisfied only by a literal — so writing an IRI here produces
     a triple that dereferences perfectly and fails validation. That combination is
-    nasty to debug (the data *looks* right), and it is an easy mistake to make now
-    that the value is a full URL, which is why the term type is pinned rather than
+    nasty to debug (the data *looks* right), and it is an easy mistake to make
+    because the value is a full URL, which is why the term type is pinned rather than
     just the string. Making it an IRI is a defensible modelling change, but it is a
     schema change, and has to be done as one.
     """

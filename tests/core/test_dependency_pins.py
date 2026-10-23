@@ -13,13 +13,12 @@ consumer:
 
 The consequence of a divergence is asymmetric and quiet: the suite passes on one
 set of versions while every container runs another, so the bump is *verified*
-against software that is not *deployed*. Task 10 found exactly that — the plan's
-own file list named the two ``pyproject.toml`` files and ``uv.lock``, and missed
-both ``requirements.txt``, which would have shipped a refresh that reached no
-container.
+against software that is not *deployed*. A bump that edits the ``pyproject.toml``
+files and ``uv.lock`` but misses a ``requirements.txt`` ships a refresh that
+reaches no container.
 
-The files already carried a comment saying they were kept in lockstep. A comment
-is a request to remember; this is the check. Same reasoning as
+Each service's ``requirements.txt`` carries a comment saying it is kept in
+lockstep. A comment is a request to remember; this is the check. Same reasoning as
 ``test_compose_topology.py``: repo-topology assertions belong wherever CI already
 runs the repo-wide checks, and they must hold with no Docker daemon and no
 network.
@@ -28,10 +27,10 @@ network.
 for the packages they share. uv already enforces it, and harder than a test could
 — a one-sided bump makes the workspace unsatisfiable, so ``uv lock``, ``uv sync``
 and even ``uv run`` refuse with *"Because rfdb-core depends on pydantic==2.12.5
-and rfdb-curator-backend depends on pydantic==2.13.4…"*. That was verified, not
-assumed. A test asserting it would restate the resolver rather than cover a gap,
-which is the distinction that earns a test its place: the four ``requirements.txt``
-checks below hold because **nothing** reads those files during resolution.
+and rfdb-curator-backend depends on pydantic==2.13.4…"*. A test asserting it would
+restate the resolver rather than cover a gap, which is the distinction that earns a
+test its place: the four ``requirements.txt`` checks below hold because
+**nothing** reads those files during resolution.
 """
 
 from __future__ import annotations

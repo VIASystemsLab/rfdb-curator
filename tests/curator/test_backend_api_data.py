@@ -123,7 +123,7 @@ def api_client() -> Iterator[None]:
     Both, because every scenario writes through one and reads back through the
     other. The two /health payloads differ by design: the writer reports its seed
     report under an "oxigraph" key, the reader reports "store" and has no seed
-    report (decision D3's sibling in Task 5).
+    report.
     """
     try:
         status, health = _request_json("GET", "/health")
@@ -686,13 +686,13 @@ def test_negative_cascade_insert_rolls_back_every_nested_entity(api_client):
     # contain *some* violation. The backend exposes violations with explicit
     # `focusNode` and `path` keys.
     #
-    # FUTURE / consider improving: the missing work label can now be reported
-    # more than once. Since cidoc:P148i_is_component_of became a real schema
-    # property (ExpressionShape has sh:node MusicalWorkShape), the same
-    # work-label violation surfaces both via MusicalWorkShape's targetClass and
-    # via the Expression's sh:node traversal. `any(...)` tolerates duplicates,
-    # so this test is unaffected — but do NOT tighten it to assert an exact
-    # violation *count* without first de-duplicating by (focusNode, path).
+    # FUTURE / consider improving: the missing work label can be reported more
+    # than once. ExpressionShape declares cidoc:P148i_is_component_of with
+    # sh:node MusicalWorkShape, so the same work-label violation surfaces both via
+    # MusicalWorkShape's targetClass and via the Expression's sh:node traversal.
+    # `any(...)` tolerates duplicates, so this test is unaffected, but do NOT
+    # tighten it to assert an exact violation *count* without first
+    # de-duplicating by (focusNode, path).
     violations = body["validationReport"]["violations"]
     work_id = f"https://rosfeatr.eu/rdf/data/{suffix}_work"
     assert any(v.get("focusNode") == work_id and v.get("path") == RDFS_LABEL for v in violations), (
@@ -887,9 +887,8 @@ def test_positive_contributor_organization_insert_persists(api_client):
 def test_negative_contributor_missing_concrete_type_is_rejected(api_client):
     """A Contributor typed only foaf:Agent fails sh:or and is not persisted.
 
-    This reproduces the exact bug the typeOptions selector fixes: before it
-    existed, the frontend always emitted `@type = shape.targetClass` alone,
-    which is what this payload does directly against the API.
+    This is the payload a client sends when it emits `@type = shape.targetClass`
+    alone, which is what the typeOptions selector exists to prevent.
     """
     suffix = _make_suffix()
     payload = {
@@ -915,7 +914,7 @@ def test_contributor_appears_in_shape_scoped_list(api_client):
     """A persisted Contributor is found by its shape-scoped listing query.
 
     The list/count SPARQL for a shape does an exact `?id a <targetClassUri>`
-    match with no subclass reasoning (see curator-backend/api/data.py), so the
+    match with no subclass reasoning (see dataexplorer-backend/api/data.py), so the
     Contributor's @type array must keep foaf:Agent alongside the concrete
     type -- the concrete type alone satisfies sh:or but would silently drop
     the entity from every shape-scoped listing.

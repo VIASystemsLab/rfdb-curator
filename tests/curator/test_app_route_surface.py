@@ -1,14 +1,13 @@
-"""The writer's route surface, pinned as a specification (decision D8).
+"""The writer's route surface, pinned as a specification.
 
-The reader has the same guard in ``tests/dataexplorer/test_app_contract.py``. Two
-route-set assertions, one per service, are what make the URL partition enforceable
-rather than aspirational: a route added to the wrong service, or a namespace that
-drifts back toward the old unowned ``/api/…``, fails here instead of surfacing as a
-405 in someone's browser.
+Each URL prefix names the service that owns it. The reader has the same guard in
+``tests/dataexplorer/test_app_contract.py``. Two route-set assertions, one per
+service, are what make the URL partition enforceable rather than aspirational: a
+route added to the wrong service, or one outside its service's namespace, fails
+here instead of surfacing as a 405 in someone's browser.
 
-Why this matters more than it looks: every symptom that produced this refactor's
-corrections (C17–C20) was a URL that identified an operation on a host rather than a
-resource. The partition is the fix, so it needs a test.
+A URL must identify a resource, not an operation on whichever host happens to
+answer. The partition is what keeps it that way, so it needs a test.
 """
 
 from __future__ import annotations
@@ -48,8 +47,8 @@ def _import_app(monkeypatch: pytest.MonkeyPatch):
 def _effective_routes(app) -> list[RouteContext]:
     """Every registered route, flattened across ``include_router`` boundaries.
 
-    Necessary since FastAPI 0.141, which made ``app.routes`` hold one lazy node
-    per ``include_router`` call rather than the included routes themselves. The
+    Necessary because, from FastAPI 0.141, ``app.routes`` holds one lazy node per
+    ``include_router`` call rather than the included routes themselves. The
     full reasoning, and why this is preferred over reading the OpenAPI paths, is
     in the twin of this helper in ``tests/dataexplorer/test_app_contract.py``.
     """
@@ -92,12 +91,11 @@ def test_writer_publishes_nothing_in_the_data_space(monkeypatch: pytest.MonkeyPa
 
 
 def test_every_route_is_namespaced_by_owner(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Nothing may sit at the old unowned ``/api/…`` root.
+    """Nothing may sit at an unowned ``/api/…`` root.
 
-    That root is what let one path mean two things depending on which service
-    answered — ``GET`` and ``DELETE /api/data/{id}`` on different services (which no
-    prefix-keyed proxy could route), and one ``/api/shapes`` with two payloads
-    (C20).
+    Such a root lets one path mean two things depending on which service answers:
+    ``GET`` and ``DELETE /api/data/{id}`` on different services (which no
+    prefix-keyed proxy can route), or one ``/api/shapes`` with two payloads.
     """
     app_module = _import_app(monkeypatch)
     stray = [
@@ -123,11 +121,11 @@ def test_no_route_uses_a_greedy_path_parameter(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_no_read_routes_leaked_back_in(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The reads that moved to dataexplorer must not reappear here.
+    """Read routes belong to dataexplorer and must not appear here.
 
     ``forms`` and ``shapes`` are the deliberate exceptions and are asserted by the
     route-set test above: forms because it drives an editing form, shapes because
-    both services serve the identical catalogue (D11).
+    both services serve the identical catalogue.
     """
     app_module = _import_app(monkeypatch)
     paths = {r.path for r in _effective_routes(app_module.app)}

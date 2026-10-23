@@ -69,8 +69,8 @@ def relation_predicates(extractor) -> list[str]:
 def preferred_label(labels: list[Literal]) -> str | None:
     """Pick the best label: English, then untagged, then any, else None.
 
-    Public because ``api.resource`` titles its HTML page with it. One rule for
-    "which of several labels does a human see", not two that agree today.
+    Public because ``api.resource`` titles its HTML page with it, so one rule
+    decides which of several labels a human sees.
     """
     if not labels:
         return None

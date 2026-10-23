@@ -49,7 +49,7 @@ def _seeder_module():
     The lifespan calls `core.seeder.bootstrap_store()`, which looks `seed_store`
     up in its own module globals — so a stub has to be installed there, not in
     app.py's namespace. Patching app.py would silently miss (and, since the name
-    is no longer imported there, monkeypatch would raise instead).
+    is not imported there, monkeypatch would raise instead).
     """
     return importlib.import_module("core.seeder")
 

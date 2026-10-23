@@ -51,7 +51,7 @@ dev = [
 # One testpaths per service: both services own a top-level `api` package, so
 # `from api.data import …` is ambiguous in a single pytest process (whichever
 # service is imported first wins sys.modules). Separate runs, separate
-# interpreters, no ambiguity. See decision D2 in the refactor plan.
+# interpreters, no ambiguity.
 testpaths = ["../tests/dataexplorer"]
 filterwarnings = [
     'ignore:ConjunctiveGraph is deprecated, use Dataset instead\.:DeprecationWarning:rdflib.plugins.parsers.jsonld',

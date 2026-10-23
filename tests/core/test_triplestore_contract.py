@@ -153,7 +153,7 @@ def test_clauses_scope_to_the_configured_graph(store_cls) -> None:
 def test_clauses_are_empty_without_a_graph(store_cls, unset) -> None:
     """With no graph, the clauses are empty strings — never the literal "None".
 
-    ``/api/meta/graphs`` depends on this: it queries unscoped so the Data Context
+    ``/api/v1/dataexplorer/meta/graphs`` depends on this: it queries unscoped so the Data Context
     Panel can see every named graph, and interpolating a stray clause would silently
     narrow those counts.
     """

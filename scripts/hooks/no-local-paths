@@ -2,10 +2,10 @@
 #
 # Refuse a commit that adds a machine-local absolute path: where this clone
 # lives, the committer's home directory, or anyone's home on macOS or Windows
-# (a name under the Users directory), as the scaffold and the audit do. The
-# path exists on one machine only, so to everyone else it is a dangling
-# reference, and it publishes the account name it contains besides. Write
-# paths relative to the repository root instead.
+# (a name under the Users directory). The path exists on one machine only, so
+# to everyone else it is a dangling reference, and it publishes the account
+# name it contains besides. Write paths relative to the repository root
+# instead.
 #
 # Only added lines are checked, so a file that already carries such a path can
 # still be edited. Where content genuinely has to hold one, commit it by hand

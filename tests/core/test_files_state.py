@@ -7,7 +7,7 @@ validates before calling, so the guard is unreachable from there) and the
 schema-driven choice of link predicates.
 
 The link predicates come from the schema, never a hardcoded list, so these tests
-use the real ``rfdb_schema.ttl`` — a schema change that stopped linking digital copies
+use the real ``rfdb_schema.ttl`` — a schema change that stops linking digital copies
 should fail here rather than silently make every file unpublished.
 """
 
@@ -130,12 +130,11 @@ def test_staged_and_published_urls_are_different_paths() -> None:
 def test_published_content_url_is_an_absolute_cool_uri() -> None:
     """The persisted value must be a dereferenceable IRI, not an application path.
 
-    This is decision D9, and it is the one property a URL redesign must not break
-    again: ``schema:contentUrl`` goes into the store, so anything relative couples
-    persisted data to the API layout — which is what made this task a data
-    migration. Asserted structurally (built from the data base, under the
-    resource's own IRI) rather than against a literal, so a namespace change stays
-    a setting.
+    No change to the API layout may break this: ``schema:contentUrl`` goes into the
+    store, so anything relative couples persisted data to the API layout and turns
+    a URL change into a data migration. Asserted structurally (built from the data
+    base, under the resource's own IRI) rather than against a literal, so a
+    namespace change stays a setting.
     """
     url = file_content_url(FILE_ID, DATA_BASE)
     assert url.startswith("https://")

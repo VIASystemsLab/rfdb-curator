@@ -5,10 +5,9 @@ by the React app to populate the shape list. `GET /forms` is called each time th
 user selects a shape, to retrieve the ordered field definitions that drive form
 generation — a writer-only route, since form fields exist to drive an editing form.
 
-The shape list is **identical** to the reader's (D11): both build it through
+The shape list is **identical** to the reader's: both build it through
 :func:`rfdb_core.shapes.list_shapes`, so the `readOnly` flags cannot drift between
-the two services. This module used to own the stamp, which is what made the editor
-depend on the writer just to enumerate shapes (C20).
+the two services and the editor can enumerate shapes with the writer down.
 """
 
 from fastapi import APIRouter, HTTPException, Request

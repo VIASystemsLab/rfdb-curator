@@ -4,8 +4,8 @@ the shape's target class.
 This pins the behaviour documented in docs/data-model.md ("Class-targeted
 validation requires explicit @type"): a shape with ``sh:targetClass`` only
 selects focus nodes of that class, so a payload that omits its ``@type`` silently
-skips the shape's constraints instead of failing. The tests below make sure a
-future schema or validator change cannot quietly reintroduce that trap.
+skips the shape's constraints instead of failing. The tests below pin both
+sides, so a schema or validator change that alters either one fails here.
 """
 
 from __future__ import annotations

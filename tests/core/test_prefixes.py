@@ -1,8 +1,7 @@
 """The CURIE prefix map is read from the schema's ``sh:declare`` declarations.
 
-``declared_prefixes`` replaced a hand-maintained dict, so these pin what the dict
-used to guarantee by construction: one namespace per prefix, nothing from
-rdflib's pre-bound vocabularies, and every prefix the shipped TTL files use.
+These pin the properties the map must have: one namespace per prefix, nothing
+from rdflib's pre-bound vocabularies, and every prefix the shipped TTL files use.
 """
 
 from __future__ import annotations

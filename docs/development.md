@@ -58,8 +58,8 @@ docker compose up --build
 ```
 
 `env-init.sh` writes `COMPOSE_PROFILES=full` into `.env`, which is what makes that command
-bring up all six services. Without it — an `.env` that predates the deploy profiles, for
-instance — you get the read-only four and no editor on `:5173`. See
+bring up all six services. Without it (an `.env` written by hand, for instance) you get the
+read-only four and no editor on `:5173`. See
 [deployment.md](deployment.md#deploy-modes--read-vs-full); the short version is that a bare
 `docker compose up` is the mode a public instance runs, and development opts into the write
 tier.
@@ -143,7 +143,8 @@ pre-commit is meant to catch formatting/hygiene issues before CI does.
 - start both backends
 - check `/health` on :8000 **and** :8001 (the payloads differ — the writer reports
   `oxigraph` + `seed`, the reader reports `store`)
-- check `/api/v1/dataexplorer/shapes` on both, and `/api/v1/dataexplorer/entities` on :8001
+- check the shapes route on both (`/api/v1/curator/shapes` on :8000,
+  `/api/v1/dataexplorer/shapes` on :8001), and `/api/v1/dataexplorer/entities` on :8001
 - run a dry-run validation request against :8000
 
 ---
@@ -164,7 +165,7 @@ The editor discovers updated shapes through the shared schema extractor
 (`rfdb-core/rfdb_core/schema_extractor.py`), which both services load at startup:
 
 ```
-GET /api/v1/dataexplorer/shapes            # both services; the curator's adds the readOnly flag
+GET /api/v1/dataexplorer/shapes       # also /api/v1/curator/shapes: identical payloads, readOnly flags included
 GET /api/v1/curator/forms?shapeId=... # curator only — form definitions drive an editing form
 ```
 

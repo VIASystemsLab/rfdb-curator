@@ -23,9 +23,9 @@ def _local_name(iri: str) -> str:
 
     ``https://rosfeatr.eu/rdf/data/L111`` and ``rfdb:L111`` both give ``L111``.
     Nested references from the editor can arrive as CURIEs, and the prefix is
-    whatever the loaded schema declares, so no prefix name is assumed here: an
-    earlier version stripped a literal ``rfdb:`` and would have minted
-    ``…/data/kb:L111_hasAgentRole_0`` for a schema using ``kb:``.
+    whatever the loaded schema declares, so no prefix name is assumed here:
+    stripping a literal ``rfdb:`` would mint ``…/data/kb:L111_hasAgentRole_0``
+    for a schema using ``kb:``.
     """
     return _LOCAL_NAME_SEPARATOR.split(iri)[-1]
 

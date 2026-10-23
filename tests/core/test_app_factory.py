@@ -1,12 +1,12 @@
-"""``configure_app``'s ``HEAD`` support, filed while auditing the API redesign.
+"""``configure_app`` answers ``HEAD`` on every ``GET`` route.
 
-FastAPI does not add ``HEAD`` to a route declared with ``@router.get(...)``, so
-every route on both services 405'd on ``HEAD`` — link checkers and harvesters
-that probe a URL before fetching it read that as broken, and it is exactly what
-happens on ``/rdf/`` identifiers in production. ``_HeadAsGetMiddleware`` fixes it
-once for both services rather than per-route; these tests pin the two properties
-that matter: the 405 is gone, and headers still describe the ``GET`` response
-(``content-length`` included) while the body is empty.
+FastAPI does not add ``HEAD`` to a route declared with ``@router.get(...)``, so on
+its own every route answers ``HEAD`` with 405. Link checkers and harvesters that
+probe a URL before fetching it read that as broken, which matters most on the
+``/rdf/`` identifiers. ``_HeadAsGetMiddleware`` handles it once for both services
+rather than per route; these tests pin the two properties that matter: no 405,
+and headers still describe the ``GET`` response (``content-length`` included)
+while the body is empty.
 """
 
 from __future__ import annotations

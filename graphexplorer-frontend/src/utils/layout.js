@@ -13,9 +13,8 @@ const NODE_W = 220
 const NODE_H = 92
 
 // Bridge badges (EntityNode's compact variant for helper-bridge entities) are
-// much smaller than a full card — sizing elk's slot for them to match is what
-// actually reclaims canvas space; leaving NODE_W/NODE_H here would still
-// space them out as if they were full cards.
+// much smaller than a full card, so elk gets a slot of their own size. A
+// card-sized slot would space them out as if they were full cards.
 const BRIDGE_W = 90
 const BRIDGE_H = 34
 

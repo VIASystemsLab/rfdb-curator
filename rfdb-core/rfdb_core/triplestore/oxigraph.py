@@ -170,9 +170,10 @@ class OxigraphStore:
             try:
                 graph.parse(data=resp.text, format="turtle")
             # BadSyntax derives from SyntaxError, NOT from rdflib.exceptions.Error,
-            # so catching the latter alone let the most likely failure — a malformed
-            # Turtle body — escape as a bare BadSyntax whose message is "<no detail
-            # available>", losing the response excerpt below. Both are needed.
+            # so catching the latter alone would let the most likely failure, a
+            # malformed Turtle body, escape as a bare BadSyntax whose message is
+            # "<no detail available>", losing the response excerpt below. Both
+            # are needed.
             except (RdflibError, BadSyntax) as exc:
                 raise ValueError(
                     f"Oxigraph returned invalid Turtle for CONSTRUCT query: {exc}\n"
@@ -242,7 +243,8 @@ class OxigraphStore:
         # Oxigraph does not send response headers until it has parsed and
         # indexed the entire document, so the read timeout must cover the whole
         # bulk load. Large vocab files (e.g. the ~38 MB Glottolog language list)
-        # routinely exceed 60s; use the configurable `load_timeout` instead.
+        # routinely exceed 60s, so the read timeout is the configurable
+        # `load_timeout`.
         timeout = httpx.Timeout(self.load_timeout, connect=10.0)
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(

@@ -25,7 +25,7 @@
  * - When editing, App fetches the full entity and passes it as the record prop to ShapeForm.
  * - ShapeForm must ensure @id is included in the form state and payload for updates.
  * - If the fetch fails, loadedRecord stays null and ShapeForm renders as a blank create
- *   form rather than an error (a known gap, tracked separately).
+ *   form rather than an error (a known gap).
  *
  * View details flow:
  *   1. User clicks eye (see details) button in records list.
@@ -419,7 +419,7 @@ export default function App() {
                     <div className="form-loading">Loading record…</div>
                   )}
                   {/*
-                    This guard has a known gap, tracked separately: on the first render after onEdit,
+                    This guard has a known gap: on the first render after onEdit,
                     recordLoading is still false, so ShapeForm briefly renders with the previous loadedRecord.
                   */}
                   {(!selectedRecord || !recordLoading) && (
@@ -432,8 +432,8 @@ export default function App() {
                       onDraftChange={handleDraftChange}
                       onValidation={setValidation}
                       onSaved={(message) => {
-                        // Stay on the form: ShapeForm blanks itself, and a toast
-                        // confirms — no jarring jump to the record list.
+                        // Stay on the form, ready for the next record: ShapeForm
+                        // blanks itself and a toast confirms the save.
                         handleDraftClear(draftKey)
                         setSelectedRecord(null)
                         setLoadedRecord(null)

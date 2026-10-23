@@ -120,15 +120,14 @@ class BaseServiceSettings(BaseSettings):
     ``"readOnly": true`` in every shapes response, and the curator additionally
     returns 403 on writes targeting them. Defaults to ``[]``.
 
-    **Shared, not writer-only** (D11), and the reclassification matters: this looks
-    like a write concern because the curator enforces it, but it is *policy
-    metadata stating which shapes are editable* — which any client needs to render
-    a UI. Filing it under the curator is what caused C20, where the editor could
-    not list shapes at all with the writer down. Both services now receive it and
-    stamp the flag through the one implementation in
-    :mod:`rfdb_core.shapes`, so the two catalogues cannot drift.
+    **Shared, not writer-only.** This looks like a write concern because the
+    curator enforces it, but it is *policy metadata stating which shapes are
+    editable*, which any client needs to render a UI. Both services receive it and
+    stamp the flag through the one implementation in :mod:`rfdb_core.shapes`, so
+    the two catalogues cannot drift and the editor can list shapes with the writer
+    down.
 
-    Operational caveat: "identical" now rests on both services being given the
+    Operational caveat: "identical" rests on both services being given the
     same value. Supply it from a single YAML anchor in Compose rather than two
     literals that can be edited apart."""
 

@@ -4,8 +4,8 @@ Both services take full IRIs straight from the client — path parameters, query
 strings, JSON-LD ``@id`` values, predicate URIs from an update payload — and
 splice them into query strings inside ``<…>``. Any character that could close
 that bracket or start a new clause has to be rejected before the splice. This
-module is that check, in one place; it was previously duplicated verbatim in
-the curator's ``api/data.py`` and the reader's ``api/graph.py``.
+module is that check, in one place, used by the curator's ``api/data.py`` and the
+reader's ``api/graph.py``.
 
 Returns a reason string rather than raising an HTTP error: rfdb-core is
 framework-agnostic, and choosing a status code is the service's job. Callers

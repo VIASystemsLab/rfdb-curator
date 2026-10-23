@@ -155,8 +155,8 @@ apart from the component logic.
 
 ## Deletion is scoped, files and data alike
 
-A wrong-directory `rm` once deleted the backend project files; never let it
-happen again. Never `rm` a tracked or real project file: use
+An `rm` run in the wrong directory deletes real project files. Never `rm` a
+tracked or real project file: use
 `git rm -- <explicit-path>`, which `git restore` can undo, and never `rm -rf` a
 path you did not create this session. Never rely on the shell's current
 directory (it drifts between calls): use absolute paths and print `pwd` +
@@ -173,7 +173,7 @@ about to go (run the equivalent `SELECT` and report the count first). See
 
 ## Versioning
 
-Decided by the user on 2026-10-23. The whole repository carries one version.
+The whole repository carries one version.
 
 - Semantic versioning, MAJOR.MINOR.PATCH. The project stays at 0.x until the
   user declares it stable: until then a breaking change bumps MINOR, and a
@@ -201,7 +201,7 @@ user** how to proceed. Do not try to separate the changes yourself.
   re-apply, no `git checkout HEAD -- <file>` then re-add, no hand-authored
   partial patches, no per-region reverts to fake a clean split. Interactive
   `git add -p` is unavailable in this environment, and these substitutes are
-  error-prone and have caused rework.
+  error-prone.
 - Only ever attempt such a split process on a **double-confirmed, explicit**
   user request that names the process.
 
@@ -223,11 +223,11 @@ Python workspace member plus `tests/`, and the prefix-map coverage check). It ru
 every commit once `pre-commit install` has run in the clone; run it manually with
 `pre-commit run --all-files`. It does not run the test suites.
 
-The hooks run `uv run --offline ruff …` **from the repo root**, matching CI. Since
-`[tool.ruff]` moved to the root `pyproject.toml` with an explicit
-`src = ["curator-backend", "dataexplorer-backend", "rfdb-core"]`, import classification no longer
-depends on cwd, and running from the root is the only invocation that also
-covers `rfdb-core/` and `tests/`. The ruff version comes from curator-backend's
+The hooks run `uv run --offline ruff …` **from the repo root**, matching CI.
+`[tool.ruff]` lives in the root `pyproject.toml` with an explicit
+`src = ["curator-backend", "dataexplorer-backend", "rfdb-core"]`, so import
+classification does not depend on cwd, and running from the root is the only
+invocation that also covers `rfdb-core/` and `tests/`. The ruff version comes from curator-backend's
 dev dependency, resolved through the workspace's single root `.venv`. The hook
 drops any stale `VIRTUAL_ENV` (`env -u`) so `uv` resolves that venv without a
 warning.

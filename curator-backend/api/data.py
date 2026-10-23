@@ -1,8 +1,8 @@
 """Data write routes: create/update and delete RDF entities.
 
 The only routes in the stack that mutate the store. Reads (list, counts, fetch
-one) live in ``dataexplorer-backend/api/data.py``; they shared nothing with this
-module but the IRI guard, which is now in ``rfdb_core.iri``.
+one) live in ``dataexplorer-backend/api/data.py``. The IRI guard both use is
+``rfdb_core.iri``.
 
 Validation merge planning lives in :mod:`core.validation_merge`.
 This module keeps the route handlers and the small request-scoped helpers they need.
@@ -262,8 +262,9 @@ def create_or_update_entity(payload: EntityData, request: Request):
     # Expression) even before that node exists in store.
     #
     # On updates, avoid seeding with entity IRI to prevent old store triples of
-    # the entity from masking payload intent (e.g. preserving removed fields or
-    # causing false maxCount violations via stale values).
+    # the entity from masking payload intent (e.g. keeping fields the curator
+    # deleted in the editor, or causing false maxCount violations via stale
+    # values).
     include_root_entity = bool(entity_uri is not None and not payload.originalTriples)
     seed_iris = {str(entity_uri)} if include_root_entity else set()
     seed_iris |= {
