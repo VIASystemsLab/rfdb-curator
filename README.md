@@ -266,7 +266,7 @@ rfdb-curator/
 │                                 #   proxies /api + /rdf → dataexplorer-backend:8001)
 │
 ├── schema/                       # rfdb SHACL schema, copied from upstream (see schema/README.md)
-├── data/                         # vocab.ttl (controlled vocabulary) + data.ttl (test fixtures)
+├── data/                         # rfdb_vocab.ttl (controlled vocabulary) + rfdb_data.ttl (sample data)
 ├── docs/                         # Topic documentation (see the Documentation section)
 ├── docker-compose.yml
 ├── garage.toml                   # Object-storage (Garage) configuration

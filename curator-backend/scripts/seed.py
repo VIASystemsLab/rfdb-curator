@@ -18,7 +18,7 @@ so a compose ``run`` inherits the right configuration by construction. Notably
 ``RESET_DATA_ON_STARTUP=true`` is honoured here too: this script will wipe the
 store if the environment says to.
 
-Idempotent: ``vocab.ttl`` merges rather than replaces, so re-running is safe.
+Idempotent: vocabulary seeding merges rather than replaces, so re-running is safe.
 Exits 0 on success, 1 with the reason on failure.
 """
 

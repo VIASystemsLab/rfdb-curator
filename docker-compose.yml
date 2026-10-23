@@ -180,8 +180,8 @@ services:
       OXIGRAPH_LOAD_TIMEOUT: "${OXIGRAPH_LOAD_TIMEOUT:-300}"
       # Paths inside the container, mapped by the volumes block below.
       SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/rfdb_schema.ttl}"
-      VOCAB_PATH: '${VOCAB_PATH:-["/app/data/vocab.ttl", "/app/data/glottolog_language.ttl"]}'
-      DATA_PATH: "${DATA_PATH:-/app/data/data.ttl}"
+      VOCAB_PATH: '${VOCAB_PATH:-["/app/data/rfdb_vocab.ttl", "/app/data/glottolog_language.ttl"]}'
+      DATA_PATH: "${DATA_PATH:-/app/data/rfdb_data.ttl}"
       # Set true only when you want a full store wipe on restart (dev/test).
       # Must be false in production — data loss is irreversible.
       RESET_DATA_ON_STARTUP: "${RESET_DATA_ON_STARTUP:-false}"

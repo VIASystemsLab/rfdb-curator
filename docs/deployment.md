@@ -65,8 +65,8 @@ an empty store or fail to find what the writer minted.
 | `S3_ENDPOINT` | both | No | Object-storage endpoint for digital copies. Empty disables it: `GET /api/v1/dataexplorer/meta/files` then reports `configured: false` instead of erroring. |
 | `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | both | No | Object-storage credentials. The writer stages and promotes objects; the reader streams them out. |
 | `LOG_FILE`, `LOG_LEVEL`, `TRUNCATE_LOG_ON_STARTUP`, `TRUNCATE_LOG_ON_FRESH_CONTAINER_START` | both | Yes / No | Structured JSON-lines logging. Each service writes to its own volume. |
-| `VOCAB_PATH` | **curator** | Yes | Path to `vocab.ttl` (controlled-vocabulary seed). Loaded at startup when `SEED_VOCAB_ON_STARTUP=true`. |
-| `DATA_PATH` | **curator** | Yes | Path to `data.ttl` (test fixture data). Loaded at startup only when `SEED_TEST_DATA_ON_STARTUP=true`. |
+| `VOCAB_PATH` | **curator** | Yes | JSON array of controlled-vocabulary Turtle files (`data/rfdb_vocab.ttl` and the Glottolog languages in this repository). Loaded at startup when `SEED_VOCAB_ON_STARTUP=true`. |
+| `DATA_PATH` | **curator** | Yes | Path to the sample-data Turtle file (`data/rfdb_data.ttl` in this repository). Loaded at startup only when `SEED_TEST_DATA_ON_STARTUP=true`. |
 | `RESET_DATA_ON_STARTUP` | **curator** | Yes | `true`/`false`. Destructive: wipes every graph in the store before seeding on every startup. Must be `false` in production. |
 | `SEED_VOCAB_ON_STARTUP` | **curator** | Yes | `true`/`false`. Load `VOCAB_PATH` on every startup. Should be `true` in all environments. |
 | `SEED_TEST_DATA_ON_STARTUP` | **curator** | Yes | `true`/`false`. Load `DATA_PATH` on startup. `true` in dev/test only. |
@@ -106,8 +106,8 @@ RESET_DATA_ON_STARTUP=true docker compose up --build
 docker compose up --build
 ```
 
-In both modes, the controlled vocabulary from `data/vocab.ttl` is loaded on every startup
-(idempotent) when `SEED_VOCAB_ON_STARTUP=true`. Test fixture data from `data/data.ttl` is
+In both modes, the controlled vocabulary from `data/rfdb_vocab.ttl` is loaded on every startup
+(idempotent) when `SEED_VOCAB_ON_STARTUP=true`. Test fixture data from `data/rfdb_data.ttl` is
 loaded only when `SEED_TEST_DATA_ON_STARTUP=true` (off by default outside test
 environments).
 
@@ -116,14 +116,14 @@ environments).
 The application distinguishes between controlled vocabulary and test fixture data. Default
 policy: seed vocabulary on, seed test data off, preserve existing data on.
 
-- `data/vocab.ttl` is the canonical seed source for controlled vocabulary (core types and role types).
+- `data/rfdb_vocab.ttl` is the canonical seed source for controlled vocabulary (core types and role types).
 - `dcterms:LinguisticSystem` vocabulary relies on [Glottolog v5.3](https://glottolog.org/meta/downloads) data, imported from `data/glottolog_language.ttl`. Prefix normalization is already applied to the committed file. Only if you re-download a fresh version from glottolog.org, replace `geo1:` with `geo:`:
 
   ```bash
   sed -i '' 's/geo1:/geo:/g' data/glottolog_language.ttl
   ```
 
-- `data/data.ttl` is test-only fixture data.
+- `data/rfdb_data.ttl` is test-only fixture data.
 
 ---
 

@@ -8,7 +8,7 @@ Startup sequence (lifespan context manager):
      is ``true`` — wipes all named graphs and the default graph before seeding.
      If this step fails the process aborts; the app must not start with a
      partially-cleared store.
-  4. Call ``seed_store()`` to load ``vocab.ttl`` (and optionally ``data.ttl``) into
+  4. Call ``seed_store()`` to load the vocabulary files (and optionally the sample data) into
      Oxigraph.  When ``reset_data_on_startup`` is ``false`` this is idempotent;
      duplicate triples are silently merged by Oxigraph.
 

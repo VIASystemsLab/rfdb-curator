@@ -420,8 +420,8 @@ services:
       # Read timeout (seconds) for bulk Turtle loads; the ~38 MB Glottolog vocab
       # needs well over Oxigraph's default. Writer-only, so not in store_env.
       OXIGRAPH_LOAD_TIMEOUT: "${OXIGRAPH_LOAD_TIMEOUT:-300}"
-      VOCAB_PATH: '${VOCAB_PATH:-["/app/data/vocab.ttl", "/app/data/glottolog_language.ttl"]}'
-      DATA_PATH: "${DATA_PATH:-/app/data/data.ttl}"
+      VOCAB_PATH: '${VOCAB_PATH:-["/app/data/rfdb_vocab.ttl", "/app/data/glottolog_language.ttl"]}'
+      DATA_PATH: "${DATA_PATH:-/app/data/rfdb_data.ttl}"
 
       # Hardcoded rather than env-overridable: a stray
       # RESET_DATA_ON_STARTUP=true in a misconfigured .env.prod would

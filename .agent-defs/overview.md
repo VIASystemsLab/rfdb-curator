@@ -18,7 +18,7 @@ RossijskijFeatrDB (rfdb-curator) is a standalone SHACL-driven RDF curation proje
 4. **Data Explorer backend** (`dataexplorer-backend/`, :8001) answers every read: listing, counts, entity fetch, autocomplete, graph traversal, metadata, digital-copy downloads. It has no validator, no seeder and no write route, and runs independently of the curator.
 5. **Frontend editor** (`curator-frontend/`) renders dynamic forms and record workflows.
 6. **Graph Explorer** (`graphexplorer-frontend/`) is a read-only, schema-driven visualizer of entity lineage & relationships — a standalone Vite app that talks only to `/api` (`GET /api/v1/dataexplorer/graph/node`).
-7. **RDF data** (`data/vocab.ttl`, `data/data.ttl`) seeds vocabulary and optional fixtures.
+7. **RDF data** (`data/rfdb_vocab.ttl`, `data/rfdb_data.ttl`) seeds vocabulary and optional fixtures.
 8. **Validation pipeline** (pySHACL + merged validation graph) enforces schema constraints — curator only, since validation gates writes.
 9. **Object storage** (Garage, S3-compatible) holds source digital copies (PDF scans); metadata lives in RDF, bytes in Garage. Note the split: a copy is *uploaded* through the curator and *downloaded* through the reader — but only once **published**, meaning a parent entity references it in RDF. Until then it is curator working state, previewable only via the curator's `GET /api/v1/curator/files/staged/{fileId}`; the reader 404s it. Publication is always an RDF question, never "which prefix holds the bytes".
 10. **Docker runtime** (`docker-compose.yml`) runs both frontends, both backends, Oxigraph, and Garage together.

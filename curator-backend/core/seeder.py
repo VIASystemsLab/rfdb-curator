@@ -8,9 +8,9 @@ Two entry points, one code path:
     deploy mode in docs/deployment.md, "Deploy modes").
 
 Design notes:
-  - `vocab.ttl` is idempotent: Oxigraph merges triples rather than replacing,
+  - vocabulary seeding is idempotent: Oxigraph merges triples rather than replacing,
     so re-seeding on every restart is safe.
-  - `data.ttl` is for development and testing only; it is never seeded in
+  - the sample data is for development and testing only; it is never seeded in
     production unless explicitly enabled via `SEED_TEST_DATA_ON_STARTUP=true`.
 """
 

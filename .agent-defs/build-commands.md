@@ -65,13 +65,13 @@ is unreachable, stop and ask the user. Managing `docker compose` services is fin
 
 How triples get into the store — the thing to check first when reads come back empty.
 
-- **On startup:** `curator-backend` seeds `data/vocab.ttl` because compose sets
-  `SEED_VOCAB_ON_STARTUP=true`. Test fixtures (`data/data.ttl`) are `SEED_TEST_DATA_ON_STARTUP`
+- **On startup:** `curator-backend` seeds `data/rfdb_vocab.ttl` because compose sets
+  `SEED_VOCAB_ON_STARTUP=true`. Test fixtures (`data/rfdb_data.ttl`) are `SEED_TEST_DATA_ON_STARTUP`
   and default to off.
 - **One-shot, no web server:** `docker compose run --rm curator-backend python scripts/seed.py`
   — the same `core.seeder.bootstrap_store()` the lifespan runs. This is how a **read-only**
   deployment gets populated: no writer process is up to seed on startup.
-- **Idempotent.** `vocab.ttl` merges rather than replaces, so re-running is safe.
+- **Idempotent.** Vocabulary seeding merges rather than replaces, so re-running is safe.
 
 **`RESET_DATA_ON_STARTUP=true` is destructive** — it wipes the whole store (every named graph and the default graph) before every seed,
 and it must stay `false` in production. Treat setting it, like `docker compose down -v`, as a
@@ -141,7 +141,7 @@ raises a real question.
    most common real issue and a plain grep catches it in a second — no validator needed.
 4. For each *new individual whose IRI looks like it belongs to a large reference file*
    (Glottolog languages, controlled vocab) : `grep -c '<iri>' data/glottolog_language.ttl` /
-   `data/vocab.ttl` before assuming it needs declaring locally — it's often already seeded there,
+   `data/rfdb_vocab.ttl` before assuming it needs declaring locally — it's often already seeded there,
    and redeclaring it in a test-fixture file is redundant clutter, not a bug, but worth flagging.
 5. Only if something looks structurally wrong (cardinality, datatype, class mismatch), run real
    pySHACL — scoped to just the one file plus `schema/rfdb_schema.ttl`, no `inference="rdfs"` unless

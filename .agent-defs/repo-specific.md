@@ -97,7 +97,7 @@ goes through `docker compose run --rm --no-deps <service>`; the commands are in
 
 ## The schema is copied, not edited
 
-`schema/rfdb_schema.ttl`, `data/vocab.ttl` and `data/data.ttl` are copies of a
+`schema/rfdb_schema.ttl`, `data/rfdb_vocab.ttl` and `data/rfdb_data.ttl` are copies of a
 tagged release of the upstream schema repository, recorded in
 `schema/README.md`. They change only by deliberately copying a newer release
 with the procedure there, never in passing as part of other work. A model

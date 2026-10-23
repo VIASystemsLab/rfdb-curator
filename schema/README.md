@@ -17,8 +17,8 @@ example data that go with it. Model changes go upstream, not into these files.
 | Local file | Upstream path | Git blob id at the release |
 | - | - | - |
 | `schema/rfdb_schema.ttl` | `schema/schema.ttl` | `75bfc4c7747aa7e9eda1e579a1e6ef8799abd3d7` |
-| `data/vocab.ttl` | `data/vocab.ttl` | `80729d80ba52785ca71d055154b6ead69b95ed8a` |
-| `data/data.ttl` | `data/examples/data.ttl` | `92468a8cfd0238b339ed5bf89ed1c818458dac48` |
+| `data/rfdb_vocab.ttl` | `data/vocab.ttl` | `80729d80ba52785ca71d055154b6ead69b95ed8a` |
+| `data/rfdb_data.ttl` | `data/examples/data.ttl` | `92468a8cfd0238b339ed5bf89ed1c818458dac48` |
 
 ## Checking the copy
 
@@ -26,7 +26,7 @@ Each local file must hash to the blob id in the table, and `owl:versionInfo` in
 `rfdb_schema.ttl` must match the release. From the repository root:
 
 ```sh
-git hash-object schema/rfdb_schema.ttl data/vocab.ttl data/data.ttl
+git hash-object schema/rfdb_schema.ttl data/rfdb_vocab.ttl data/rfdb_data.ttl
 ```
 
 To confirm the ids against upstream, run this in a clone of the upstream
@@ -40,7 +40,20 @@ git ls-tree <tag> schema/schema.ttl data/vocab.ttl data/examples/data.ttl
 
 1. Read the upstream `CHANGELOG.md` between the copied release and the new one.
    A MAJOR release changes what validates.
-2. Copy the three files from the new tag, using the paths in the table.
+2. Copy the three files from the new tag. The local names differ from the
+   upstream paths (each carries the `rfdb_` prefix, so a fork's own files can sit
+   next to them), so copy each upstream path to its local name from the table.
+   With a clone of the upstream repository at `<clone>` and the new tag in place
+   of `<tag>`, from the repository root:
+
+   ```sh
+   git -C <clone> show <tag>:schema/schema.ttl > schema/rfdb_schema.ttl
+   git -C <clone> show <tag>:data/vocab.ttl > data/rfdb_vocab.ttl
+   git -C <clone> show <tag>:data/examples/data.ttl > data/rfdb_data.ttl
+   ```
+
+   `git show` writes the files exactly as committed at the tag, so their blob
+   ids match the ones `git ls-tree` reports there.
 3. Update both tables above.
 4. Run the three test suites (see [docs/development.md](../docs/development.md)).
 5. Commit the files and this record together, as one change.

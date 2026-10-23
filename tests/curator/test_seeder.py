@@ -52,7 +52,7 @@ class TestParseVocabPaths:
         monkeypatch.setenv("DATA_GRAPH_URI", "https://rfdb.it/graph/data")
         monkeypatch.setenv("SCHEMA_PATH", "schema/rfdb_schema.ttl")
         monkeypatch.setenv("VOCAB_PATH", vocab_path_value)
-        monkeypatch.setenv("DATA_PATH", "data/data.ttl")
+        monkeypatch.setenv("DATA_PATH", "data/rfdb_data.ttl")
         monkeypatch.setenv("RESET_DATA_ON_STARTUP", "false")
         monkeypatch.setenv("SEED_VOCAB_ON_STARTUP", "false")
         monkeypatch.setenv("SEED_TEST_DATA_ON_STARTUP", "false")
@@ -64,20 +64,20 @@ class TestParseVocabPaths:
 
     def test_bare_string_is_wrapped_in_list(self, monkeypatch):
         """A JSON array with one element produces a single-element list."""
-        settings = self._make_settings('["data/vocab.ttl"]', monkeypatch)
-        assert settings.vocab_paths == ["data/vocab.ttl"]
+        settings = self._make_settings('["data/rfdb_vocab.ttl"]', monkeypatch)
+        assert settings.vocab_paths == ["data/rfdb_vocab.ttl"]
 
     def test_json_array_single_path(self, monkeypatch):
         """A JSON array with one path is parsed correctly."""
-        settings = self._make_settings('["data/vocab.ttl"]', monkeypatch)
-        assert settings.vocab_paths == ["data/vocab.ttl"]
+        settings = self._make_settings('["data/rfdb_vocab.ttl"]', monkeypatch)
+        assert settings.vocab_paths == ["data/rfdb_vocab.ttl"]
 
     def test_json_array_two_paths(self, monkeypatch):
         """A JSON array with two paths is parsed correctly."""
         settings = self._make_settings(
-            '["data/vocab.ttl", "data/glottolog_language.ttl"]', monkeypatch
+            '["data/rfdb_vocab.ttl", "data/glottolog_language.ttl"]', monkeypatch
         )
-        assert settings.vocab_paths == ["data/vocab.ttl", "data/glottolog_language.ttl"]
+        assert settings.vocab_paths == ["data/rfdb_vocab.ttl", "data/glottolog_language.ttl"]
 
 
 # ---------------------------------------------------------------------------

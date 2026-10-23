@@ -71,7 +71,7 @@ def test_get_prefixes_covers_all_ttl_sources() -> None:
     prefixes = TestClient(_make_meta_app()).get(PREFIXES_URL).json()["prefixes"]
     assert prefixes["rfdb"] == "https://rosfeatr.eu/rdf/data/"  # rfdb_schema.ttl
     assert prefixes["lrmoo"] == "http://iflastandards.info/ns/lrm/lrmoo/"  # rfdb_schema.ttl
-    assert prefixes["wd"] == "http://www.wikidata.org/entity/"  # data.ttl only
+    assert prefixes["wd"] == "http://www.wikidata.org/entity/"  # rfdb_data.ttl only
     assert prefixes["lexvo"] == "http://lexvo.org/ontology#"  # glottolog only
 
 

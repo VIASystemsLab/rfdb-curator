@@ -17,8 +17,8 @@ import os
 
 def pytest_configure() -> None:
     """Provide defaults required by the curator's Settings at import time."""
-    os.environ.setdefault("VOCAB_PATH", '["data/vocab.ttl"]')
-    os.environ.setdefault("DATA_PATH", "data/data.ttl")
+    os.environ.setdefault("VOCAB_PATH", '["data/rfdb_vocab.ttl"]')
+    os.environ.setdefault("DATA_PATH", "data/rfdb_data.ttl")
     os.environ.setdefault("RESET_DATA_ON_STARTUP", "false")
     os.environ.setdefault("SEED_VOCAB_ON_STARTUP", "false")
     os.environ.setdefault("SEED_TEST_DATA_ON_STARTUP", "false")
