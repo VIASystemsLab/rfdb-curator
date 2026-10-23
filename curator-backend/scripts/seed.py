@@ -8,10 +8,12 @@ it, load vocab (and optionally test data) — because it calls the same
 
     docker compose run --rm curator-backend python scripts/seed.py
 
-That matters for the read-only deploy mode (docs/deployment.md, "Deploy modes"),
-where the stack runs dataexplorer-backend alone and no writer process is up to
-seed on startup. Also useful for re-seeding after adding a vocabulary file,
-without restarting the API.
+It loads the controlled vocabulary (and the sample data when enabled), never
+curated records or uploaded files. That is enough for a vocabulary-only demo in
+the read-only deploy mode, where no writer process is up to seed on startup; a
+read-only instance with real data gets it from carried-over volumes instead (see
+docs/deployment.md, "Deploy modes"). Also useful for re-seeding after adding a
+vocabulary file, without restarting the API.
 
 Reads exactly the same environment variables as the service (``core.config``),
 so a compose ``run`` inherits the right configuration by construction. Notably

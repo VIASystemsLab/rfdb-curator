@@ -66,8 +66,10 @@ How triples get into the store — the thing to check first when reads come back
   `SEED_VOCAB_ON_STARTUP=true`. Test fixtures (`data/rfdb_data.ttl`) are `SEED_TEST_DATA_ON_STARTUP`
   and default to off.
 - **One-shot, no web server:** `docker compose run --rm curator-backend python scripts/seed.py`
-  — the same `core.seeder.bootstrap_store()` the lifespan runs. This is how a **read-only**
-  deployment gets populated: no writer process is up to seed on startup.
+  — the same `core.seeder.bootstrap_store()` the lifespan runs. It loads the controlled
+  vocabulary (and the sample data when enabled), never curated records or uploaded files:
+  enough for a vocabulary-only read-only demo, where no writer process seeds on startup.
+  Real data reaches a read-only instance through carried-over volumes (`docs/deployment.md`).
 - **Idempotent.** Vocabulary seeding merges rather than replaces, so re-running is safe.
 
 **`RESET_DATA_ON_STARTUP=true` is destructive** — it wipes the whole store (every named graph and the default graph) before every seed,
