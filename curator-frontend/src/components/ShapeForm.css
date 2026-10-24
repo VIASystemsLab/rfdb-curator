@@ -44,6 +44,27 @@
   padding: var(--space-3) var(--space-4);
 }
 
+.form-error p {
+  margin: 0;
+}
+
+.form-error-retry {
+  margin-top: var(--space-3);
+  border: none;
+  border-radius: var(--radius-input);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--color-surface-top);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.form-error-retry:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .form-actions {
   display: flex;
   gap: var(--space-3);
