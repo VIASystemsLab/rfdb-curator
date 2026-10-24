@@ -44,7 +44,7 @@ def search_entities(
 
     # Match the full URI or the whole local name, never a suffix: with a suffix
     # match "RoleShape" also hits "AgentRoleShape", and which one wins depends
-    # on the order of the shapes in schema.ttl.
+    # on the order of the shapes in the schema.
     all_shapes = extractor.get_all_shapes()
     matched = next(
         (s for s in all_shapes if shape in (s["id"], _local_name(s["id"]))),

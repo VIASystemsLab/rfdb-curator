@@ -35,7 +35,10 @@ from rfdb_core.file_storage import (  # noqa: E402
     registered_key,
 )
 from rfdb_core.files_state import collect_file_state, key_file_id  # noqa: E402
-from rfdb_core.vocab import RFDB_BASE  # noqa: E402
+
+
+class NoFileLinks(RuntimeError):
+    """The schema declares no file upload, but file state exists."""
 
 
 def reconcile(
@@ -43,6 +46,7 @@ def reconcile(
     store,
     extractor,
     *,
+    data_base: str,
     staged_ttl_s: float,
     registered_grace_s: float,
     now: float,
@@ -51,13 +55,26 @@ def reconcile(
     """Apply the reconciliation rules; return the actions (taken or planned).
 
     Pure orchestration over the injected services so tests can drive it with
-    fakes and a fixed ``now``.
+    fakes and a fixed ``now``. ``data_base`` is the ``DATA_BASE_URI`` setting,
+    which file nodes are named under.
 
     Returns:
         Dict of action lists keyed by ``promoted`` / ``deleted_staged`` /
         ``deleted_registered`` / ``purged_nodes`` (file ids).
+
+    Raises:
+        NoFileLinks: the schema declares no file upload, yet the store holds
+            ``schema:DigitalDocument`` nodes or storage holds objects. Every file
+            would count as unreferenced and be deleted, so nothing is done: that
+            state means a schema swap or a schema mistake, not garbage.
     """
-    state = collect_file_state(storage, store, extractor)
+    state = collect_file_state(storage, store, extractor, data_base)
+    if not extractor.file_links() and (state["typed"] or state["staged"] or state["registered"]):
+        raise NoFileLinks(
+            "The schema declares no file upload (no property whose sh:node shape targets "
+            "schema:DigitalDocument), but file nodes or stored files exist. Refusing to "
+            "delete them; fix the schema or remove the files deliberately."
+        )
     linked: set[str] = state["linked"]
     actions: dict[str, list[str]] = {
         "promoted": [],
@@ -74,7 +91,7 @@ def reconcile(
         purged.add(file_id)
         actions["purged_nodes"].append(file_id)
         if not dry_run:
-            file_iri = f"{RFDB_BASE}{file_id}"
+            file_iri = f"{data_base}{file_id}"
             store.update(
                 f"{store.with_clause()} "
                 f"DELETE {{ <{file_iri}> ?p ?o . }} WHERE {{ <{file_iri}> ?p ?o . }}"
@@ -137,15 +154,20 @@ def main() -> int:
     store = build_triplestore(settings)
     extractor = SchemaExtractor(settings.schema_path)
 
-    actions = reconcile(
-        storage,
-        store,
-        extractor,
-        staged_ttl_s=args.staged_ttl_hours * 3600,
-        registered_grace_s=args.registered_grace_hours * 3600,
-        now=time.time(),
-        dry_run=args.dry_run,
-    )
+    try:
+        actions = reconcile(
+            storage,
+            store,
+            extractor,
+            data_base=settings.data_base_uri,
+            staged_ttl_s=args.staged_ttl_hours * 3600,
+            registered_grace_s=args.registered_grace_hours * 3600,
+            now=time.time(),
+            dry_run=args.dry_run,
+        )
+    except NoFileLinks as exc:
+        print(f"ABORTED: {exc}", file=sys.stderr)
+        return 1
 
     prefix = "[dry-run] would " if args.dry_run else ""
     for action, ids in actions.items():

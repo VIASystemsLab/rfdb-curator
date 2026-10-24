@@ -95,6 +95,25 @@ goes through `docker compose run --rm --no-deps <service>`; the commands are in
 - RDF validation uses the Dockerized Jena `riot --validate` workflow in
   `build-commands.md` → "RDF Validation with Jena".
 
+## The schema is copied, not edited
+
+`schema/rfdb_schema.ttl`, `data/rfdb_vocab.ttl` and `data/rfdb_data.ttl` are copies of a
+tagged release of the upstream schema repository, recorded in
+`schema/README.md`. They change only by deliberately copying a newer release
+with the procedure there, never in passing as part of other work. A model
+change is made upstream. If a task seems to need one, stop and say so.
+
+Two checks, when asked or before relying on the copy:
+
+- **Does the copy match the recorded release?** Offline: `git hash-object`
+  on each of the three files must print the blob id in `schema/README.md`, and
+  `owl:versionInfo` in `schema/rfdb_schema.ttl` must equal the recorded release.
+  Confirming the recorded ids against upstream (`git ls-tree <tag> <path>` in a
+  clone) needs the network, so ask first.
+- **Is there a newer release?** Compare the recorded tag with upstream's
+  latest release and read upstream's `CHANGELOG.md` in between. A MAJOR
+  release changes what validates. This needs the network, so ask first.
+
 ## Python and naming
 
 Imports go standard library → third-party → local package:
@@ -122,10 +141,22 @@ functions carry a concise docstring describing intent and expected behaviour.
 
 Sanitize error messages before they reach users or logs.
 
+## Configuration is never a code edit
+
+A value that a deployment or a fork is expected to change is a setting, read
+from the environment. Never ask anyone to edit Python or JavaScript to change
+one. Each setting is documented in every `.env.example` that lists it, with an
+example of the value and of where it ends up (an IRI it mints, a route it
+serves).
+
+The one accepted exception is project-specific UI text, such as the Welcome
+guide. It lives in a single dedicated frontend file that a fork replaces, kept
+apart from the component logic.
+
 ## Deletion is scoped, files and data alike
 
-A wrong-directory `rm` once deleted the backend project files; never let it
-happen again. Never `rm` a tracked or real project file: use
+An `rm` run in the wrong directory deletes real project files. Never `rm` a
+tracked or real project file: use
 `git rm -- <explicit-path>`, which `git restore` can undo, and never `rm -rf` a
 path you did not create this session. Never rely on the shell's current
 directory (it drifts between calls): use absolute paths and print `pwd` +
@@ -139,6 +170,48 @@ store on every startup, and a loose `DELETE WHERE` destroys triples. All three
 are deletions and need the same explicit approval, plus a check of what is
 about to go (run the equivalent `SELECT` and report the count first). See
 `build-commands.md` → "Seeding and Data Reset".
+
+## Versioning
+
+The whole repository carries one version.
+
+- Semantic versioning, MAJOR.MINOR.PATCH. The project stays at 0.x until the
+  user declares it stable: until then a breaking change bumps MINOR, and a
+  feature or fix bumps PATCH.
+- Every bump is its own commit, `chore: bump the version to X.Y.Z [BOT]`,
+  made after the changes it releases. It sets the same number in all five
+  manifests (`rfdb-core/`, `curator-backend/` and `dataexplorer-backend/`
+  `pyproject.toml`; `curator-frontend/` and `graphexplorer-frontend/`
+  `package.json`) and in their lockfiles.
+- That commit carries an annotated tag, `vX.Y.Z`.
+- The bump and the tag each need the exact number confirmed first, as
+  `code-style.md` requires.
+- **Tag only a commit whose CI has passed.** Push the branch first, ask the user
+  to confirm the run on GitHub is green (no `gh`), and only then create and push
+  the tag. A tag on a commit with red CI has to be moved and force-pushed, which
+  changes a published reference.
+
+## GitHub Actions and CI
+
+`.github/workflows/ci.yml` cannot be run locally, so every change to it is
+checked before it is pushed, and confirmed after.
+
+- **A ref in `uses:` must exist.** Before writing `owner/action@<ref>`, confirm
+  that exact tag or commit exists in the action's repository. Do not assume a
+  moving major tag (`@v10`) exists because a release (`v10.3.2`) does: some
+  actions, `astral-sh/setup-uv` among them, publish only full version tags.
+  Prefer a full version tag. Checking needs the network, so ask first.
+- **Check the inputs at that ref.** Read the action's `action.yml` at the new
+  tag, not at `main`. Every `with:` key the workflow passes must still exist,
+  and any changed default that matters (caching, for example) goes in the commit
+  message.
+- **Tool pins follow the lockfile.** CI pins uv to the version that writes
+  `uv.lock` locally. When the local uv changes, update all three jobs in the
+  same change, run `uv lock`, and confirm `uv lock --check` passes.
+- **Validate what can be validated.** Parse the file as YAML, and run the
+  compose `config` commands the workflow runs. Anything else waits for a real
+  run: after pushing a CI change, say that it is unverified and ask the user to
+  check the run.
 
 ## Commits
 
@@ -154,7 +227,7 @@ user** how to proceed. Do not try to separate the changes yourself.
   re-apply, no `git checkout HEAD -- <file>` then re-add, no hand-authored
   partial patches, no per-region reverts to fake a clean split. Interactive
   `git add -p` is unavailable in this environment, and these substitutes are
-  error-prone and have caused rework.
+  error-prone.
 - Only ever attempt such a split process on a **double-confirmed, explicit**
   user request that names the process.
 
@@ -176,14 +249,32 @@ Python workspace member plus `tests/`, and the prefix-map coverage check). It ru
 every commit once `pre-commit install` has run in the clone; run it manually with
 `pre-commit run --all-files`. It does not run the test suites.
 
-The hooks run `uv run --offline ruff …` **from the repo root**, matching CI. Since
-`[tool.ruff]` moved to the root `pyproject.toml` with an explicit
-`src = ["curator-backend", "dataexplorer-backend", "rfdb-core"]`, import classification no longer
-depends on cwd, and running from the root is the only invocation that also
-covers `rfdb-core/` and `tests/`. The ruff version comes from curator-backend's
+The hooks run `uv run --offline ruff …` **from the repo root**, matching CI.
+`[tool.ruff]` lives in the root `pyproject.toml` with an explicit
+`src = ["curator-backend", "dataexplorer-backend", "rfdb-core"]`, so import
+classification does not depend on cwd, and running from the root is the only
+invocation that also covers `rfdb-core/` and `tests/`. The ruff version comes from curator-backend's
 dev dependency, resolved through the workspace's single root `.venv`. The hook
 drops any stale `VIRTUAL_ENV` (`env -u`) so `uv` resolves that venv without a
 warning.
+
+### PR descriptions: changes grouped by topic
+
+This replaces `git-workflow.md`'s "one line per commit, in commit order" for this
+repository. In a PR body's **Changes** section, group the commits by topic, so
+the section reads as what the PR does rather than the order the work happened
+in. One bullet per topic, a short line saying what changed, with the commits it
+covers. Keep commit order within a topic, and keep a single-commit topic as one
+line. Follow-up fixes to work in the same PR (a CI pin corrected, a doc
+adjusted) join the topic they fix rather than standing alone.
+
+### Lockfile changes and the hooks
+
+pre-commit stashes unstaged changes while it runs, so the hooks see the
+committed `uv.lock`, not the working copy. If `uv.lock` has unstaged changes,
+`uv run --offline` resyncs to the old lock and fails when a wheel it pins is not
+in the cache. Commit a lockfile change before, or together with, any other
+commit made while it is pending, rather than leaving it unstaged.
 
 ## Waiting and polling
 

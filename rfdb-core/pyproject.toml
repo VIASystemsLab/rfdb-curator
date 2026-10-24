@@ -1,6 +1,6 @@
 [project]
 name = "rfdb-core"
-version = "0.1.0"
+version = "0.4.0"
 description = "Shared library for the RossijskijFeatrDB services: triplestore seam, prefixes, schema extraction, object storage, config, logging"
 requires-python = ">=3.11"
 
@@ -35,16 +35,16 @@ build-backend = "hatchling.build"
 packages = ["rfdb_core"]
 
 [dependency-groups]
-# pyshacl is a *test-only* dependency here: tests/core/ validates schema.ttl's
+# pyshacl is a *test-only* dependency here: tests/core/ validates rfdb_schema.ttl's
 # SHACL semantics, which is this library's subject (it owns schema_extractor),
 # but nothing in rfdb_core itself runs a validator — that is a write concern and
 # it lives in curator-backend.
 #
 # pyyaml is likewise test-only: tests/core/test_compose_topology.py reads both
 # compose files to check the profile/depends_on invariant. It is already in the
-# lock as a transitive of uvicorn[standard], but declared here anyway — a test
+# lock as a transitive of uvicorn[standard], but declared here anyway: a test
 # that depends on someone else's dependency breaks for reasons unrelated to what
-# it asserts, which is the drift Task 10 exists to clean up.
+# it asserts.
 dev = [
     "pytest==9.1.1",
     "ruff==0.16.1",
@@ -55,5 +55,6 @@ dev = [
 [tool.pytest.ini_options]
 # tests/core/ covers this library: the triplestore seam contract, the prefix map,
 # schema extraction, and the schema's own SHACL constraints. One config per
-# workspace member — see decision D2 in the refactor plan.
+# workspace member, because both services own a top-level `api` package and so
+# each runs its own pytest.
 testpaths = ["../tests/core"]

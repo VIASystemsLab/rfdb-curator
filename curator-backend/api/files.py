@@ -13,7 +13,7 @@ A digital copy is a bridge node whose fields are machine-filled. The flow:
    resolves against the very origin the client just POSTed to.
 3. The node travels inside the normal JSON-LD payload of ``POST /api/v1/curator/entities``
    under whatever predicate the *schema* declares (any shape with a property
-   whose ``sh:node`` targets ``DigitalCopyShape`` gets the widget). The write
+   whose ``sh:node`` shape targets ``schema:DigitalDocument`` gets the widget). The write
    path re-derives the metadata server-side — including ``contentUrl``, which it
    rewrites to the published path — and promotes the object to ``registered/``
    on persist. See ``api/data.py``.
@@ -25,7 +25,7 @@ Abandoned staged files and unreferenced registered ones are collected by
 ``scripts/cleanup_files.py`` — RDF is the source of truth; storage is
 reconciled against it, never the other way around. The read-only snapshot both
 that script and ``/api/v1/dataexplorer/meta/files`` work from lives in
-``rfdb_core.files_state``, since it is needed on both sides of the split.
+``rfdb_core.files_state``, since both the writer and the reader need it.
 """
 
 from __future__ import annotations
@@ -43,7 +43,6 @@ from core.config import settings
 from models.files import DigitalCopy
 from rfdb_core.file_storage import staged_key
 from rfdb_core.files_state import FILE_ID_RE, staged_content_url
-from rfdb_core.vocab import RFDB_BASE
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -123,7 +122,7 @@ def stage_file(request: Request, file: UploadFile) -> DigitalCopy:
     request.app.state.storage.put_pdf(staged_key(file_id), spool)
 
     return DigitalCopy(
-        id=RFDB_BASE + file_id,
+        id=settings.data_base_uri + file_id,
         fileId=file_id,
         name=original_name,
         # The staged preview path, not the published one: this file is not a

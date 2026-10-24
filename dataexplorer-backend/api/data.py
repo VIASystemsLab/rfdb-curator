@@ -1,11 +1,10 @@
 """Data read routes: list entities by shape, count them, fetch one by IRI.
 
-The read half of what used to be one ``api/data.py``. The write half (entity
-create and delete, digital-copy reconciliation, SHACL merge planning) stayed in
-curator-backend along with everything it needs.
+The write side (entity create and delete, digital-copy reconciliation, SHACL
+merge planning) belongs to curator-backend, along with everything it needs.
 
-The only helper these three ever needed from the shared pool is the IRI guard,
-which now lives in ``rfdb_core.iri``.
+The only shared helper these three routes use is the IRI guard in
+``rfdb_core.iri``.
 """
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -42,7 +41,7 @@ def list_data(
     both the primary ``rdfs:label`` and the entity IRI.
 
     Args:
-        shapeId: Full URI of a NodeShape defined in ``schema/schema.ttl``.
+        shapeId: Full URI of a NodeShape defined in ``schema/rfdb_schema.ttl``.
         q: Optional free-text filter applied to label and IRI.
         limit: Maximum number of items to return (1–500, default 50).
         offset: Number of items to skip for pagination (default 0).
@@ -184,14 +183,14 @@ def get_entity(
     """Fetch all triples for a single entity by IRI.
 
     The IRI travels as ``?id=``, matching ``/graph/node``, and **never** as a path
-    segment. Two reasons, both learned the hard way:
+    segment. Two reasons:
 
     1. **No route may shadow a sibling.** A path parameter here would have to be
        ``{iri:path}`` — greedy, because an encoded IRI's ``%2F`` is decoded before
-       matching — and a greedy parameter directly under ``/entities/`` silently
-       swallows ``/entities/search`` and ``/entities/counts`` unless every literal
-       route happens to be registered first. That invariant is invisible at the call
-       site and was spread across three files.
+       matching — and a greedy parameter directly under ``/entities/`` would
+       silently swallow ``/entities/search`` and ``/entities/counts`` unless every
+       literal route were registered first, an invariant invisible at the call
+       site.
     2. **No double-encoding trap.** A path-encoded IRI has to be encoded twice to
        survive, and a bare local name fails the unsafe-IRI guard with a 400 that
        looks like a data problem.

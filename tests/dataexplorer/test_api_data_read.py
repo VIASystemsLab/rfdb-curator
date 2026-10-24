@@ -1,10 +1,9 @@
 """Read routes for data: list, counts, fetch one.
 
-Split out of the curator's data suite when these three handlers moved to the read
-service. The emphasis here is the invariant Task 9 depends on: **a read service
-pointed at an empty or unseeded store must return empty results, not 500s.** The
-read-only deploy mode brings the reader up with no writer around to seed, so
-"nothing there yet" has to be an ordinary answer rather than an outage.
+The emphasis here is the invariant the read-only deploy mode depends on: **a read
+service pointed at an empty or unseeded store must return empty results, not
+500s.** The read-only deploy mode brings the reader up with no writer around to
+seed, so "nothing there yet" has to be an ordinary answer rather than an outage.
 
 Handlers are called directly with a stubbed store, matching the other unit-level
 suites.
@@ -22,7 +21,7 @@ from rdflib import Graph
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "dataexplorer-backend"
-SCHEMA_PATH = ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
@@ -68,7 +67,7 @@ def _request(store):
 
 
 # ---------------------------------------------------------------------------
-# Empty store: empty answers, never errors (Task 9 invariant)
+# Empty store: empty answers, never errors (a fresh read-mode instance starts empty)
 # ---------------------------------------------------------------------------
 
 

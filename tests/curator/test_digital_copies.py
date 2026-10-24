@@ -34,14 +34,14 @@ from rfdb_core.file_storage import InMemoryStorage, registered_key, staged_key
 from rfdb_core.files_state import file_content_url
 from rfdb_core.schema_extractor import SchemaExtractor
 from rfdb_core.vocab import SCHEMA_CONTENT_URL
-from scripts.cleanup_files import reconcile
+from scripts.cleanup_files import NoFileLinks, reconcile
 
 FILE_ID_RE = re.compile(r"^File_[0-9a-f]{8}$")
 RFDB = "https://rosfeatr.eu/rdf/data/"
 P138I = "http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation"
 DIGITAL_DOCUMENT = "http://schema.org/DigitalDocument"
 
-_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "schema.ttl"
+_SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "rfdb_schema.ttl"
 _EXTRACTOR = SchemaExtractor(str(_SCHEMA_PATH))
 
 
@@ -224,8 +224,8 @@ def test_download_staged_serves_the_staged_bytes(env):
 def test_download_staged_matches_the_url_staging_handed_back(env):
     """The staging response's contentUrl is the path this route actually serves.
 
-    The point of C18's fix: a client joining ``contentUrl`` to the origin it just
-    POSTed to must land on real bytes, with no cross-service knowledge.
+    A client joining ``contentUrl`` to the origin it just POSTed to must land on
+    real bytes, with no cross-service knowledge.
     """
     node = stage_file(env.request, _upload("a.pdf", _make_pdf()))
     assert node.contentUrl == f"/api/v1/curator/files/staged/{node.fileId}"
@@ -299,18 +299,18 @@ def test_reconcile_rederives_staged_metadata(env):
     assert str(len(pdf)) in values and "999" not in values
     # contentUrl recomputed to the *published* absolute URL, replacing the staged
     # preview path staging handed back: on persist the file stops being working
-    # state and acquires a published identity (D9).
-    assert file_content_url(node.fileId) in values
+    # state and acquires a published identity, absolute and dereferenceable.
+    assert file_content_url(node.fileId, RFDB) in values
     assert f"/api/v1/curator/files/staged/{node.fileId}" not in values
 
 
 def test_reconciled_copy_passes_shacl_validation(env):
     """The graph the write path produces must **validate**, not merely look right.
 
-    This is the guard that matters, and the one whose absence let a bug through: an
-    absolute ``contentUrl`` stored as an IRI dereferences perfectly, returns 200, and
-    violates ``sh:datatype xsd:anyURI`` — which admits only literals. Nothing about
-    the response or the URL would tell you. Only pyshacl does.
+    This is the guard that matters: an absolute ``contentUrl`` stored as an IRI
+    dereferences perfectly, returns 200, and violates ``sh:datatype xsd:anyURI``,
+    which admits only literals. Nothing about the response or the URL would tell
+    you. Only pyshacl does.
 
     Asserting the *outcome* (this graph conforms) rather than the mechanism (the term
     is a literal) is deliberate: it stays true if the shape's constraints change, and
@@ -325,7 +325,7 @@ def test_reconciled_copy_passes_shacl_validation(env):
     _reconcile_digital_copies(payload, env.request)
 
     # A copy is only valid as something's representation, so give it a parent — the
-    # same link predicate the schema declares (see find_links_to_shape).
+    # same link predicate the schema declares (see SchemaExtractor.file_links).
     payload.add(
         (
             URIRef("https://rosfeatr.eu/rdf/data/probe_source"),
@@ -342,11 +342,11 @@ def test_reconciled_copy_passes_shacl_validation(env):
 def test_persisted_content_url_is_an_any_uri_literal(env):
     """The value must be an ``xsd:anyURI`` **literal**, not an IRI node.
 
-    ``schema.ttl`` declares ``sh:datatype xsd:anyURI`` on ``schema:contentUrl``, and
+    ``rfdb_schema.ttl`` declares ``sh:datatype xsd:anyURI`` on ``schema:contentUrl``, and
     ``sh:datatype`` is satisfied only by a literal — so writing an IRI here produces
     a triple that dereferences perfectly and fails validation. That combination is
-    nasty to debug (the data *looks* right), and it is an easy mistake to make now
-    that the value is a full URL, which is why the term type is pinned rather than
+    nasty to debug (the data *looks* right), and it is an easy mistake to make
+    because the value is a full URL, which is why the term type is pinned rather than
     just the string. Making it an IRI is a defensible modelling change, but it is a
     schema change, and has to be done as one.
     """
@@ -361,7 +361,7 @@ def test_persisted_content_url_is_an_any_uri_literal(env):
     (url,) = urls
     assert isinstance(url, Literal), f"contentUrl must be a literal, got {type(url).__name__}"
     assert url.datatype == XSD.anyURI, f"expected xsd:anyURI, got {url.datatype}"
-    assert str(url) == file_content_url(node.fileId)
+    assert str(url) == file_content_url(node.fileId, RFDB)
 
 
 def test_reconcile_strips_registered_metadata(env):
@@ -449,6 +449,7 @@ def test_reconcile_script_rules(env):
         storage,
         env.store,
         _EXTRACTOR,
+        data_base=RFDB,
         staged_ttl_s=86_400,
         registered_grace_s=86_400,
         now=clock["now"],
@@ -480,6 +481,7 @@ def test_reconcile_script_dry_run_changes_nothing(env):
         storage,
         env.store,
         _EXTRACTOR,
+        data_base=RFDB,
         staged_ttl_s=86_400,
         registered_grace_s=86_400,
         now=clock["now"],
@@ -487,3 +489,24 @@ def test_reconcile_script_dry_run_changes_nothing(env):
     )
     assert actions["deleted_staged"] == ["File_bbbbbbbb"]
     assert staged_key("File_bbbbbbbb") in storage.objects  # still there
+
+
+def test_reconcile_refuses_when_the_schema_declares_no_upload(env):
+    """With no upload links, every file would look unreferenced: abort, touch nothing."""
+    storage = InMemoryStorage()
+    storage.put_pdf(registered_key("File_aaaaaaaa"), io.BytesIO(b"%PDF-a"))
+    _link(env, "File_aaaaaaaa")
+    no_uploads = SimpleNamespace(file_links=lambda: [])
+
+    with pytest.raises(NoFileLinks):
+        reconcile(
+            storage,
+            env.store,
+            no_uploads,
+            data_base=RFDB,
+            staged_ttl_s=0,
+            registered_grace_s=0,
+            now=10**9,
+        )
+    assert registered_key("File_aaaaaaaa") in storage.objects
+    assert f"{RFDB}File_aaaaaaaa" in {str(s) for s in env.store.g.subjects()}

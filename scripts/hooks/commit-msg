@@ -28,7 +28,8 @@ msg=$(sed -e '/^# -* >8 -*$/,$d' -e '/^#/d' "$1" | sed '/./,$!d')
 subject=$(printf '%s\n' "$msg" | head -n 1)
 
 # The way out is for people only: an agent's commit is the one this hook
-# exists to hold to the format, and the git guard denies it --no-verify anyway.
+# exists to hold to the format, and an agent never uses --no-verify
+# (.agent-defs/git-workflow.md).
 fail() {
     echo "commit-msg: $1" >&2
     echo "  $subject" >&2

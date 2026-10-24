@@ -18,12 +18,11 @@ The development and testing stack is the `docker-compose.yml` at the repository 
 it running with the [Quick Start](../README.md#quick-start); the sections below document
 the configuration knobs, the data-reset modes, and the seed sources it uses.
 
-> ⚠ **`docker compose up` no longer starts the editor.** Read mode is now the default in
+> ⚠ **A bare `docker compose up` does not start the editor.** Read mode is the default in
 > both compose files (see [Deploy modes](#deploy-modes--read-vs-full)). For the whole
-> stack, add `COMPOSE_PROFILES=full` to your repo-root `.env` — that is what
-> `scripts/env-init.sh` writes for a fresh checkout, and it refuses to overwrite an
-> existing `.env`, so on an existing clone this is a one-line manual addition. Or pass
-> `--profile full` on each invocation.
+> stack, set `COMPOSE_PROFILES=full` in the repo-root `.env`, which `scripts/env-init.sh`
+> writes; it refuses to overwrite an existing `.env`, so an `.env` written another way
+> needs the line added by hand. Or pass `--profile full` on each invocation.
 
 ### Configuration
 
@@ -47,44 +46,49 @@ simply invisible to the reader — setting `READ_ONLY=true` has no effect on
 For Docker Compose, edit the relevant `environment:` block. `OXIGRAPH_URL` uses the
 Docker-internal hostname since the store is a separate service; `SCHEMA_PATH` /
 `VOCAB_PATH` / `DATA_PATH` are container paths backed by the `volumes:` mounts (change
-both together). `OXIGRAPH_URL` and `DATA_GRAPH_URI` **must match across the two
-services**, or the reader will correctly report an empty store.
+both together). `OXIGRAPH_URL`, `DATA_GRAPH_URI`, `DATA_BASE_URI` and
+`SCHEMA_BASE_URI` **must match across the two services**, or the reader will report
+an empty store or fail to find what the writer minted.
 
 | Variable | Service | Required | Description |
 |---|---|---|---|
+| `COMPOSE_PROJECT_NAME` | compose | Yes | Compose project name, required by both compose files: containers are `<name>-<service>-1`, volumes `<name>_<volume>`. `rfdb-dev` in the repo-root `.env` (written by `scripts/env-init.sh`), `rfdb-prod` in `.env.prod`. Each stack on a host needs its own; changing it on a running deployment starts new, empty volumes. |
 | `TRIPLESTORE` | both | No | Which `TripleStore` implementation to build. Only `oxigraph` ships today; the seam exists so a second one is a config change. Default: `oxigraph`. |
 | `OXIGRAPH_URL` | both | Yes | Base URL of the Oxigraph HTTP endpoint, no trailing slash. `http://localhost:7878` locally, `http://oxigraph:7878` inside Docker. Must match across services. |
 | `DATA_GRAPH_URI` | both | Yes | Named graph URI where instance data is stored and queried. Every SPARQL read uses `FROM <uri>`; every Turtle load targets `?graph=<uri>`. Must match across services. |
+| `DATA_BASE_URI` | both | Yes | Namespace every minted record and digital copy is named under, ending in `/` or `#`. With `https://rosfeatr.eu/rdf/data/`, a new Place is `https://rosfeatr.eu/rdf/data/Place_4f3a9d12` and a PDF's `schema:contentUrl` is `…/data/File_0123abcd/content`. Served to the curator frontend on `GET /api/v1/dataexplorer/meta/schema`. Must match across services. |
+| `SCHEMA_BASE_URI` | both | Yes | Namespace of the loaded schema's SHACL shapes, ending in `/` or `#`, e.g. `https://rosfeatr.eu/rdf/schema/` for `…/schema/PlaceShape`. Must match the schema file and across services. |
+| `LONG_TEXT_PREDICATES` | both | No | JSON array of predicate IRIs whose form fields are multi-line text areas. Default: the rfdb schema's description, note and transcription predicates (`rdfs:comment`, `dcterms:description`, `dcterms:abstract`, `skos:definition`, `skos:note`, `skos:scopeNote`, `core:text`). Must match across services. |
+| `PROJECT_NAME` | both | No | Name of the knowledge base, shown in the reader's HTML page titles, the editor's header and tab title, and the API docs. Default: `RossijskijFeatrDB`. |
+| `EXTERNAL_ID_LINKS` | both | No | JSON object mapping a predicate IRI to a URL template (`$1` is the identifier) for identifiers stored as text; every UI shows them as links. Default: VIAF (`wdt:P214` → `https://viaf.org/en/viaf/$1`) and RISM (`wdt:P5504` → `https://rism.online/$1`). Must match across services. |
 | `OXIGRAPH_LOAD_TIMEOUT` | both | No | Read timeout (seconds) for bulk Turtle loads. Only the writer loads, but the field is in the shared base. Default: `300`. |
-| `SCHEMA_PATH` | both | Yes | Path to `schema.ttl` relative to the service working directory. Docker mounts it at `/app/schema/schema.ttl`. |
-| `CORS_ORIGINS` | both | Yes | JSON array string of allowed CORS origins, e.g. `["http://localhost:5173"]`. Must not contain `"*"` — the app aborts at import time if it does. The reader needs **both** frontend origins. |
+| `SCHEMA_PATH` | both | Yes | Path to `rfdb_schema.ttl` relative to the service working directory. Docker mounts it at `/app/schema/rfdb_schema.ttl`. |
+| `CORS_ORIGINS` | both | Yes | JSON array string of allowed CORS origins, e.g. `["http://localhost:5173"]`. Must not contain `"*"` — the app aborts at import time if it does. The reader needs **both** frontend origins. In production it is not set by hand: `docker-compose.prod.yml` builds it from `RFDB_DOMAIN`. |
 | `S3_ENDPOINT` | both | No | Object-storage endpoint for digital copies. Empty disables it: `GET /api/v1/dataexplorer/meta/files` then reports `configured: false` instead of erroring. |
 | `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | both | No | Object-storage credentials. The writer stages and promotes objects; the reader streams them out. |
-| `LOG_FILE`, `LOG_LEVEL`, `TRUNCATE_LOG_ON_STARTUP`, `TRUNCATE_LOG_ON_FRESH_CONTAINER_START` | both | Yes / No | Structured JSON-lines logging. Each service writes to its own volume. |
-| `VOCAB_PATH` | **curator** | Yes | Path to `vocab.ttl` (controlled-vocabulary seed). Loaded at startup when `SEED_VOCAB_ON_STARTUP=true`. |
-| `DATA_PATH` | **curator** | Yes | Path to `data.ttl` (test fixture data). Loaded at startup only when `SEED_TEST_DATA_ON_STARTUP=true`. |
+| `LOG_FILE`, `LOG_LEVEL`, `TRUNCATE_LOG_ON_STARTUP`, `TRUNCATE_LOG_ON_FRESH_CONTAINER_START` | both | Yes / No | Structured JSON-lines logging. Each service writes to its own volume. `LOG_LEVEL` is one of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; default `INFO`. |
+| `VOCAB_PATH` | **curator** | Yes | JSON array of controlled-vocabulary Turtle files (`data/rfdb_vocab.ttl` and the Glottolog languages in this repository). Loaded at startup when `SEED_VOCAB_ON_STARTUP=true`. |
+| `DATA_PATH` | **curator** | Yes | Path to the sample-data Turtle file (`data/rfdb_data.ttl` in this repository). Loaded at startup only when `SEED_TEST_DATA_ON_STARTUP=true`. |
 | `RESET_DATA_ON_STARTUP` | **curator** | Yes | `true`/`false`. Destructive: wipes every graph in the store before seeding on every startup. Must be `false` in production. |
 | `SEED_VOCAB_ON_STARTUP` | **curator** | Yes | `true`/`false`. Load `VOCAB_PATH` on every startup. Should be `true` in all environments. |
 | `SEED_TEST_DATA_ON_STARTUP` | **curator** | Yes | `true`/`false`. Load `DATA_PATH` on startup. `true` in dev/test only. |
-| `READ_ONLY` | **curator** | No | `true`/`false`. When `true`, rejects `POST /api/v1/curator/entities` and `DELETE /api/v1/curator/entities/{entityId}` with HTTP 403. Reads are unaffected — they are on the other service. Default: `false`. |
+| `READ_ONLY` | **curator** | No | `true`/`false`. When `true`, rejects `POST /api/v1/curator/entities` and `DELETE /api/v1/curator/entities?id=<iri>` with HTTP 403. Reads are unaffected — they are on the other service. Default: `false`. |
 | `READ_ONLY_SHAPES` | **both** | No | JSON array string of shape IRIs to protect from create/update/delete even when `READ_ONLY` is `false`, e.g. `["https://rosfeatr.eu/rdf/schema/LanguageShape"]`. Also drives the `readOnly` flag on both services' shapes route. **Give both backends the same value** — `docker-compose.yml` uses a single YAML anchor for exactly this reason; if they drift, clients get different flags depending on which service they asked. Default: `[]`. |
 | `MAX_UPLOAD_MB` | **curator** | No | Per-file ceiling for staged uploads; `0` disables the cap. |
 
 Seeding does not require a running web server: `python curator-backend/scripts/seed.py`
 performs the same readiness-poll → optional-reset → seed sequence as the lifespan, so a
 deployment can populate the store as a one-shot job.
-| `LOG_LEVEL` | No | Minimum log level for file and console handlers. Default: `INFO`. One of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
 
 The S3/object-storage (`S3_*`) and Garage (`GARAGE_RPC_SECRET`) variables consumed by the
 compose file are generated into `.env` by `scripts/env-init.sh`; see the
 [Quick Start](../README.md#quick-start). Backend log/troubleshooting details are in
 [development.md](development.md).
 
-`LOG_FILE` (the JSON-lines log path) isn't listed above: it's pinned to the
-`curator_backend_logs` / `dataexplorer_backend_logs` volume mounts in the compose
-files and isn't meant to be
-overridden in the supported deployments — changing it without also updating
-the volume mount would write logs outside the persisted volume.
+`LOG_FILE` (the JSON-lines log path) is pinned to the `curator_backend_logs` /
+`dataexplorer_backend_logs` volume mounts in the compose files. Leave it as set there:
+changing it without also updating the volume mount would write logs outside the
+persisted volume. The application rotates that file itself (10 MB, five backups).
 
 ### Data reset modes
 
@@ -102,8 +106,8 @@ RESET_DATA_ON_STARTUP=true docker compose up --build
 docker compose up --build
 ```
 
-In both modes, the controlled vocabulary from `data/vocab.ttl` is loaded on every startup
-(idempotent) when `SEED_VOCAB_ON_STARTUP=true`. Test fixture data from `data/data.ttl` is
+In both modes, the controlled vocabulary from `data/rfdb_vocab.ttl` is loaded on every startup
+(idempotent) when `SEED_VOCAB_ON_STARTUP=true`. Test fixture data from `data/rfdb_data.ttl` is
 loaded only when `SEED_TEST_DATA_ON_STARTUP=true` (off by default outside test
 environments).
 
@@ -112,14 +116,14 @@ environments).
 The application distinguishes between controlled vocabulary and test fixture data. Default
 policy: seed vocabulary on, seed test data off, preserve existing data on.
 
-- `data/vocab.ttl` is the canonical seed source for controlled vocabulary (core types and role types).
+- `data/rfdb_vocab.ttl` is the canonical seed source for controlled vocabulary (core types and role types).
 - `dcterms:LinguisticSystem` vocabulary relies on [Glottolog v5.3](https://glottolog.org/meta/downloads) data, imported from `data/glottolog_language.ttl`. Prefix normalization is already applied to the committed file. Only if you re-download a fresh version from glottolog.org, replace `geo1:` with `geo:`:
 
   ```bash
   sed -i '' 's/geo1:/geo:/g' data/glottolog_language.ttl
   ```
 
-- `data/data.ttl` is test-only fixture data.
+- `data/rfdb_data.ttl` is test-only fixture data.
 
 ---
 
@@ -140,8 +144,8 @@ are gated. Set `COMPOSE_PROFILES=full` in `.env` / `.env.prod` to make full mode
 default for an instance.
 
 In read mode a public deployment omits the **entire `/api/v1/curator/*` namespace** rather
-than deploying a service that refuses each route with a 403. That works because
-[D8](architecture.md#api-reference) names every prefix after the service that owns it — see
+than deploying a service that refuses each route with a 403. That works because every
+prefix is named after the service that owns it ([API reference](architecture.md#api-reference)) — see
 [the proxy section](#the-proxy) for what the edge does with those paths when nothing is
 behind them.
 
@@ -206,14 +210,11 @@ That loads vocab/fixtures only — never curated data or blobs. (It is
 
 ## Production Deployment
 
-> **Status — complete but never deployed.** Every piece the stack needs now exists and the
-> whole topology has been exercised locally: both frontend production images build, and the
-> real `proxy/Caddyfile` was run against them plus live backends, checking each route (see
-> [Verify](#5-verify)). What has *not* happened is a real deployment — no host, no domain,
-> no certificate, no data. Treat the procedure below as tested-in-parts rather than
-> battle-worn, and expect the first run to surface something about DNS, TLS or file
-> ownership that a local run cannot. **One known gap remains:** log rotation, at the end of
-> this section.
+> **Status: complete, not yet deployed.** The whole topology runs locally: both frontend
+> production images build, and `proxy/Caddyfile` serves each route in [Verify](#5-verify)
+> against live backends. There is no host, domain, certificate or data yet, so treat the
+> procedure below as tested in parts, and expect the first real deployment to surface
+> something about DNS, TLS or file ownership that a local run cannot.
 
 ### Target topology
 
@@ -251,18 +252,16 @@ in read mode:
 | `/explorer/*` | `graphexplorer-frontend:80` (prefix stripped) |
 | everything else | `$RFDB_ROOT_UPSTREAM`, default `curator-frontend:80` |
 
-That it *can* be a prefix table is the payoff of [D8](architecture.md#api-reference). Before the
-URL re-cut, `GET /api/data/{id}` was the reader and `DELETE /api/data/{id}` the writer — the
-same path on two services, which no prefix-keyed proxy can split. This document used to say
-"the proxy must also learn to split `/api` by route ... This is new work in prod." It is not
-work any more; it is five `handle` blocks.
+It can be a prefix table because every prefix names the service that owns it
+([API reference](architecture.md#api-reference)): no path is served by two services, so
+nothing needs splitting by method.
 
 Three details that are load-bearing rather than stylistic:
 
 - **`/rdf/*` must be served by this domain and no other.** Those URLs are the permanent
   public identifiers stored inside the triples. A second origin serving them would give
   every resource two URLs, which is what a stable identifier is not. Keep `RFDB_DOMAIN`
-  equal to the namespace in `rfdb-core/rfdb_core/vocab.py`.
+  equal to the host of `DATA_BASE_URI` and `SCHEMA_BASE_URI` in `.env.prod`.
 - **The explorer's image must be built with `VITE_BASE_PATH=/explorer/`** to match the route
   that serves it. Vite bakes asset URLs against `base` at build time, so a bundle built for
   `/` would request `/assets/…`, hit the fallback route, and be handed the *editor's*
@@ -302,8 +301,9 @@ cp .env.prod.example .env.prod && chmod 600 .env.prod
 Fill in real values. Every `${VAR:?…}` in the compose file must be set or the stack refuses
 to start — that is deliberate, so a missing value fails immediately instead of deploying a
 dev default. `.env.prod.example` documents each one, including which variables are
-intentionally *not* env knobs (`READ_ONLY_SHAPES` is one YAML anchor per compose file, per
-`D11`; `S3_ENDPOINT`/`S3_REGION` are fixed by the topology).
+intentionally *not* env knobs (`READ_ONLY_SHAPES` is one YAML anchor per compose file, so
+both backends serve the same `readOnly` flags; `S3_ENDPOINT`/`S3_REGION` are fixed by the
+topology).
 
 Set `COMPOSE_PROFILES` to pick the [mode](#deploy-modes--read-vs-full) for this instance.
 
@@ -358,10 +358,14 @@ unreachable.
   tolerance. Separately is worse than useless: triples restored without their blobs leave
   records pointing at files that do not exist.
 
+  Each volume is named `<COMPOSE_PROJECT_NAME>_<volume>`, and the project name is in
+  `.env.prod` (`rfdb-prod` unless changed), so the loop reads it from there:
+
   ```bash
+  PROJECT=$(grep '^COMPOSE_PROJECT_NAME=' .env.prod | cut -d= -f2)
   for v in oxigraph_data garage_data garage_meta; do
-    docker run --rm -v "rfdb_$v:/data" -v "$(pwd):/backup" \
-      alpine tar czf "/backup/${v}_$(date +%F).tar.gz" -C /data .
+    docker run --rm -v "${PROJECT}_$v:/data" -v "$(pwd):/backup" \
+      alpine tar czf "/backup/${PROJECT}_${v}_$(date +%F).tar.gz" -C /data .
   done
   ```
 

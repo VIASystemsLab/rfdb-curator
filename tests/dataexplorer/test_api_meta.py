@@ -1,4 +1,4 @@
-"""Unit tests for the reader's meta routes: meta/prefixes and meta/graphs."""
+"""Unit tests for the reader's meta routes: meta/schema, meta/prefixes and meta/graphs."""
 
 from __future__ import annotations
 
@@ -9,12 +9,15 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "dataexplorer-backend"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_DIR = REPO_ROOT / "dataexplorer-backend"
+SCHEMA_PATH = REPO_ROOT / "schema" / "rfdb_schema.ttl"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 META = "/api/v1/dataexplorer/meta"
+SCHEMA_URL = f"{META}/schema"
 PREFIXES_URL = f"{META}/prefixes"
 GRAPHS_URL = f"{META}/graphs"
 
@@ -22,15 +25,54 @@ GRAPHS_URL = f"{META}/graphs"
 def _make_meta_app() -> FastAPI:
     """Build a minimal FastAPI app with just the meta router mounted at /api/v1/dataexplorer."""
     from api.meta import router
+    from rfdb_core.schema_extractor import SchemaExtractor
 
     app = FastAPI()
     app.include_router(router, prefix="/api/v1/dataexplorer")
+    app.state.schema_extractor = SchemaExtractor(str(SCHEMA_PATH))
     return app
 
 
 # ---------------------------------------------------------------------------
 # GET /api/v1/dataexplorer/meta/prefixes
 # ---------------------------------------------------------------------------
+
+
+def test_get_schema_reports_the_loaded_version() -> None:
+    """meta/schema serves the version the loaded schema states about itself."""
+    from rfdb_core.schema_extractor import SchemaExtractor
+
+    res = TestClient(_make_meta_app()).get(SCHEMA_URL)
+    assert res.status_code == 200
+    assert res.json()["version"] == SchemaExtractor(str(SCHEMA_PATH)).version
+    assert res.json()["version"]
+
+
+def test_get_schema_serves_the_configured_base_iris(monkeypatch: pytest.MonkeyPatch) -> None:
+    """meta/schema serves both base IRIs from the settings, not from a prefix name."""
+    from core.config import settings
+
+    monkeypatch.setattr(settings, "data_base_uri", "https://example.org/kb/data/")
+    monkeypatch.setattr(settings, "schema_base_uri", "https://example.org/kb/shapes/")
+    body = TestClient(_make_meta_app()).get(SCHEMA_URL).json()
+    assert body["dataBaseUri"] == "https://example.org/kb/data/"
+    assert body["schemaBaseUri"] == "https://example.org/kb/shapes/"
+
+
+def test_get_schema_serves_the_project_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """meta/schema serves PROJECT_NAME for the editor's header."""
+    from core.config import settings
+
+    monkeypatch.setattr(settings, "project_name", "MovieDB")
+    assert TestClient(_make_meta_app()).get(SCHEMA_URL).json()["projectName"] == "MovieDB"
+
+
+def test_get_schema_serves_the_external_id_links() -> None:
+    """meta/schema serves the EXTERNAL_ID_LINKS map for clients that render IDs."""
+    from core.config import settings
+
+    body = TestClient(_make_meta_app()).get(SCHEMA_URL).json()
+    assert body["externalIdLinks"] == settings.external_id_links
 
 
 def test_get_prefixes_returns_200_with_prefixes_key() -> None:
@@ -41,16 +83,16 @@ def test_get_prefixes_returns_200_with_prefixes_key() -> None:
 
 
 def test_get_prefixes_covers_all_ttl_sources() -> None:
-    """The curated map spans schema, data-only, and glottolog-only prefixes."""
+    """The schema's sh:declare covers schema, data-only, and glottolog-only prefixes."""
     prefixes = TestClient(_make_meta_app()).get(PREFIXES_URL).json()["prefixes"]
-    assert prefixes["rfdb"] == "https://rosfeatr.eu/rdf/data/"  # schema.ttl
-    assert prefixes["lrmoo"] == "http://iflastandards.info/ns/lrm/lrmoo/"  # schema.ttl
-    assert prefixes["wd"] == "http://www.wikidata.org/entity/"  # data.ttl only
+    assert prefixes["rfdb"] == "https://rosfeatr.eu/rdf/data/"  # rfdb_schema.ttl
+    assert prefixes["lrmoo"] == "http://iflastandards.info/ns/lrm/lrmoo/"  # rfdb_schema.ttl
+    assert prefixes["wd"] == "http://www.wikidata.org/entity/"  # rfdb_data.ttl only
     assert prefixes["lexvo"] == "http://lexvo.org/ontology#"  # glottolog only
 
 
 def test_get_prefixes_excludes_rdflib_default_noise() -> None:
-    """rdflib's auto-bound vocabularies must not leak into the curated map."""
+    """rdflib's auto-bound vocabularies must not leak into the declared map."""
     prefixes = TestClient(_make_meta_app()).get(PREFIXES_URL).json()["prefixes"]
     for noise in ("brick", "csvw", "dcat", "qb", "odrl", "prov", "doap"):
         assert noise not in prefixes, f"unexpected rdflib default '{noise}' in map"

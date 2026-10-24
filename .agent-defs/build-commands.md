@@ -15,9 +15,6 @@ source .venv/bin/activate       # the venv is at the ROOT, not curator-backend/.
 `cd curator-backend && uv sync …` works identically — uv walks up to the workspace root — so
 either is fine. Use this one environment for all Python checks.
 
-> If you have a stale `curator-backend/.venv` or `curator-backend/uv.lock` from before the workspace
-> existed, they are dead weight; uv ignores both. Delete them at your leisure.
-
 ## Frontend Environment Setup
 
 Node never runs on the host ([platform.md](platform.md)). Each frontend image runs `npm ci`
@@ -65,13 +62,15 @@ is unreachable, stop and ask the user. Managing `docker compose` services is fin
 
 How triples get into the store — the thing to check first when reads come back empty.
 
-- **On startup:** `curator-backend` seeds `data/vocab.ttl` because compose sets
-  `SEED_VOCAB_ON_STARTUP=true`. Test fixtures (`data/data.ttl`) are `SEED_TEST_DATA_ON_STARTUP`
+- **On startup:** `curator-backend` seeds `data/rfdb_vocab.ttl` because compose sets
+  `SEED_VOCAB_ON_STARTUP=true`. Test fixtures (`data/rfdb_data.ttl`) are `SEED_TEST_DATA_ON_STARTUP`
   and default to off.
 - **One-shot, no web server:** `docker compose run --rm curator-backend python scripts/seed.py`
-  — the same `core.seeder.bootstrap_store()` the lifespan runs. This is how a **read-only**
-  deployment gets populated: no writer process is up to seed on startup.
-- **Idempotent.** `vocab.ttl` merges rather than replaces, so re-running is safe.
+  — the same `core.seeder.bootstrap_store()` the lifespan runs. It loads the controlled
+  vocabulary (and the sample data when enabled), never curated records or uploaded files:
+  enough for a vocabulary-only read-only demo, where no writer process seeds on startup.
+  Real data reaches a read-only instance through carried-over volumes (`docs/deployment.md`).
+- **Idempotent.** Vocabulary seeding merges rather than replaces, so re-running is safe.
 
 **`RESET_DATA_ON_STARTUP=true` is destructive** — it wipes the whole store (every named graph and the default graph) before every seed,
 and it must stay `false` in production. Treat setting it, like `docker compose down -v`, as a
@@ -106,7 +105,7 @@ docker run --rm \
 	--platform=linux/amd64 \
 	-v "$PWD":/data \
 	stain/jena:5.1.0 \
-	riot --validate /data/data/corporate/prod-inst.ttl
+	riot --validate /data/data/rfdb_vocab.ttl
 ```
 
 Batch (all `.ttl` / `.nt` under `data/`):
@@ -134,19 +133,19 @@ raises a real question.
 1. `git diff -- data/<file>.ttl` — read the actual diff, not the whole file.
 2. `python3 -c "from rdflib import Graph; Graph().parse('data/<file>.ttl', format='turtle')"`
    — syntax check, ~1s. Never merge in `glottolog_language.ttl` (38MB) for this.
-3. For each *new predicate* in the diff: `grep -n '<local-name>' schema/schema.ttl`. Predicates
+3. For each *new predicate* in the diff: `grep -n '<local-name>' schema/rfdb_schema.ttl`. Predicates
    absent from every shape are legal RDF (shapes aren't `sh:closed` by default) but are
    **invisible** to the graph explorer and curator UI — both are schema-driven
    (`dataexplorer-backend/api/graph.py`: "every shape property ... is a relation"). This is the
    most common real issue and a plain grep catches it in a second — no validator needed.
 4. For each *new individual whose IRI looks like it belongs to a large reference file*
    (Glottolog languages, controlled vocab) : `grep -c '<iri>' data/glottolog_language.ttl` /
-   `data/vocab.ttl` before assuming it needs declaring locally — it's often already seeded there,
+   `data/rfdb_vocab.ttl` before assuming it needs declaring locally — it's often already seeded there,
    and redeclaring it in a test-fixture file is redundant clutter, not a bug, but worth flagging.
 5. Only if something looks structurally wrong (cardinality, datatype, class mismatch), run real
-   pySHACL — scoped to just the one file plus `schema/schema.ttl`, no `inference="rdfs"` unless
+   pySHACL — scoped to just the one file plus `schema/rfdb_schema.ttl`, no `inference="rdfs"` unless
    the check specifically needs subclass entailment, and never with `glottolog_language.ttl`
-   merged in (rdfs inference over 38MB is why this used to take minutes).
+   merged in (rdfs inference over 38MB takes minutes).
 
 ## Linting and Formatting
 
@@ -155,7 +154,7 @@ library), `curator-backend/` (writes) and `dataexplorer-backend/` (reads). Ruff 
 pinned in **each member's `[dependency-groups] dev`** (the workspace resolves one
 version for all three), but **its config lives in the root `pyproject.toml`** — one
 `[tool.ruff]` for every member, plus `tests/`. The version is deliberately not repeated
-here: this file said `ruff==0.14.5` for two releases after the pin moved on.
+here, so the pin stays its only copy.
 
 Run ruff **from the repo root**, which is what CI does:
 
@@ -188,12 +187,7 @@ the workspace environment:
   `VIRTUAL_ENV does not match` warning; uv ignores it. Run `deactivate` to clear it.
 - `uv run ruff check .` needs no manual `source .venv/bin/activate` — uv resolves
   the environment itself. If it still fails, run `uv sync --all-extras --dev`.
-- Historical note: ruff genuinely could not run from the repo root before the
-  workspace existed, because there was no project there. That is no longer true, and
-  running from the root is now the *correct* invocation — it is the only one that
-  also checks `rfdb-core/`.
 
 ## Notes
 
-- Do not rely on a root Python package named `rfdbtools`; this repository is a standalone editor stack.
-- The `graphexplorer-frontend/` app (read-only graph visualizer) is an active, first-class frontend — set it up, lint, and build it alongside `curator-frontend/` (see the sections above). Treat only commands referencing Excel generation or ontology download pipelines as legacy unless explicitly reintroduced.
+- The `graphexplorer-frontend/` app (read-only graph visualizer) is a first-class frontend: set it up, lint, and build it alongside `curator-frontend/` (see the sections above).

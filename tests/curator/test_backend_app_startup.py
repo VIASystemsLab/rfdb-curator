@@ -24,9 +24,9 @@ def _import_backend_app(monkeypatch: pytest.MonkeyPatch, reset_data_on_startup: 
     """Import the backend app with deterministic environment values."""
     monkeypatch.setenv("OXIGRAPH_URL", "http://localhost:7878")
     monkeypatch.setenv("DATA_GRAPH_URI", "https://rfdb.it/graph/data")
-    monkeypatch.setenv("SCHEMA_PATH", "schema/schema.ttl")
-    monkeypatch.setenv("VOCAB_PATH", '["data/vocab.ttl"]')
-    monkeypatch.setenv("DATA_PATH", "data/data.ttl")
+    monkeypatch.setenv("SCHEMA_PATH", "schema/rfdb_schema.ttl")
+    monkeypatch.setenv("VOCAB_PATH", '["data/rfdb_vocab.ttl"]')
+    monkeypatch.setenv("DATA_PATH", "data/rfdb_data.ttl")
     monkeypatch.setenv("RESET_DATA_ON_STARTUP", str(reset_data_on_startup).lower())
     monkeypatch.setenv("SEED_VOCAB_ON_STARTUP", "false")
     monkeypatch.setenv("SEED_TEST_DATA_ON_STARTUP", "false")
@@ -49,7 +49,7 @@ def _seeder_module():
     The lifespan calls `core.seeder.bootstrap_store()`, which looks `seed_store`
     up in its own module globals — so a stub has to be installed there, not in
     app.py's namespace. Patching app.py would silently miss (and, since the name
-    is no longer imported there, monkeypatch would raise instead).
+    is not imported there, monkeypatch would raise instead).
     """
     return importlib.import_module("core.seeder")
 
@@ -78,7 +78,9 @@ def test_startup_initialization_order_populates_services_before_seeding(
     calls: list[str] = []
 
     class SchemaExtractorStub:
-        def __init__(self, schema_path: str):
+        version = None
+
+        def __init__(self, schema_path: str, _long_text_predicates=(), _external_id_links=None):
             calls.append("schema_extractor")
             self.schema_path = schema_path
 
@@ -144,8 +146,8 @@ def test_startup_initialization_order_populates_services_before_seeding(
         "store",
         "seed_store",
     ]
-    assert fake_app.state.schema_extractor.schema_path == "schema/schema.ttl"
-    assert fake_app.state.shacl_validator.schema_path == "schema/schema.ttl"
+    assert fake_app.state.schema_extractor.schema_path == "schema/rfdb_schema.ttl"
+    assert fake_app.state.shacl_validator.schema_path == "schema/rfdb_schema.ttl"
     assert fake_app.state.store.base_url == "http://localhost:7878/"
     assert fake_app.state.seed_report == {
         "seedVocab": False,
@@ -162,7 +164,9 @@ def test_reset_data_on_startup_clears_store_before_seeding(
     calls: list[str] = []
 
     class SchemaExtractorStub:
-        def __init__(self, schema_path: str):
+        version = None
+
+        def __init__(self, schema_path: str, _long_text_predicates=(), _external_id_links=None):
             calls.append("schema_extractor")
             self.schema_path = schema_path
 
@@ -240,7 +244,9 @@ def test_first_write_can_read_shape_dep_graph_after_startup(
     captured: dict[str, object] = {}
 
     class SchemaExtractorStub:
-        def __init__(self, schema_path: str):
+        version = None
+
+        def __init__(self, schema_path: str, _long_text_predicates=(), _external_id_links=None):
             self.schema_path = schema_path
 
     class ShaclValidatorStub:
@@ -340,8 +346,8 @@ def test_startup_failure_stops_before_partially_initialized_state(
     app_module = _import_backend_app(monkeypatch)
 
     class FailingSchemaExtractor:
-        def __init__(self, _schema_path: str):
-            raise BadSyntax("schema/schema.ttl", 0, "", 0, "broken schema")
+        def __init__(self, _schema_path: str, _long_text_predicates=(), _external_id_links=None):
+            raise BadSyntax("schema/rfdb_schema.ttl", 0, "", 0, "broken schema")
 
     monkeypatch.setattr(app_module, "SchemaExtractor", FailingSchemaExtractor)
 

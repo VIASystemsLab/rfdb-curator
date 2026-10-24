@@ -1,7 +1,8 @@
 """Settings shared by every RossijskijFeatrDB service.
 
 Holds only what more than one service needs: how to reach the triplestore, where
-the SHACL schema lives, CORS, logging, and the object-storage credentials. Each
+the SHACL schema lives, the base IRIs records and shapes are named under, CORS,
+logging, and the object-storage credentials. Each
 service instantiates a module-level ``settings`` singleton of its own: the curator
 from a subclass adding its seeding/reset/read-only knobs, the reader from
 :class:`BaseServiceSettings` directly, since it needs nothing more.
@@ -20,6 +21,8 @@ import json
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from rfdb_core.external_ids import PLACEHOLDER
+
 
 class BaseServiceSettings(BaseSettings):
     """Configuration common to the curator (writer) and dataexplorer (reader).
@@ -30,7 +33,11 @@ class BaseServiceSettings(BaseSettings):
         data_graph_uri: Named graph URI scoping reads (``FROM <uri>``) and Turtle
             loads (``?graph=<uri>``). Example: ``https://rosfeatr.eu/rdf/graph/``
         schema_path: Path to the SHACL schema Turtle file, relative to the
-            service's working directory. Example: ``schema/schema.ttl``
+            service's working directory. Example: ``schema/rfdb_schema.ttl``
+        data_base_uri: Namespace every minted record and digital copy is named
+            under. Example: ``https://rosfeatr.eu/rdf/data/``
+        schema_base_uri: Namespace of the schema's SHACL shapes. Example:
+            ``https://rosfeatr.eu/rdf/schema/``
         cors_origins: Allowed CORS origins, supplied as a JSON array string and
             parsed by :meth:`parse_cors`. Both compose files give both services
             the same value.
@@ -79,10 +86,31 @@ class BaseServiceSettings(BaseSettings):
     # ------------------------------------------------------------------ #
 
     schema_path: str
-    """Path to the SHACL schema Turtle file (e.g. ``schema/schema.ttl``).
+    """Path to the SHACL schema Turtle file (e.g. ``schema/rfdb_schema.ttl``).
 
     Both services parse it: the curator for validation and form schemas, the
     reader for relation predicates and type/relation labels."""
+
+    project_name: str = "RossijskijFeatrDB"
+    """The name of the knowledge base this deployment serves, shown to users: the
+    reader's HTML page titles, the editor's header, the API documentation.
+    Supplied via ``PROJECT_NAME``."""
+
+    # ------------------------------------------------------------------ #
+    # Base IRIs                                                            #
+    # ------------------------------------------------------------------ #
+
+    data_base_uri: str
+    """Namespace every record this deployment mints is named under, digital-copy
+    nodes included: ``<data_base_uri>Place_ab12cd34``, and a copy's
+    ``schema:contentUrl`` is ``<data_base_uri>File_x/content``. Both services slice
+    it off an IRI to recover a local id, and the reader serves the IRIs under it
+    on ``/rdf/data/{local_name}``."""
+
+    schema_base_uri: str
+    """Namespace of the schema's SHACL shapes (the ``rfdbs:`` prefix in the rfdb
+    schema). The reader serves the shapes under it on ``/rdf/schema/{name}``.
+    Must match the namespace the loaded schema names its shapes in."""
 
     read_only_shapes: list[str] = []
     """Shape URIs whose records are not editable in this deployment.
@@ -92,17 +120,47 @@ class BaseServiceSettings(BaseSettings):
     ``"readOnly": true`` in every shapes response, and the curator additionally
     returns 403 on writes targeting them. Defaults to ``[]``.
 
-    **Shared, not writer-only** (D11), and the reclassification matters: this looks
-    like a write concern because the curator enforces it, but it is *policy
-    metadata stating which shapes are editable* — which any client needs to render
-    a UI. Filing it under the curator is what caused C20, where the editor could
-    not list shapes at all with the writer down. Both services now receive it and
-    stamp the flag through the one implementation in
-    :mod:`rfdb_core.shapes`, so the two catalogues cannot drift.
+    **Shared, not writer-only.** This looks like a write concern because the
+    curator enforces it, but it is *policy metadata stating which shapes are
+    editable*, which any client needs to render a UI. Both services receive it and
+    stamp the flag through the one implementation in :mod:`rfdb_core.shapes`, so
+    the two catalogues cannot drift and the editor can list shapes with the writer
+    down.
 
-    Operational caveat: "identical" now rests on both services being given the
+    Operational caveat: "identical" rests on both services being given the
     same value. Supply it from a single YAML anchor in Compose rather than two
     literals that can be edited apart."""
+
+    long_text_predicates: list[str] = [
+        "http://www.w3.org/2000/01/rdf-schema#comment",
+        "http://purl.org/dc/terms/description",
+        "http://purl.org/dc/terms/abstract",
+        "http://www.w3.org/2004/02/skos/core#definition",
+        "http://www.w3.org/2004/02/skos/core#note",
+        "http://www.w3.org/2004/02/skos/core#scopeNote",
+        "https://w3id.org/polifonia/ontology/core/text",
+    ]
+    """Full IRIs of the predicates whose form fields are multi-line text.
+
+    SHACL has no long-text hint, so the property's ``sh:path`` decides. Any other
+    text field gets a one-line input and saves the same way. Supplied as a JSON
+    array string via ``LONG_TEXT_PREDICATES``. The default is the description,
+    note and transcription predicates of the rfdb schema, the value both compose
+    files set. Both services build the same field descriptors, so give them the
+    same value."""
+
+    external_id_links: dict[str, str] = {
+        "http://www.wikidata.org/prop/direct/P214": "https://viaf.org/en/viaf/$1",
+        "http://www.wikidata.org/prop/direct/P5504": "https://rism.online/$1",
+    }
+    """Predicates whose text values are external identifiers, mapped to a URL
+    template with ``$1`` where the identifier goes.
+
+    Every UI shows such a value as a link: the form beside its input, the graph
+    explorer's inspector and the reader's HTML page. Supplied as a JSON object
+    string via ``EXTERNAL_ID_LINKS``. The default covers the rfdb schema's VIAF
+    (``wdt:P214``) and RISM (``wdt:P5504``) IDs, with Wikidata's formatter URLs,
+    the value both compose files set. Both services must get the same value."""
 
     # ------------------------------------------------------------------ #
     # HTTP / CORS                                                          #
@@ -166,6 +224,49 @@ class BaseServiceSettings(BaseSettings):
     # ------------------------------------------------------------------ #
     # Validators                                                           #
     # ------------------------------------------------------------------ #
+
+    @field_validator("data_base_uri", "schema_base_uri")
+    @classmethod
+    def check_namespace(cls, v: str) -> str:
+        """Require a base IRI to end in ``/`` or ``#``.
+
+        IRIs are built by appending a local name to the base, so a base without a
+        separator would mint ``…/dataPlace_1`` and fail no check along the way.
+        """
+        if not v.endswith(("/", "#")):
+            raise ValueError(f"must end with '/' or '#', got {v!r}")
+        return v
+
+    @field_validator("long_text_predicates", mode="before")
+    @classmethod
+    def parse_long_text_predicates(cls, v: str | list[str]) -> list[str]:
+        """Accept ``LONG_TEXT_PREDICATES`` as a JSON array string or a list.
+
+        An empty string means no long-text fields at all, the same as ``[]``.
+        """
+        if isinstance(v, str):
+            return json.loads(v) if v.strip() else []
+        return v
+
+    @field_validator("external_id_links", mode="before")
+    @classmethod
+    def parse_external_id_links(cls, v: str | dict[str, str]) -> dict[str, str]:
+        """Accept ``EXTERNAL_ID_LINKS`` as a JSON object string or a dict.
+
+        An empty string means no external-identifier links, the same as ``{}``.
+        """
+        if isinstance(v, str):
+            return json.loads(v) if v.strip() else {}
+        return v
+
+    @field_validator("external_id_links")
+    @classmethod
+    def check_link_templates(cls, v: dict[str, str]) -> dict[str, str]:
+        """Require ``$1`` in every template, or the identifier would be dropped."""
+        for predicate, template in v.items():
+            if PLACEHOLDER not in template:
+                raise ValueError(f"template for {predicate} has no $1: {template!r}")
+        return v
 
     @field_validator("read_only_shapes", mode="before")
     @classmethod

@@ -38,13 +38,13 @@ class Settings(BaseServiceSettings):
     and the ``s3_*`` group.
 
     Attributes:
-        vocab_paths: Paths to ``vocab.ttl``-style files loaded into the store on
+        vocab_paths: Paths to the controlled-vocabulary Turtle files loaded into the store on
             every startup when ``seed_vocab_on_startup`` is ``true``.
-            Example: ``["data/vocab.ttl"]``
+            Example: ``["data/rfdb_vocab.ttl"]``
 
-        data_path: Path to ``data.ttl`` — test fixture data, seeded only when
+        data_path: Path to the sample-data Turtle file — test fixture data, seeded only when
             ``seed_test_data_on_startup`` is ``true``.
-            Example: ``data/data.ttl``
+            Example: ``data/rfdb_data.ttl``
 
         reset_data_on_startup: Wipe the store and re-seed at startup. When
             ``true``, every graph is erased (``DROP ALL`` plus ``CLEAR DEFAULT``)
@@ -72,13 +72,13 @@ class Settings(BaseServiceSettings):
     """Paths to vocabulary Turtle files seeded on startup.
 
     Supplied as a JSON array string via the ``VOCAB_PATH`` environment variable,
-    e.g. ``'["data/vocab.ttl","data/glottolog_language.ttl"]'``.
+    e.g. ``'["data/rfdb_vocab.ttl","data/glottolog_language.ttl"]'``.
     The ``parse_vocab_paths`` validator parses the JSON array string; a list value
     passed directly (in tests) is returned unchanged.
     """
 
     data_path: str
-    """Path to the test-fixture Turtle file (e.g. ``data/data.ttl``)."""
+    """Path to the test-fixture Turtle file (e.g. ``data/rfdb_data.ttl``)."""
 
     # ------------------------------------------------------------------ #
     # Startup behaviour — writer-only                                      #
@@ -108,7 +108,8 @@ class Settings(BaseServiceSettings):
     whereas mode decides whether the curator is deployed at all."""
 
     # ``read_only_shapes`` is inherited: besides gating writes, it tells any
-    # client which shapes are editable, so the reader needs it too (D11).
+    # client which shapes are editable, so the reader needs it too: both services
+    # serve the same shape list, and the editor works with the writer down.
 
     max_upload_mb: int = 500
     """Per-file upload ceiling in megabytes. Uploads exceeding this are

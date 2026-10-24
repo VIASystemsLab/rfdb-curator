@@ -28,6 +28,7 @@ on it; where an open task builds on something already shipped, that context is n
 - [ ] Auto-refresh entity lists (e.g. "has place" relations) when backend data changes behind the scenes.
 - [ ] Records pagination with a default page size of 20 (frontend side; pairs with cursor-based SPARQL pagination under [Backend](#backend)).
 - [ ] Real-time validation — debounced SHACL checking on blur/change via `POST /api/v1/curator/validate`.
+- [ ] UI language switch (English / Italian). The schema names shapes and fields in both languages (`sh:name`), and vocabulary concepts carry an Italian `rdfs:label` with an English `skos:altLabel`, but the backend picks English for every label (`_english_first` in [schema_extractor.py](rfdb-core/rfdb_core/schema_extractor.py), `preferred_label` in [graph.py](dataexplorer-backend/api/graph.py)). Let the user pick the language in each UI, defaulting to the browser's: the shapes and entity endpoints return every language (or take a `lang` parameter), and the frontends choose. Cover shape and field names, controlled-vocabulary labels, and entity labels.
 - [ ] Warn on duplicate `owl:sameAs`: when a same-as value is entered, check whether another record already has it and warn the user (needs a backend lookup).
 - [ ] Data Context Panel enhancements on top of the shipped read-only baseline (the panel plus its metadata API — `GET /api/v1/dataexplorer/meta/prefixes`, `GET /api/v1/dataexplorer/meta/graphs` with per-graph active/empty status, `GET /api/v1/dataexplorer/meta/files`):
   - [ ] Prefixes: per-entry `source` attribution (`schema` / `jsonld-context` / `runtime`); explicit prefix-drift warnings when mappings differ across schema, JSON-LD context, and runtime; copy Turtle prefix declaration / copy namespace IRI; search by prefix or namespace substring.
@@ -43,12 +44,12 @@ on it; where an open task builds on something already shipped, that context is n
 - [ ] **REQUIRES BRAINSTORM + USER APPROVAL — optimize startup bulk load of large vocab files.**
   The ~38 MB `data/glottolog_language.ttl` is re-loaded via `POST /store` on every startup
   ([curator-backend/core/seeder.py](curator-backend/core/seeder.py), [rfdb-core/rfdb_core/triplestore/oxigraph.py](rfdb-core/rfdb_core/triplestore/oxigraph.py) `load_turtle`).
-  This is slow and previously timed out (mitigated for now by the configurable `OXIGRAPH_LOAD_TIMEOUT`,
-  default 300s). Options to brainstorm: skip re-seeding when the graph already holds the vocab
+  This is slow, and it needs the configurable `OXIGRAPH_LOAD_TIMEOUT` (default 300s) to finish
+  at all. Options to brainstorm: skip re-seeding when the graph already holds the vocab
   (idempotency check), one-time offline load into a persisted Oxigraph volume, Oxigraph
   bulk-loader / native import instead of HTTP, streaming/chunked upload, or splitting vocab from
   large reference data. Decide and get user sign-off before implementing. (The Glottolog
-  vocabulary itself is already hydrated and wired to `rfdbs:SourceShape` `dcterms:language`;
+  vocabulary itself is wired to `rfdbs:SourceShape` `dcterms:language`;
   this task concerns only how it is loaded, not the feature.)
 
 - [ ] **REQUIRES BRAINSTORM — manage Julian vs Gregorian calendar dates.** Historical sources
@@ -65,13 +66,13 @@ on it; where an open task builds on something already shipped, that context is n
 ### Modeling & schema
 
 Changes that touch only the SHACL shapes or the RDF model are tracked in the
-schema repository, where `schema/schema.ttl` comes from. Items here need work
+schema repository, where this repository's `schema/rfdb_schema.ttl` comes from. Items here need work
 in this repository too.
 
 - [ ] Complete the shape-role policy for nested shapes and helper records (see [architecture.md](docs/architecture.md#shape-role-policy)).
 - [ ] Entity delete orphans its bridge nodes. `DELETE /api/v1/curator/entities` removes only `<entity> ?p ?o` (`delete_entity` in [data.py](curator-backend/api/data.py)), so an `AgentRole` owned by the deleted Work stays in the store. The update path already removes a bridge node together with its link, guarded by `FILTER NOT EXISTS` for shared nodes, over the predicates from `bridge_link_predicates()`. Reuse that query shape on delete and run it before the entity delete. The frontend sends `shapeId` on delete, but the endpoint treats it as optional. See [architecture.md](docs/architecture.md#delete-behavior-and-orphaned-helper-nodes).
 - [ ] Entity delete leaves inbound links dangling: triples with the deleted entity as object stay (e.g. deleting a Person leaves `core:hasAgent` on its `AgentRole` nodes pointing at nothing). Decide between blocking the delete, cascading, or warning in the UI; the only guard today is the generic `window.confirm` in `ShapeRecordList.jsx`.
-- [ ] Clean up `AgentRole` nodes already orphaned in existing stores. Before the edit-path fix, removing a connection in the editor kept the node's triples. Nothing detects them: `scripts/cleanup_files.py` and the `orphanedNodes` count of `/meta/files` cover `schema:DigitalDocument` only.
+- [ ] Clean up `AgentRole` nodes orphaned in existing stores: nodes no record links to any more, whose triples remain. Nothing detects them: `scripts/cleanup_files.py` and the `orphanedNodes` count of `/meta/files` cover `schema:DigitalDocument` only.
 - [ ] Check bridge-node removal, re-pointing and rollback in the live editor. They are covered by `tests/curator/test_agent_role_nested.py` against an rdflib-backed store double, never against Oxigraph.
 - [ ] Improve JSON-LD handling for nested forms and repeated multilingual values.
 - [ ] Expand the controlled-vocabulary seed set.
@@ -112,6 +113,18 @@ in this repository too.
 
 ### Platform & future
 
+- [ ] **FUTURE (next release) — base IRIs with any path.** `DATA_BASE_URI` and
+  `SCHEMA_BASE_URI` are settings, but the IRIs only resolve when their paths are
+  `/rdf/data/` and `/rdf/schema/`: the proxy forwards only `/rdf/*`
+  (`proxy/Caddyfile`), and the reader's routes are fixed in
+  `dataexplorer-backend/api/resource.py`. With another path, records still save
+  and edit, but visiting an IRI, the links on the reader's HTML pages and opening
+  uploaded PDFs from the editor all 404. To plan: register the reader's routes at
+  each base's path, have the proxy route those paths from the environment, and
+  check the frontends' `/rdf/` assumptions (`resolveFileUrl`, `fileDownloadUrl`
+  and `entityPageUrl` in `curator-frontend/src/api/client.js`, the graph
+  explorer's client). Until then [docs/custom-schema.md](docs/custom-schema.md)
+  tells a fork to keep the paths.
 - [ ] **DEFERRED — cross-entity date-order check.** E.g. an Expression's creation date should
   be after its Work's, and a Manifestation's after its Expression's. Too specific and strict to
   enforce now: historical dates are often approximate or uncertain. Reconsider once the
@@ -129,25 +142,20 @@ in this repository too.
   `rfdb-core/rfdb_core/file_storage.py` seam — a later, isolated swap. Trade-offs: embedded (no
   separate S3 service) and unlocks semantic search, but is not blob-first, has no S3 API, and
   needs an OCR/embedding pipeline.
-- [x] **DONE — decouple the services from the triplestore so Oxigraph can be swapped.**
-  The `TripleStore` seam ships in [rfdb-core/rfdb_core/triplestore/](rfdb-core/rfdb_core/triplestore/):
-  a runtime-checkable Protocol (`base.py`), `OxigraphStore` as the first implementation, and a
-  `build_triplestore(settings)` factory keyed on the `TRIPLESTORE` env var — so a second store is a
+- [ ] **Triplestore seam: open points for a second store.** The `TripleStore` seam is in
+  [rfdb-core/rfdb_core/triplestore/](rfdb-core/rfdb_core/triplestore/): a runtime-checkable
+  Protocol (`base.py`), `OxigraphStore` as the only implementation, and a
+  `build_triplestore(settings)` factory keyed on the `TRIPLESTORE` env var, so a second store is a
   config change, not an edit to a handler. Both services reach the store only through
-  `app.state.store`; `oxigraph_client.py` is gone. The conformance suite this item asked for is
-  [tests/core/test_triplestore_contract.py](tests/core/test_triplestore_contract.py) (24 cases:
-  Protocol conformance, graph-scoping strings, transport request shape/parsing, plus a live
-  round-trip that skips without a store). Writing it found a real pre-existing bug: `construct()`
-  caught `rdflib.exceptions.Error`, but malformed Turtle raises `BadSyntax`, which derives from
-  `SyntaxError` — so the documented `ValueError` never fired.
-  Still open, and deliberately deferred until a second implementation is actually attempted:
-  - [ ] **Seam method naming.** The Protocol keeps today's names (`query`, `construct`, `update`,
+  `app.state.store`, and [tests/core/test_triplestore_contract.py](tests/core/test_triplestore_contract.py)
+  is the conformance suite. Deferred until a second implementation is actually attempted:
+  - [ ] **Seam method naming.** The Protocol uses the Oxigraph client's names (`query`, `construct`, `update`,
     `load_turtle`, `clear_store`, `health`, `from_clause`, `with_clause`, `graph`) because renaming
     would touch ~20 call sites and ~12 test doubles for zero behavioural gain. Revisit when a store
     with a different scoping model is added — that is the moment names get tested against reality
     rather than taste. Candidates: `query` → `query_select` (it only does SELECT), `construct` →
     `query_construct`, and replacing the raw `from_clause()`/`with_clause()` SPARQL fragments with a
-    scoping object. (Decision D6 of the modular-services refactor.)
+    scoping object.
   - [ ] **Bulk-load path** — ties into the startup bulk-load item above; `load_turtle` currently
     assumes the Graph Store Protocol.
   - [ ] **Transaction/atomicity semantics** differ across stores and are not modelled by the seam.
@@ -160,7 +168,7 @@ in this repository too.
 
 > Context — the digital-copy upload-first subsystem (staging → `registered/` promotion,
 > `rfdb-core/rfdb_core/file_storage.py`, `curator-backend/scripts/cleanup_files.py`, `GET /api/v1/dataexplorer/meta/files`)
-> is shipped and live-verified in dev. Note that after the writer/reader split the upload lands on
+> is shipped and live-verified in dev. The upload lands on
 > `curator-backend` and the **published** download on `dataexplorer-backend` — a copy becomes
 > published when a parent entity references it in RDF, never by which storage prefix holds its
 > bytes. Until then it is curator working state, previewable only via
@@ -170,7 +178,7 @@ in this repository too.
 > items below cover production deployment and operation.
 
 - [ ] **OPERATIONAL — run the file-storage cleanup periodically:** `docker compose exec curator-backend python scripts/cleanup_files.py` (add `--dry-run` to preview). Purges abandoned staged uploads (>24h), unreferenced registered files (>24h grace), and orphaned digital-copy nodes. The Data Context Panel "File storage" section shows when counts grow.
-- [x] **DONE — production digital-copy storage.** `garage` is in [docker-compose.prod.yml](docker-compose.prod.yml) on the `internal` network only (never on `edge`), with `read_only`, `no-new-privileges` and tmpfs hardening; [proxy/Caddyfile](proxy/Caddyfile) sets `request_body max_size {$RFDB_MAX_UPLOAD}` on the curator prefix, which is the only prefix that accepts uploads; the S3 wiring reaches both backends from one YAML anchor. Docs updated in [deployment.md](docs/deployment.md#production-deployment) (topology table + runbook) and this README. **Not yet deployed anywhere** — see the status note at that heading.
+- [x] **DONE — production digital-copy storage.** `garage` is in [docker-compose.prod.yml](docker-compose.prod.yml) on the `internal` network only (never on `edge`), with `read_only`, `no-new-privileges` and tmpfs hardening; [proxy/Caddyfile](proxy/Caddyfile) sets `request_body max_size {$RFDB_MAX_UPLOAD}` on the curator prefix, which is the only prefix that accepts uploads; the S3 wiring reaches both backends from one YAML anchor. Documented in [deployment.md](docs/deployment.md#production-deployment) (topology table + runbook). **Not yet deployed anywhere** — see the status note at that heading.
 - [ ] Investigate what dominates build/deploy time (backend especially) and whether it can be sped up.
 - [ ] Set up automated release to GitHub Releases and the GitHub package registry.
 - [ ] Verify versioning and commit tagging work with GitHub Actions (automatic release from tagged commits).

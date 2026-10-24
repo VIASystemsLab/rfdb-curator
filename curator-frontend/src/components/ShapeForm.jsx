@@ -14,8 +14,8 @@ const RDF_TYPE_URI = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
 /**
  * Resolve which `typeOptions` value (e.g. "foaf:Person") a record's actual
  * `rdf:type` triples match, for pre-selecting the type selector on edit.
- * Returns '' when the record has none of the declared alternatives (e.g. a
- * brand new shape whose data predates this constraint).
+ * Returns '' when none of the record's `rdf:type` values is a declared
+ * alternative.
  */
 function resolveTypeChoice(flatTriples, typeOptions) {
   const raw = flatTriples['rdf:type']
@@ -268,27 +268,10 @@ export default function ShapeForm({
         continue
       }
 
-      // --- Language field (dcterms:language) ---
-      // Stores the literal string value of the language code triple.
-      // Falls back to empty string so the input is never left as undefined.
-      // (Path-based special case, not type-based — left as-is.)
-      else if (field.path === 'dcterms:language') {
-        const triple = Array.isArray(val) ? val[0] : val
-        if (triple && typeof triple === 'object' && triple['@value']) {
-          formData[field.path] = triple['@value']
-        } else if (triple && typeof triple === 'object' && triple.object) {
-          formData[field.path] = triple.object
-        } else if (typeof triple === 'string') {
-          formData[field.path] = triple
-        } else {
-          formData[field.path] = ''
-        }
-      }
-
       // --- Entity search ---
       // Initialised to null here; resolved asynchronously in useEffect
       // to obtain a proper {value, label} object the async-select can display.
-      else if (field.type === 'entity-search') {
+      if (field.type === 'entity-search') {
         formData[field.path] = null
       }
 
@@ -362,8 +345,7 @@ export default function ShapeForm({
       // New/blank record. Seed EVERY field with its empty value (not just the
       // list widgets) so reset() clears all fields. This matters after editing:
       // react-hook-form's defaultValues are then the edited record's values, so
-      // a partial reset would leave omitted fields (and a stale @id) populated —
-      // the "edited values linger after save" bug.
+      // a partial reset would leave omitted fields (and a stale @id) populated.
       const defaults = { '@id': undefined }
       for (const field of formSchema.fields) {
         if (field.type === 'lang-string-list') {
@@ -586,9 +568,8 @@ export default function ShapeForm({
       // whose dirtyFields entry does not reliably report an appended/removed
       // card. Compare the bridge-node IRIs the record was loaded with against
       // the ones still in the form instead: any difference means the link
-      // predicate must be rewritten, which is what puts it in originalTriples.
-      // Without this, removing a connection sent no delete for the link, the
-      // store kept it, and the "removed" connection came back on reload.
+      // predicate must be rewritten, which puts it in originalTriples so the
+      // backend deletes the link of a removed connection.
       // Sound only on a fully loaded form, which is why submit waits for
       // `hydration` and refuses one where a bridge node failed to load.
       if (dirtyFields[field.path]) return true
@@ -667,7 +648,7 @@ export default function ShapeForm({
       if (result.success) {
         // Report create vs update before the parent clears the record, then
         // blank the form in place (resetNonce re-seeds defaults) so the curator
-        // can keep entering records without a jump to the list.
+        // can keep entering records from the same form.
         onSaved?.(record?.id ? 'Record updated' : 'Record created')
         setResetNonce((n) => n + 1)
       }

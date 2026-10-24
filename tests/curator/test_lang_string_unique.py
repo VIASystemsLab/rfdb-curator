@@ -19,7 +19,7 @@ from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import RDFS, SH
 
 ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 BACKEND_DIR = ROOT / "curator-backend"
 
 if str(BACKEND_DIR) not in sys.path:

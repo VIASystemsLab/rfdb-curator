@@ -13,9 +13,8 @@ members = ["rfdb-core", "curator-backend", "dataexplorer-backend"]
 # ---------------------------------------------------------------------------
 # Ruff — one config for the whole repo
 # ---------------------------------------------------------------------------
-# Previously lived in backend/pyproject.toml, when backend/ was the only Python
-# project. It moved up here the moment there was a second member, so both are
-# linted by identical rules from a single source of truth. Ruff finds this by
+# It lives at the root so every workspace member is linted by identical rules
+# from a single source of truth. Ruff finds this by
 # walking up from each file (a pyproject.toml without [tool.ruff] is not a
 # config boundary), so `uv run ruff check .` works from the root or any member.
 [tool.ruff]

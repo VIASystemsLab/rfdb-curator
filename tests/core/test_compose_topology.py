@@ -1,16 +1,15 @@
 """The deploy-mode invariant, as a test instead of a note to remember.
 
-Task 9 makes which kind of instance this is a deploy-time choice: base services
+Which kind of instance this is, read or full, is a deploy-time choice: base services
 carry no ``profiles:`` key and run in every mode, while ``curator-backend`` and
-``curator-frontend`` are ``full``-only. The plan attached a warning to that —
-*"re-check after any compose edit"* — because Compose versions **disagree** about
-what a ``depends_on`` pointing into an inactive profile does: some silently
-activate that profile (so read mode quietly starts the editor), some hard-error
-(so read mode will not start at all). Either way the failure appears at deploy
-time, on someone else's machine, from an edit that looked local.
+``curator-frontend`` are ``full``-only. Compose versions **disagree** about what a
+``depends_on`` pointing into an inactive profile does: some silently activate that
+profile (so read mode quietly starts the editor), some hard-error (so read mode
+will not start at all). Either way the failure appears at deploy time, on someone
+else's machine, from an edit that looked local, so every compose edit is checked
+here.
 
-An instruction to re-check is the weakest form of an invariant, so it is checked
-here. These tests read the compose files directly rather than shelling out to
+These tests read the compose files directly rather than shelling out to
 ``docker compose config`` — the assertions are about what the files declare, and
 they should hold on a machine with no Docker daemon. ``docker compose config``
 validation is a separate CI step, which catches the different class of problem
@@ -119,13 +118,13 @@ def test_the_reader_never_waits_on_the_writer(filename: str) -> None:
 
 @pytest.mark.parametrize("filename", COMPOSE_FILES)
 def test_both_backends_get_the_same_read_only_shapes(filename: str) -> None:
-    """One YAML anchor, two services — the required mitigation for D11.
+    """One YAML anchor gives both backends the same ``READ_ONLY_SHAPES``.
 
     Both services serve the same shape catalogue with the same ``readOnly``
     flags, and the editor fetches it from the reader so it can start with the
     writer down. Two literals that could be edited apart would hand clients
-    different flags depending on which service answered: C20 again, but quieter,
-    because each service would be internally consistent.
+    different flags depending on which service answered, and no single-service
+    test would notice, because each service would be internally consistent.
 
     The anchor makes them one value; this asserts the *resolved* values match, so
     it fails whether the anchor was replaced by a literal or simply forgotten.
@@ -141,3 +140,49 @@ def test_both_backends_get_the_same_read_only_shapes(filename: str) -> None:
         f"{filename}: READ_ONLY_SHAPES reaches {sorted(values)}; both backends need it"
     )
     assert len(set(values.values())) == 1, f"{filename}: the two values have drifted: {values}"
+
+
+@pytest.mark.parametrize(
+    "variable",
+    [
+        "DATA_BASE_URI",
+        "SCHEMA_BASE_URI",
+        "LONG_TEXT_PREDICATES",
+        "EXTERNAL_ID_LINKS",
+        "PROJECT_NAME",
+    ],
+)
+@pytest.mark.parametrize("filename", COMPOSE_FILES)
+def test_both_backends_get_the_same_schema_settings(filename: str, variable: str) -> None:
+    """Settings both backends must agree on, or they describe the data differently.
+
+    The writer mints under the base IRIs and the reader serves and parses them;
+    both build field descriptors from the long-text list. Different values fail
+    silently, with no error from either service.
+    """
+    services = _services(filename)
+    values = {
+        name: svc["environment"][variable]
+        for name, svc in services.items()
+        if variable in (svc.get("environment") or {})
+    }
+
+    assert set(values) == {"curator-backend", "dataexplorer-backend"}, (
+        f"{filename}: {variable} reaches {sorted(values)}; both backends need it"
+    )
+    assert len(set(values.values())) == 1, f"{filename}: the two values have drifted: {values}"
+
+
+@pytest.mark.parametrize("filename", COMPOSE_FILES)
+def test_the_project_name_is_required_and_names_everything(filename: str) -> None:
+    """Every stack is named on purpose, and its containers and volumes carry that name.
+
+    The top-level ``name`` must come from ``COMPOSE_PROJECT_NAME`` with no default,
+    so Compose refuses to start an unnamed stack. No service may fix its own
+    ``container_name``: a fixed name stops two stacks running on one host and does
+    not say which stack a container belongs to.
+    """
+    parsed = yaml.safe_load((REPO_ROOT / filename).read_text(encoding="utf-8"))
+    assert parsed["name"].startswith("${COMPOSE_PROJECT_NAME:?"), parsed.get("name")
+    fixed = [name for name, svc in parsed["services"].items() if "container_name" in svc]
+    assert not fixed, f"{filename}: fixed container_name on {fixed}"

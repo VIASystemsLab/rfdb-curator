@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 from rdflib import Graph
 
 ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 BACKEND_DIR = ROOT / "dataexplorer-backend"
 
 if str(BACKEND_DIR) not in sys.path:
@@ -29,7 +29,7 @@ DATA = "https://rosfeatr.eu/rdf/data/"
 NODE_URL = "/api/v1/dataexplorer/graph/node"
 CORE = "https://w3id.org/polifonia/ontology/core/"
 
-# Known relation predicates (declare sh:node / sh:class in schema.ttl).
+# Known relation predicates (declare sh:node / sh:class in rfdb_schema.ttl).
 HAS_AGENT_ROLE = CORE + "hasAgentRole"
 IS_COMPONENT_OF = "http://www.cidoc-crm.org/cidoc-crm/P148i_is_component_of"
 IS_ABOUT = "http://www.cidoc-crm.org/cidoc-crm/P129_is_about"
@@ -200,3 +200,26 @@ def test_get_node_503_when_store_down() -> None:
     ox = _StubOxigraph(raise_exc=RuntimeError("store down"))
     res = _client(ox).get(NODE_URL, params={"id": DATA + "Src1"})
     assert res.status_code == 503
+
+
+def test_identifier_literal_carries_its_link() -> None:
+    """A VIAF ID stored as text comes back as a literal with the page's URL."""
+    viaf = "http://www.wikidata.org/prop/direct/P214"
+    turtle = f"""
+    @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+    <{DATA}Work1> rdfs:label "A work"@en ;
+        <{viaf}> "293925180" ;
+        rdfs:comment "not an identifier" .
+    """
+    app = FastAPI()
+    app.include_router(router, prefix="/api/v1/dataexplorer")
+    app.state.schema_extractor = SchemaExtractor(
+        str(SCHEMA_PATH), external_id_links={viaf: "https://viaf.org/en/viaf/$1"}
+    )
+    app.state.store = _StubOxigraph(self_turtle=turtle)
+    body = TestClient(app).get(NODE_URL, params={"id": DATA + "Work1"}).json()
+
+    urls = {lit["predicate"]: lit["url"] for lit in body["literals"]}
+    assert urls[viaf] == "https://viaf.org/en/viaf/293925180"
+    assert urls["http://www.w3.org/2000/01/rdf-schema#comment"] is None
+    assert body["externalLinks"] == []

@@ -8,17 +8,19 @@ it, load vocab (and optionally test data) — because it calls the same
 
     docker compose run --rm curator-backend python scripts/seed.py
 
-That matters for the read-only deploy mode (docs/deployment.md, "Deploy modes"),
-where the stack runs dataexplorer-backend alone and no writer process is up to
-seed on startup. Also useful for re-seeding after adding a vocabulary file,
-without restarting the API.
+It loads the controlled vocabulary (and the sample data when enabled), never
+curated records or uploaded files. That is enough for a vocabulary-only demo in
+the read-only deploy mode, where no writer process is up to seed on startup; a
+read-only instance with real data gets it from carried-over volumes instead (see
+docs/deployment.md, "Deploy modes"). Also useful for re-seeding after adding a
+vocabulary file, without restarting the API.
 
 Reads exactly the same environment variables as the service (``core.config``),
 so a compose ``run`` inherits the right configuration by construction. Notably
 ``RESET_DATA_ON_STARTUP=true`` is honoured here too: this script will wipe the
 store if the environment says to.
 
-Idempotent: ``vocab.ttl`` merges rather than replaces, so re-running is safe.
+Idempotent: vocabulary seeding merges rather than replaces, so re-running is safe.
 Exits 0 on success, 1 with the reason on failure.
 """
 
@@ -38,7 +40,7 @@ from rfdb_core.triplestore import build_triplestore  # noqa: E402
 
 def main() -> int:
     # Same structured logging as the service, so a one-shot run lands in the
-    # same JSON-lines file as the startup seed it replaces.
+    # same JSON-lines file as the seed the service runs on startup.
     configure_logging(settings.log_file, settings.log_level)
 
     store = build_triplestore(settings)

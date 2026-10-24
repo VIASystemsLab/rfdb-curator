@@ -81,7 +81,7 @@ def _build_shape_dep_graph(extractor) -> dict[str, _ShapeNode]:
 def bridge_link_predicates(dep_graph: dict[str, _ShapeNode], shape_id: str) -> set[str]:
     """Predicates of ``shape_id`` whose objects are inline helper-bridge nodes.
 
-    Used by the write path to decide which old objects it may delete outright
+    Used by the write path to decide which stored objects it may delete outright
     when a predicate is rewritten: a bridge node unlinked from its only parent
     is garbage, while a standalone entity (or a store-owned digital copy) must
     survive. See :class:`_ShapeEdge.inline_bridge` for the exact rule.
@@ -166,9 +166,9 @@ def _build_validation_construct(
                 bgp_lines.append(f"    {current} <{predicate_uri}> {next_var} .")
                 current = next_var
 
-            # Use terminal_var directly for the last hop instead of rewriting
-            # the line afterward with str.replace(), which is unsafe when the
-            # variable name appears as a substring of a predicate URI.
+            # Emit terminal_var directly for the last hop. Substituting it into
+            # a built line with str.replace() would be unsafe when the variable
+            # name appears as a substring of a predicate URI.
             bgp_lines.append(f"    {current} <{suffix[-1]}> {terminal_var} .")
             bgp_lines.append(f"    {terminal_var} {pred_var} {obj_var} .")
 

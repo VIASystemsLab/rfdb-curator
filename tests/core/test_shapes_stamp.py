@@ -1,10 +1,11 @@
-"""The ``readOnly`` stamp is single-sourced — decision D11's required guard.
+"""The ``readOnly`` stamp is single-sourced.
 
-Both services serve a shape catalogue, and the two payloads must be identical. The
-catalogue itself was always shared (one ``SchemaExtractor``, one ``schema.ttl``);
-the *flag* was not, and that single divergence produced C20 — the editor could only
-get the flags from the writer, so it rendered an empty sidebar whenever the writer
-was down.
+Both services serve a shape catalogue, and the two payloads must be identical,
+``readOnly`` flags included, so the editor can take the catalogue from the reader
+and keep working with the writer down. The catalogue is shared through one
+``SchemaExtractor`` over one ``rfdb_schema.ttl``; the *flag* must be shared too, or
+the editor depends on the writer for it and shows an empty sidebar whenever the
+writer is down.
 
 The invariant is maintained by sharing the implementation, not by two copies that
 agree today. So this module tests the shared function's behaviour, and then asserts
@@ -22,7 +23,7 @@ import pytest
 from rfdb_core.shapes import list_shapes, stamp_read_only
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = REPO_ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = REPO_ROOT / "schema" / "rfdb_schema.ttl"
 
 LOCKED = "https://rosfeatr.eu/rdf/schema/LanguageShape"
 OPEN = "https://rosfeatr.eu/rdf/schema/SourceShape"
@@ -70,7 +71,7 @@ def test_stamp_preserves_every_other_field() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not SCHEMA_PATH.exists(), reason="schema.ttl not found")
+@pytest.mark.skipif(not SCHEMA_PATH.exists(), reason="rfdb_schema.ttl not found")
 def test_list_shapes_stamps_every_shape() -> None:
     """What both services return: the whole catalogue, every entry flagged."""
     from rfdb_core.schema_extractor import SchemaExtractor

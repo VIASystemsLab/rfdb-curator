@@ -10,7 +10,7 @@ from rdflib import Graph
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "curator-backend"
-SCHEMA_PATH = ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))

@@ -57,9 +57,14 @@ Both scripts are idempotent. After setup, ordinary runs need only:
 docker compose up --build
 ```
 
+`env-init.sh` also writes `COMPOSE_PROJECT_NAME=rfdb-dev` into `.env`. Compose requires it
+and names every container `rfdb-dev-<service>-1` and every volume `rfdb-dev_<volume>` after
+it. Another checkout on the same machine (a fork, a second clone) needs its own name, or
+Compose treats both as one stack.
+
 `env-init.sh` writes `COMPOSE_PROFILES=full` into `.env`, which is what makes that command
-bring up all six services. Without it — an `.env` that predates the deploy profiles, for
-instance — you get the read-only four and no editor on `:5173`. See
+bring up all six services. Without it (an `.env` written by hand, for instance) you get the
+read-only four and no editor on `:5173`. See
 [deployment.md](deployment.md#deploy-modes--read-vs-full); the short version is that a bare
 `docker compose up` is the mode a public instance runs, and development opts into the write
 tier.
@@ -143,17 +148,21 @@ pre-commit is meant to catch formatting/hygiene issues before CI does.
 - start both backends
 - check `/health` on :8000 **and** :8001 (the payloads differ — the writer reports
   `oxigraph` + `seed`, the reader reports `store`)
-- check `/api/v1/dataexplorer/shapes` on both, and `/api/v1/dataexplorer/entities` on :8001
+- check the shapes route on both (`/api/v1/curator/shapes` on :8000,
+  `/api/v1/dataexplorer/shapes` on :8001), and `/api/v1/dataexplorer/entities` on :8001
 - run a dry-run validation request against :8000
 
 ---
 
 ## 4. Schema Change Workflow
 
-To add or change a form in the editor, update the active SHACL schema at `schema/schema.ttl`. 
-Each new record type is a `sh:NodeShape`.
+Forms come from the SHACL schema at `SCHEMA_PATH`. In this repository that is
+`schema/rfdb_schema.ttl`, a copy of a tagged [rfdb-schema](https://github.com/VIASystemsLab/rfdb-schema)
+release: a model change is made upstream, released, and copied in by the procedure in
+[schema/README.md](../schema/README.md), never by editing the copy. To try a model of your
+own, point `SCHEMA_PATH` at it. Each record type is a `sh:NodeShape`.
 
-When adding/changing shapes, verify:
+When a schema adds or changes shapes, verify:
 
 `sh:targetClass`, `rdfs:label`, `sh:description`, `sh:property`, `sh:path`, `sh:minCount`, `sh:maxCount`, `sh:datatype`, `sh:nodeKind`, `sh:class`, `sh:node`, `sh:or`, `sh:hasValue`, `sh:closed`, `sh:uniqueLang`
 
@@ -161,40 +170,39 @@ The editor discovers updated shapes through the shared schema extractor
 (`rfdb-core/rfdb_core/schema_extractor.py`), which both services load at startup:
 
 ```
-GET /api/v1/dataexplorer/shapes            # both services; the curator's adds the readOnly flag
+GET /api/v1/dataexplorer/shapes       # also /api/v1/curator/shapes: identical payloads, readOnly flags included
 GET /api/v1/curator/forms?shapeId=... # curator only — form definitions drive an editing form
 ```
 
-A schema change therefore needs **both** services restarted: each parses `schema.ttl`
+A schema change therefore needs **both** services restarted: each parses the schema
 into its own in-memory index at startup.
 
 Two behaviors matter when adding or changing a shape, and both are documented elsewhere:
 
 - **Helper/bridge vs. standalone-entity classification** — whether a shape renders as a top-level record or as a nested inline editor is derived from the schema (whether it declares an `rdfs:label` property), not hardcoded per class name. Check both the SHACL shape and the resulting `/api/v1/dataexplorer/shapes` metadata before changing frontend code. See [architecture.md](architecture.md#helperbridge-shape-classification).
-- **Performance and contributor modeling rationale** — the deliberate use of `cidoc:P19_was_intended_use_of` vs `cidoc:P16_used_specific_object`, and of `dcterms:contributor` with `rfdbs:ContributorShape`, should be preserved unless there is an explicit migration plan. See [data-model.md](data-model.md#intentional-modeling-decisions).
+- **Modeling rationale** — why the rfdb model uses `cidoc:P19_was_intended_use_of` and `cidoc:P16_used_specific_object` side by side, and `dcterms:contributor` with `rfdbs:ContributorShape`. These belong to the model, so they are documented upstream, in [data-model.md](https://github.com/VIASystemsLab/rfdb-schema/blob/v2.2.2/docs/data-model.md).
 
 ---
 
 ## 5. Data Change Workflow
 
-- `data/vocab.ttl` — canonical seed data for controlled vocabulary. Seeding should normally be **enabled**.
-- `data/data.ttl` — test-only fixture data. Seeding should normally be **disabled** outside dev/test.
+- `data/rfdb_vocab.ttl` — canonical seed data for controlled vocabulary. Seeding should normally be **enabled**.
+- `data/rfdb_data.ttl` — test-only fixture data. Seeding should normally be **disabled** outside dev/test.
 
 ### Namespace hardcoding map
 
 When the RFDB namespaces change, update these locations together:
 
-- `schema/schema.ttl` — authoritative Turtle prefixes and SHACL shape IRIs. Shape IRIs use `rfdbs:` (`https://rosfeatr.eu/rdf/schema/`); data resources use `rfdb:` (`https://rosfeatr.eu/rdf/data/`).
-- `data/vocab.ttl` and `data/data.ttl` — authoritative Turtle data prefixes for seeded and fixture data.
-- `curator-backend/core/blank_node_handler.py` — generated entity IDs use the hardcoded `RFDB_BASE` data namespace.
+- `schema/rfdb_schema.ttl` — authoritative Turtle prefixes and SHACL shape IRIs. Shape IRIs use `rfdbs:` (`https://rosfeatr.eu/rdf/schema/`); data resources use `rfdb:` (`https://rosfeatr.eu/rdf/data/`).
+- `data/rfdb_vocab.ttl` and `data/rfdb_data.ttl` — authoritative Turtle data prefixes for seeded and fixture data.
+- `DATA_BASE_URI` and `SCHEMA_BASE_URI` — the settings both backends name records and shapes under. Set them in the compose files (or a root `.env` in dev, `.env.prod` in production); the `.env.example` files show where each one ends up.
 - `curator-backend/models/data.py`, `rfdb-core/rfdb_core/models_data.py` and the two `core/config.py` files — doc examples reference shape/data IRIs.
-- `rfdb-core/rfdb_core/vocab.py` — `RFDB_BASE` is the data namespace itself, so a migration starts here.
 - `tests/` Python files (all three subdirectories) — many tests assert full shape or entity IRIs directly; search for `rosfeatr.eu/rdf/` before and after any namespace migration.
 
 Quick check from repo root:
 
 ```bash
-rg -n 'https://rosfeatr\.eu/rdf/|https://rfdb\.it/data/' schema data curator-backend rfdb-core tests docs AGENTS.md .agent-defs
+rg -n 'https://rosfeatr\.eu/rdf/' schema data curator-backend rfdb-core tests docs AGENTS.md .agent-defs
 ```
 
 ---
@@ -291,40 +299,44 @@ A good PR description covers: what changed, whether the SHACL schema changed, wh
 ## 8. Quick Regex Log Checks (when UI submit appears to do nothing)
 
 Backend structured logs are written to `/app/logs/app.jsonl` inside the
-`curator_backend_logs` volume (the reader has its own, `dataexplorer_backend_logs` —
-swap the volume name in the commands below to inspect it). You can query them without
-entering a container:
+`<project>_curator_backend_logs` volume (the reader has its own,
+`<project>_dataexplorer_backend_logs`: swap the volume name in the commands below to
+inspect it). `<project>` is `COMPOSE_PROJECT_NAME` from the repo-root `.env` (`rfdb-dev` by
+default), so read it from there first. You can then query the logs without entering a
+container, even with the backend stopped:
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine ls -l /logs
+PROJECT=$(grep '^COMPOSE_PROJECT_NAME=' .env | cut -d= -f2)
+LOGS="${PROJECT}_curator_backend_logs"
+docker run --rm -v "$LOGS:/logs" alpine ls -l /logs
 ```
 
 Start with broad error scan:
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine sh -lc \
-	"rg -n -i 'error|exception|traceback|validation|shacl|httpexception' /logs/app.jsonl"
+docker run --rm -v "$LOGS:/logs" alpine \
+	grep -n -i -E 'error|exception|traceback|validation|shacl|httpexception' /logs/app.jsonl
 ```
 
 Check whether POST `/api/v1/curator/entities` was hit at all:
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine sh -lc \
-	"rg -n 'POST|/api/v1/curator/entities|create_or_update_entity|validationReport' /logs/app.jsonl"
+docker run --rm -v "$LOGS:/logs" alpine \
+	grep -n -E 'POST|/api/v1/curator/entities|create_or_update_entity|validationReport' /logs/app.jsonl
 ```
 
 Target your example payload text (`Expression 1`, `en`):
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine sh -lc \
-	"rg -n -i 'Expression 1|\"en\"|rdfs:label|core:text|langString' /logs/app.jsonl"
+docker run --rm -v "$LOGS:/logs" alpine \
+	grep -n -i -E 'Expression 1|"en"|rdfs:label|core:text|langString' /logs/app.jsonl
 ```
 
 Live-tail only relevant lines while retrying submit in UI:
 
 ```bash
-docker run --rm -v rfdb_backend_logs:/logs alpine sh -lc \
-	"tail -f /logs/app.jsonl" | rg --line-buffered -i 'POST|/api/v1/curator/entities|Expression 1|validation|error|exception|shacl'
+docker run --rm -v "$LOGS:/logs" alpine tail -f /logs/app.jsonl \
+	| grep --line-buffered -i -E 'POST|/api/v1/curator/entities|Expression 1|validation|error|exception|shacl'
 ```
 
 If using Docker and file logs look empty, check container logs too:

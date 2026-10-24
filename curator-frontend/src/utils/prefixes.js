@@ -7,7 +7,7 @@
  *
  * The prefix map is hydrated at app startup via `hydratePrefixes()`, which
  * receives the response from `GET /api/v1/dataexplorer/meta/prefixes`.
- * The authoritative source is the rdflib graph parsed from schema.ttl on the backend.
+ * The authoritative source is the rdflib graph parsed from the loaded schema on the backend.
  *
  * See App.jsx for the startup fetch and hydration call.
  */

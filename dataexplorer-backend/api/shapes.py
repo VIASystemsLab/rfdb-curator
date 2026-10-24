@@ -1,16 +1,13 @@
 """Shape metadata for read clients: the sidebar nav and the graph type picker.
 
-**Identical to the curator's shapes response** (decision D11). Both services build
-it with :func:`rfdb_core.shapes.list_shapes` over the same ``schema.ttl``, so there
-is one implementation and one place to change.
+**Identical to the curator's shapes response**, ``readOnly`` flags included. Both
+services build it with :func:`rfdb_core.shapes.list_shapes` over the same schema,
+so there is one implementation and one place to change.
 
-This reverses D3, which had the reader omit the ``readOnly`` flag on the grounds
-that ``READ_ONLY_SHAPES`` was a write-policy setting a read service had no business
-knowing. The flag does gate writes — but it also states which shapes are editable,
-which is exactly what a client needs to render a UI. Withholding it meant the
-editor had to fetch its shape list from the writer, so with the writer down it had
-no sidebar at all (C20). Serving the same catalogue from both services removes the
-divergence instead of teaching the client to work around it.
+The ``readOnly`` flag gates writes, but it also states which shapes are editable,
+which is what a client needs to render a UI. Serving it here lets the editor take
+its shape list from this service, so the sidebar still renders when the writer is
+down, and a client never has to reconcile two catalogues.
 
 There is still no forms route here: form field definitions exist to drive an
 editing form.

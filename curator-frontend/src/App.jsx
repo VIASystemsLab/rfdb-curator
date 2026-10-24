@@ -25,7 +25,7 @@
  * - When editing, App fetches the full entity and passes it as the record prop to ShapeForm.
  * - ShapeForm must ensure @id is included in the form state and payload for updates.
  * - If the fetch fails, loadedRecord stays null and ShapeForm renders as a blank create
- *   form rather than an error (a known gap, tracked separately).
+ *   form rather than an error (a known gap).
  *
  * View details flow:
  *   1. User clicks eye (see details) button in records list.
@@ -89,6 +89,8 @@ export default function App() {
   const [guideOpen, setGuideOpen] = useState(false) // first-time curator welcome guide (WEMI overlay)
   const [showContext, setShowContext] = useState(false) // read-only Data Context Panel in the main area
   const [toast, setToast] = useState('') // transient bottom-right confirmation (e.g. after save)
+  const [dataBaseUri, setDataBaseUri] = useState(null) // DATA_BASE_URI, from /api/v1/dataexplorer/meta/schema
+  const [projectName, setProjectName] = useState('') // PROJECT_NAME, from the same route
   // Draft cache keyed by `shape::<shapeId>`. Single slot per shape form (last state wins),
   // so unsaved input survives shape/record navigation even though ShapeForm re-hydrates
   // via reset() on every shape/record change. Seeded from sessionStorage (with a 1h TTL)
@@ -182,7 +184,7 @@ export default function App() {
         }
         setActiveShape(null)
         setShapesError(
-          'No shapes returned by /api/v1/dataexplorer/shapes. Check backend startup logs and schema/schema.ttl syntax.'
+          'No shapes returned by /api/v1/dataexplorer/shapes. Check backend startup logs and schema/rfdb_schema.ttl syntax.'
         )
       })
       .catch((error) => {
@@ -206,6 +208,24 @@ export default function App() {
         'Failed to fetch prefix map from /api/v1/dataexplorer/meta/prefixes; IRI compaction disabled.',
       )
     })
+
+    // The project's name, and the namespace that marks an IRI as one of our
+    // records. On failure the header stays blank and the inspector shows
+    // record IRIs as plain text instead of links.
+    apiClient
+      .getSchemaInfo()
+      .then((info) => {
+        setDataBaseUri(info.dataBaseUri || null)
+        if (info.projectName) {
+          setProjectName(info.projectName)
+          document.title = `${info.projectName} — Editor`
+        }
+      })
+      .catch(() => {
+        console.warn(
+          'Failed to fetch schema info from /api/v1/dataexplorer/meta/schema; record links disabled.',
+        )
+      })
   }, [])
 
   useEffect(() => {
@@ -314,7 +334,7 @@ export default function App() {
       {/* ── Left navigation ── */}
       <nav className="app-nav">
         <div>
-          <p className="app-title">RossijskijFeatrDB</p>
+          <p className="app-title">{projectName}</p>
           <p className="app-subtitle">Data Editor</p>
           <div className="nav-actions">
             <button
@@ -399,7 +419,7 @@ export default function App() {
                     <div className="form-loading">Loading record…</div>
                   )}
                   {/*
-                    This guard has a known gap, tracked separately: on the first render after onEdit,
+                    This guard has a known gap: on the first render after onEdit,
                     recordLoading is still false, so ShapeForm briefly renders with the previous loadedRecord.
                   */}
                   {(!selectedRecord || !recordLoading) && (
@@ -412,8 +432,8 @@ export default function App() {
                       onDraftChange={handleDraftChange}
                       onValidation={setValidation}
                       onSaved={(message) => {
-                        // Stay on the form: ShapeForm blanks itself, and a toast
-                        // confirms — no jarring jump to the record list.
+                        // Stay on the form, ready for the next record: ShapeForm
+                        // blanks itself and a toast confirms the save.
                         handleDraftClear(draftKey)
                         setSelectedRecord(null)
                         setLoadedRecord(null)
@@ -454,6 +474,7 @@ export default function App() {
                 validation={validation}
                 record={selectedRecord}
                 onNavigate={(iri) => handleViewRecord({ id: iri })}
+                dataBaseUri={dataBaseUri}
               />
             </aside>
           </>

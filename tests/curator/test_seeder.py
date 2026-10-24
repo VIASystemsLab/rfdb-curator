@@ -1,7 +1,7 @@
 """Unit tests for the startup data seeder.
 
-Covers the vocab_paths list handling added in the Glottolog language dropdown feature:
-- bare string VOCAB_PATH is auto-wrapped in a list by the config validator
+Covers the ``vocab_paths`` list handling:
+- a bare-string VOCAB_PATH (not a JSON array) is refused at startup
 - JSON array with one path seeds one file
 - JSON array with two paths seeds both files
 - a missing file returns loaded=False without raising
@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic_settings import SettingsError
 
 BACKEND_DIR = Path(__file__).resolve().parents[2] / "curator-backend"
 
@@ -50,9 +51,9 @@ class TestParseVocabPaths:
     def _make_settings(self, vocab_path_value: str, monkeypatch):
         monkeypatch.setenv("OXIGRAPH_URL", "http://localhost:7878")
         monkeypatch.setenv("DATA_GRAPH_URI", "https://rfdb.it/graph/data")
-        monkeypatch.setenv("SCHEMA_PATH", "schema/schema.ttl")
+        monkeypatch.setenv("SCHEMA_PATH", "schema/rfdb_schema.ttl")
         monkeypatch.setenv("VOCAB_PATH", vocab_path_value)
-        monkeypatch.setenv("DATA_PATH", "data/data.ttl")
+        monkeypatch.setenv("DATA_PATH", "data/rfdb_data.ttl")
         monkeypatch.setenv("RESET_DATA_ON_STARTUP", "false")
         monkeypatch.setenv("SEED_VOCAB_ON_STARTUP", "false")
         monkeypatch.setenv("SEED_TEST_DATA_ON_STARTUP", "false")
@@ -62,22 +63,22 @@ class TestParseVocabPaths:
         # Re-instantiate Settings with the patched env.
         return config_mod.Settings()
 
-    def test_bare_string_is_wrapped_in_list(self, monkeypatch):
-        """A JSON array with one element produces a single-element list."""
-        settings = self._make_settings('["data/vocab.ttl"]', monkeypatch)
-        assert settings.vocab_paths == ["data/vocab.ttl"]
+    def test_bare_string_is_refused(self, monkeypatch):
+        """VOCAB_PATH must be a JSON array, even for one file: a bare path fails at startup."""
+        with pytest.raises(SettingsError, match="vocab_paths"):
+            self._make_settings("data/rfdb_vocab.ttl", monkeypatch)
 
     def test_json_array_single_path(self, monkeypatch):
         """A JSON array with one path is parsed correctly."""
-        settings = self._make_settings('["data/vocab.ttl"]', monkeypatch)
-        assert settings.vocab_paths == ["data/vocab.ttl"]
+        settings = self._make_settings('["data/rfdb_vocab.ttl"]', monkeypatch)
+        assert settings.vocab_paths == ["data/rfdb_vocab.ttl"]
 
     def test_json_array_two_paths(self, monkeypatch):
         """A JSON array with two paths is parsed correctly."""
         settings = self._make_settings(
-            '["data/vocab.ttl", "data/glottolog_language.ttl"]', monkeypatch
+            '["data/rfdb_vocab.ttl", "data/glottolog_language.ttl"]', monkeypatch
         )
-        assert settings.vocab_paths == ["data/vocab.ttl", "data/glottolog_language.ttl"]
+        assert settings.vocab_paths == ["data/rfdb_vocab.ttl", "data/glottolog_language.ttl"]
 
 
 # ---------------------------------------------------------------------------

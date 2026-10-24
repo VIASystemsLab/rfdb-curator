@@ -2,8 +2,8 @@
 
 This is the Linked Data surface — the reason RFDB's persisted IRIs are worth
 calling identifiers. An entity IRI is ``https://rosfeatr.eu/rdf/data/{name}`` and
-production serves that host, so visiting the identifier has to return the resource
-(D9). Three properties therefore matter more than the response bodies:
+production serves that host, so visiting the identifier has to return the
+resource. Three properties therefore matter more than the response bodies:
 
   * **the negotiated variant is honest** — the ``Content-Type`` matches the payload,
     and ``Vary: Accept`` is set so a cache cannot hand one client another's format;
@@ -13,7 +13,7 @@ production serves that host, so visiting the identifier has to return the resour
   * **every URL this endpoint hands out can be fetched** — the alternates it
     advertises, the ``Content-Location`` it names, the links on the HTML page.
     Several tests follow those URLs rather than matching them as strings, because
-    the string was right and the URL was broken: a raw ``+`` in
+    a URL can be right as a string and still broken: a raw ``+`` in
     ``?_mediatype=application/ld+json`` decodes to a space.
 """
 
@@ -31,15 +31,16 @@ from rdflib import Graph
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = REPO_ROOT / "dataexplorer-backend"
-SCHEMA_PATH = REPO_ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = REPO_ROOT / "schema" / "rfdb_schema.ttl"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from api.resource import router  # noqa: E402
+from core.config import settings  # noqa: E402
 from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
-from rfdb_core.vocab import RFDB_BASE  # noqa: E402
 
+RFDB_BASE = settings.data_base_uri
 LOCAL = "Src1"
 IRI = f"{RFDB_BASE}{LOCAL}"
 
@@ -222,10 +223,10 @@ def test_vary_accept_is_set() -> None:
 def test_content_location_names_a_variant_that_can_be_fetched(media_type: str) -> None:
     """The named variant URL must *work*, not merely be present.
 
-    Asserting the property instead of the string is deliberate: the header used to
-    interpolate the media type raw, so ``?_mediatype=application/ld+json``
-    advertised a URL that answered 400 — a query string is form-encoded, so the
-    ``+`` arrives as a space. A test comparing strings passed the whole time.
+    Asserting the property instead of the string is deliberate: a header that
+    interpolates the media type raw advertises ``?_mediatype=application/ld+json``,
+    which answers 400 because a query string is form-encoded and the ``+`` arrives
+    as a space. A test comparing strings would pass on that broken URL.
     """
     client = _client()
     location = client.get(f"/rdf/data/{LOCAL}", headers={"Accept": media_type}).headers[
@@ -335,7 +336,7 @@ def test_html_does_not_linkify_a_non_http_object() -> None:
 def test_html_links_a_digital_copy_to_its_bytes() -> None:
     """``schema:contentUrl`` is an ``xsd:anyURI`` literal, and must still be clickable.
 
-    It is the whole point of a digital copy's page, and D9 forces it to be a
+    It is the whole point of a digital copy's page, and the schema requires a
     literal rather than an IRI (``sh:datatype xsd:anyURI`` admits nothing else), so
     the rendering has to notice the datatype. Re-based like every other local link,
     so a dev page reaches that stack's bytes and not production's.
@@ -345,11 +346,10 @@ def test_html_links_a_digital_copy_to_its_bytes() -> None:
 
 
 def test_every_relative_link_on_the_html_page_resolves() -> None:
-    """The acceptance criterion, executed: no dead link on the page.
+    """No dead link on the page.
 
-    Covers the variant links too, which is where the first cut was wrong — a raw
-    ``+`` in ``?_mediatype=application/ld+json`` decodes to a space, so the page
-    advertised two formats that answered 400.
+    Covers the variant links too: a raw ``+`` in ``?_mediatype=application/ld+json``
+    decodes to a space, so an unencoded variant link answers 400.
     """
     client = _client(_StubStore(turtle=RICH_TURTLE), content_route=True)
     page = client.get(f"/rdf/data/{LOCAL}", headers={"Accept": BROWSER_ACCEPT}).text
@@ -559,3 +559,18 @@ def test_shape_alternates_list_only_what_shapes_serve() -> None:
         "application/rdf+xml",
         "application/n-triples",
     }, "the shape route offers no HTML, so its alternates must not advertise it"
+
+
+def test_html_links_an_identifier_stored_as_text() -> None:
+    """A VIAF ID literal links to its VIAF page, per EXTERNAL_ID_LINKS."""
+    turtle = f"""
+    <{IRI}> <http://www.wikidata.org/prop/direct/P214> "293925180" .
+    """
+    page = _html(_StubStore(turtle=turtle))
+    assert '<a href="https://viaf.org/en/viaf/293925180">293925180</a>' in page
+
+
+def test_html_title_names_the_configured_project(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The page title ends with PROJECT_NAME, not a fixed project name."""
+    monkeypatch.setattr(settings, "project_name", "MovieDB")
+    assert "<title>A source — MovieDB</title>" in _html()

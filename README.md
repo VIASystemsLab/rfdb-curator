@@ -85,12 +85,14 @@ docker compose up
 **Which services start is a mode**, not a fixed list. Base services (Oxigraph, Garage, the
 read backend, the graph explorer) run in every mode, and the two curator services are gated
 behind the `full` profile — so a bare `docker compose up` is the read-only stack a public
-instance would run. `scripts/env-init.sh` writes `COMPOSE_PROFILES=full` into `.env`, so
+instance would run. `scripts/env-init.sh` writes `COMPOSE_PROJECT_NAME=rfdb-dev` (required: it
+names the containers and volumes) and `COMPOSE_PROFILES=full` into `.env`, so
 development gets the whole six-service stack by default.
 
-*On an existing clone,* `env-init.sh` will not overwrite your `.env` — add
-`COMPOSE_PROFILES=full` to it yourself, or pass `--profile full` per invocation. Without it
-the editor on `:5173` simply will not start. See
+`env-init.sh` refuses to overwrite an existing `.env`, so an `.env` written another way
+needs both lines added by hand. Without `COMPOSE_PROJECT_NAME`, Compose refuses to start;
+without `COMPOSE_PROFILES=full` (or `--profile full` on each invocation), the editor on
+`:5173` does not start. See
 [docs/deployment.md](docs/deployment.md#deploy-modes--read-vs-full).
 
 Stop services:
@@ -132,11 +134,11 @@ Startup seeding, data-reset modes, and the full environment-variable reference l
 
 ## The Schema
 
-The active SHACL schema lives in `schema/schema.ttl` and is the single source of truth: every record type, form field, constraint, datatype, and relation is derived from it at runtime. **To experiment with a different model, replace `schema/schema.ttl`** (or repoint `SCHEMA_PATH`) — forms, validation, and the record-type list all follow automatically, with no code changes.
+The loaded SHACL schema is the source of truth: every record type, form field, constraint, datatype, and relation is derived from it at runtime. This repository ships the rfdb schema in `schema/rfdb_schema.ttl`, copied from a tagged release of [rfdb-schema](https://github.com/VIASystemsLab/rfdb-schema) and recorded in [schema/README.md](schema/README.md); model changes go upstream. **To run a different model, point `SCHEMA_PATH` at it**: forms, validation, and the record-type list all follow, with no code changes. What a schema must provide is in [docs/data-model.md](docs/data-model.md); what a fork sets is in [docs/custom-schema.md](docs/custom-schema.md).
 
 ### Data Model
 
-The active model uses [LRMoo](https://cidoc-crm.org/lrmoo/) (rather than the older FRBR/FaBiO model) and draws on [LRMoo](https://cidoc-crm.org/lrmoo/), [CIDOC CRM](https://cidoc-crm.org/), the Polifonia [Core](https://github.com/polifonia-project/core-ontology) / [Music Meta](https://github.com/polifonia-project/music-meta-ontology) / [Source](https://github.com/polifonia-project/source-ontology) ontologies, [Dublin Core Terms](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/), [PRISM](https://www.w3.org/submissions/prism/), [SKOS](https://www.w3.org/TR/skos-reference/), [FOAF](http://xmlns.com/foaf/spec/), [Schema.org](https://schema.org/), [Wikidata](https://www.wikidata.org/) direct properties, and RDF/RDFS/OWL/XSD.
+The rfdb model draws on [LRMoo](https://cidoc-crm.org/lrmoo/), [CIDOC CRM](https://cidoc-crm.org/), the Polifonia [Core](https://github.com/polifonia-project/core-ontology) / [Music Meta](https://github.com/polifonia-project/music-meta-ontology) / [Source](https://github.com/polifonia-project/source-ontology) ontologies, [Dublin Core Terms](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/), [PRISM](https://www.w3.org/submissions/prism/), [SKOS](https://www.w3.org/TR/skos-reference/), [FOAF](http://xmlns.com/foaf/spec/), [Schema.org](https://schema.org/), [Wikidata](https://www.wikidata.org/) direct properties, and RDF/RDFS/OWL/XSD.
 
 LRMoo hierarchy: a **Musical Work** is the abstract work; an **Expression** is an intellectual realization (e.g. a libretto); a **Manifestation** is an edition or product type; a **Source / Item** is a specific physical or documentary copy. Each level refines the one above it, from Work through Expression and Manifestation to Source/Item, and every WEMI link points from the more concrete record up to its parent — so create parents before children.
 
@@ -166,7 +168,7 @@ Each `sh:NodeShape` becomes a form type and each `sh:property` becomes a form fi
 
 Shapes with a `sh:property` on `rdfs:label` are treated as standalone entities; shapes without one are helper/bridge nodes rendered inline when referenced by a parent (e.g. `rfdbs:AgentRoleShape`). Shapes whose shape-level `sh:or` branches into multiple `sh:class` alternatives (e.g. `rfdbs:ContributorShape`, `foaf:Person` or `foaf:Organization`) surface a type-selection dropdown at creation time.
 
-> Modeling principles and design decisions — the vocabularies used and for what, WEMI layering and link direction, the Agent Role bridge pattern, and the literal/language/date/IRI policies — are in [docs/data-model.md](docs/data-model.md). Per-shape fields and cardinalities live in the schema itself (`schema/schema.ttl`, or `GET /api/v1/dataexplorer/shapes`). The schema-driven extraction and validation pipeline is described in [docs/architecture.md](docs/architecture.md).
+> What the application requires of any schema (entity and helper shapes, the constraints the editor understands, identifiers, uploads) is in [docs/data-model.md](docs/data-model.md). The rfdb model's own decisions and rationale are in upstream's [data-model.md](https://github.com/VIASystemsLab/rfdb-schema/blob/v2.2.2/docs/data-model.md). Per-shape fields and cardinalities live in the schema itself (`schema/rfdb_schema.ttl`, or `GET /api/v1/dataexplorer/shapes`). The schema-driven extraction and validation pipeline is described in [docs/architecture.md](docs/architecture.md).
 
 ---
 
@@ -174,9 +176,9 @@ Shapes with a `sh:property` on `rdfs:label` are treated as standalone entities; 
 
 All settings are loaded from environment variables; each service fails fast if a required variable is missing or malformed. The source of truth is the `environment:` blocks in `docker-compose.yml` plus the settings models.
 
-Both services share a base (`rfdb-core/rfdb_core/config.py`: store connection, schema path, CORS, logging, S3). `curator-backend/core/config.py` extends it with the write-side surface — seeding, data reset, `READ_ONLY`, `READ_ONLY_SHAPES`, `MAX_UPLOAD_MB`. `dataexplorer-backend` adds nothing: everything a reader needs is already in the base. Because the base ignores unknown variables, one shared `.env` across both services is safe — the writer-only values are simply invisible to the reader.
+Both services share a base (`rfdb-core/rfdb_core/config.py`: store connection, schema path, base IRIs, project name, read-only shapes, long-text fields, external-ID links, CORS, logging, S3). `curator-backend/core/config.py` extends it with the write-side surface — seeding, data reset, `READ_ONLY`, `MAX_UPLOAD_MB`. `dataexplorer-backend` adds nothing: everything a reader needs is already in the base. Because the base ignores unknown variables, one shared `.env` across both services is safe — the writer-only values are simply invisible to the reader.
 
-The full environment-variable reference, data-reset modes, and seed sources (controlled vocabulary + Glottolog languages) are documented in the [development & testing deployment guide](docs/deployment.md#development--testing-deployment). The production stack is **complete but has never been deployed** — every piece exists and the whole topology has been exercised locally, but there is no host, domain or certificate yet. Runbook and the one remaining gap: [docs/deployment.md](docs/deployment.md#production-deployment).
+The full environment-variable reference, data-reset modes, and seed sources (controlled vocabulary + Glottolog languages) are documented in the [development & testing deployment guide](docs/deployment.md#development--testing-deployment). The production stack is complete but not yet deployed to a host. Runbook: [docs/deployment.md](docs/deployment.md#production-deployment).
 
 ---
 
@@ -205,15 +207,16 @@ The full endpoint table (data listing, autocomplete, file staging, downloads, an
 
 ## Documentation
 
-The root README is the entry point (overview, setup, schema, API, configuration). These topic guides go deeper; where any document and the implementation diverge, the implementation and the active `schema/schema.ttl` take precedence.
+The root README is the entry point (overview, setup, schema, API, configuration). These topic guides go deeper; where any document and the implementation diverge, the implementation and the active `schema/rfdb_schema.ttl` take precedence.
 
 | Document | Covers |
 |---|---|
 | [docs/getting-started.md](docs/getting-started.md) | What the editor is for, the WEMI data model in brief, and how to run it locally and in production. |
-| [docs/data-model.md](docs/data-model.md) | Modeling principles and design decisions: the vocabularies used and for what, WEMI layering, the bridge-node pattern, and the literal/language/date/IRI policies. Per-shape fields live in `schema/schema.ttl`. |
+| [docs/data-model.md](docs/data-model.md) | The data-model contract: what any schema must provide for this application, and the rfdb schema this repository runs. Per-shape fields live in `schema/rfdb_schema.ttl`. |
 | [docs/architecture.md](docs/architecture.md) | System design: the schema-driven pipeline, the writer/reader service split and what each owns, the API endpoint reference, SHACL extraction, validation and delete behavior, the metadata API, and the storage stack. |
 | [docs/development.md](docs/development.md) | Development workflow: environment setup, code quality, CI, schema and data change workflows, troubleshooting, and the commit checklist. |
-| [docs/deployment.md](docs/deployment.md) | Deployment & operations: the development/testing configuration, data-reset modes, and seed sources; the read-vs-full deploy modes; plus the production runbook and its complete-but-never-deployed status. |
+| [docs/deployment.md](docs/deployment.md) | Deployment & operations: the development/testing configuration, data-reset modes, and seed sources; the read-vs-full deploy modes; plus the production runbook. |
+| [docs/custom-schema.md](docs/custom-schema.md) | Running your own deployment: the checklist of what a fork sets (schema, base IRIs, graph, seed data, long-text fields, Welcome guide) and where. |
 
 The live task list lives in the root `TODO.md`.
 
@@ -233,10 +236,11 @@ rfdb-curator/
 │       ├── files_state.py        # Digital-copy state snapshot (RDF vs. storage)
 │       ├── app_factory.py        # Shared CORS / access log / storage-error wiring
 │       ├── config.py             # BaseServiceSettings — the fields both services read
-│       ├── prefixes.py           # Curated CURIE map
+│       ├── prefixes.py           # CURIE map read from the schema's sh:declare
+│       ├── external_ids.py       # URL for an external identifier stored as text
 │       ├── iri.py                # IRI guard for SPARQL interpolation
 │       ├── models_data.py        # Record-list response models
-│       └── vocab.py              # Data namespace + digital-copy vocabulary terms
+│       └── vocab.py              # Digital-copy vocabulary terms
 │
 ├── curator-backend/              # WRITES ONLY — :8000
 │   ├── api/                      # data (POST/DELETE), files (staging), shapes, validate
@@ -256,7 +260,8 @@ rfdb-curator/
 │   └── pyproject.toml
 │
 ├── curator-frontend/
-│   ├── src/                      # React components, API client, JSON-LD/prefix utils
+│   ├── src/                      # React components, API client, JSON-LD/prefix utils;
+│   │                             #   src/project/ holds the Welcome guide text a fork replaces
 │   ├── Dockerfile
 │   ├── vite.config.js            # Dev server + proxy: /api/v1/curator → :8000,
 │   └── package.json               #   /api/v1/dataexplorer + /rdf → :8001
@@ -264,8 +269,8 @@ rfdb-curator/
 ├── graphexplorer-frontend/       # Standalone read-only graph visualizer (own Vite app;
 │                                 #   proxies /api + /rdf → dataexplorer-backend:8001)
 │
-├── schema/schema.ttl             # Active SHACL schema (source of truth)
-├── data/                         # vocab.ttl (controlled vocabulary) + data.ttl (test fixtures)
+├── schema/                       # rfdb SHACL schema, copied from upstream (see schema/README.md)
+├── data/                         # rfdb_vocab.ttl (controlled vocabulary) + rfdb_data.ttl (sample data)
 ├── docs/                         # Topic documentation (see the Documentation section)
 ├── docker-compose.yml
 ├── garage.toml                   # Object-storage (Garage) configuration

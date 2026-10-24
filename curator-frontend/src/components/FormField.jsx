@@ -9,15 +9,19 @@
  *   year             - number input clamped to [800, 2100]
  *   temporal         - text input accepting YYYY, YYYY-MM or YYYY-MM-DD
  *   number           - unbounded number input
- *   uri              - URL input for external identifiers (owl:sameAs, wdt:P214, etc.),
+ *   uri              - URL input for external IRIs (owl:sameAs, etc.),
  *                      or a <UriList> when the property allows several values
  *   lang-string      - text + language dropdown; stored as {__value, __lang}
  *   lang-string-list - one text + language row per value (<LangStringList>)
  *   default          - plain text input
  *
- * Fields flagged `longText` by the backend (rdfs:comment, description/note
- * predicates, core:text) render a multi-line <textarea> instead of a single-line
- * input — applies to the `default` and single `lang-string` widgets.
+ * Fields flagged `longText` by the backend (their predicate is in the
+ * LONG_TEXT_PREDICATES setting) render a multi-line <textarea> instead of a
+ * single-line input — applies to the `default` and single `lang-string` widgets.
+ *
+ * A `default` field with a `linkTemplate` holds an external identifier as text
+ * (a VIAF or RISM ID; the EXTERNAL_ID_LINKS setting). Once its value is valid,
+ * a link to the authority's page shows under the input.
  *
  * Props:
  *   field      {object}    - Property descriptor from /api/v1/curator/forms
@@ -33,10 +37,21 @@ import FileField from './FileField.jsx'
 import LangStringList from './LangStringList.jsx'
 import StyledSelect from './StyledSelect.jsx'
 import UriList from './UriList.jsx'
+import { externalIdUrl } from '../utils/externalIds.js'
 import { LANG_OPTIONS, languageLabel } from '../utils/languages.js'
 
 export default function FormField({ field, allShapes, register, control }) {
-  const { path, name, type, description, minCount, longText, in: options = [] } = field
+  const {
+    path,
+    name,
+    type,
+    description,
+    minCount,
+    longText,
+    linkTemplate,
+    pattern,
+    in: options = [],
+  } = field
   const isRequired = minCount > 0
   const languageTagPolicy = field.languageTagPolicy ?? 'not-applicable'
   const hasNoLanguageOption = languageTagPolicy === 'optional'
@@ -272,15 +287,32 @@ export default function FormField({ field, allShapes, register, control }) {
         defaultValue={''}
         rules={{
           required: isRequired,
-          pattern: field.pattern ? new RegExp(field.pattern) : undefined,
+          pattern: pattern ? new RegExp(pattern) : undefined,
         }}
-        render={({ field }) =>
-          longText ? (
-            <textarea id={path} className="field-input field-textarea" rows={4} {...field} />
-          ) : (
-            <input id={path} className="field-input" type="text" {...field} />
+        render={({ field }) => {
+          if (longText) {
+            return (
+              <textarea id={path} className="field-input field-textarea" rows={4} {...field} />
+            )
+          }
+          const value = String(field.value ?? '').trim()
+          const showLink = linkTemplate && value && (!pattern || new RegExp(pattern).test(value))
+          return (
+            <>
+              <input id={path} className="field-input" type="text" {...field} />
+              {showLink && (
+                <a
+                  className="field-external-link"
+                  href={externalIdUrl(linkTemplate, value)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open {value} ↗
+                </a>
+              )}
+            </>
           )
-        }
+        }}
       />
     </div>
   )

@@ -14,6 +14,11 @@
  *   record      {object|null}   - The currently selected record {id, label}
  *   onNavigate  {function}      - Called with an IRI when a linked internal
  *                                 record is clicked, to bring up its view.
+ *   dataBaseUri {string|null}   - Namespace this deployment's records live under
+ *                                 (DATA_BASE_URI, from GET /api/v1/dataexplorer/meta/schema).
+ *                                 Objects under it are navigable; everything else
+ *                                 (classes, external IRIs, vocab) is plain text.
+ *                                 While it is unknown, nothing is a link.
  */
 import { useEffect, useState } from 'react'
 import { apiClient } from '../api/client.js'
@@ -21,9 +26,6 @@ import Icon from './Icon.jsx'
 import { compactIri } from '../utils/prefixes.js'
 import './ValidationPanel.css'
 
-// Instance-data namespace: objects under it are our own records (navigable);
-// everything else (classes, external IRIs, vocab) is shown as plain text.
-const RFDB_BASE = 'https://rosfeatr.eu/rdf/data/'
 const RDFS_LABEL = 'http://www.w3.org/2000/01/rdf-schema#label'
 
 function renderObjectLabel(triple) {
@@ -40,7 +42,7 @@ function renderObjectAnnotation(triple) {
   return null
 }
 
-export default function ValidationPanel({ validation, record, onNavigate }) {
+export default function ValidationPanel({ validation, record, onNavigate, dataBaseUri }) {
   const [entity, setEntity] = useState(null)
 
   useEffect(() => {
@@ -73,7 +75,9 @@ export default function ValidationPanel({ validation, record, onNavigate }) {
               {triples.map((triple, i) => {
                 const annotation = renderObjectAnnotation(triple)
                 const isRecordLink =
-                  triple.objectType !== 'literal' && triple.object.startsWith(RFDB_BASE)
+                  Boolean(dataBaseUri) &&
+                  triple.objectType !== 'literal' &&
+                  triple.object.startsWith(dataBaseUri)
                 return (
                   <span key={i}>
                     {isRecordLink ? (

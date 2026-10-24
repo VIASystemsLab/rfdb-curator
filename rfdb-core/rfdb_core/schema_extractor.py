@@ -3,7 +3,7 @@ as plain Python dicts consumable by FastAPI route handlers and the frontend.
 
 Overview
 --------
-The application's data model is defined entirely in a SHACL schema (schema.ttl).
+The application's data model is defined entirely in a SHACL schema.
 This module reads that file once at startup, parses every ``sh:NodeShape``, and
 produces structured descriptors that drive two things:
 
@@ -81,30 +81,46 @@ restart is required.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from rdflib import BNode, Graph, Literal, URIRef
 from rdflib.collection import Collection
-from rdflib.namespace import RDF, RDFS, SH, XSD
+from rdflib.namespace import OWL, RDF, RDFS, SH, XSD
 
+from rfdb_core.prefixes import declared_prefixes
 from rfdb_core.vocab import SCHEMA_DIGITAL_DOCUMENT as _SCHEMA_DIGITAL_DOCUMENT
 
-# Predicates whose values are free-form prose and should render as a multi-line
-# textarea rather than a single-line input. SHACL has no native "long text" hint,
-# so we derive it from the property's sh:path: these are the description / note /
-# transcription predicates used across the schema. Extend this set to opt another
-# predicate into the larger textarea widget.
-LONG_TEXT_PREDICATES: frozenset[str] = frozenset(
-    {
-        str(RDFS.comment),  # rdfs:comment — free-text notes / descriptions
-        "http://purl.org/dc/terms/description",  # dcterms:description
-        "http://purl.org/dc/terms/abstract",  # dcterms:abstract
-        "http://www.w3.org/2004/02/skos/core#definition",  # skos:definition
-        "http://www.w3.org/2004/02/skos/core#note",  # skos:note
-        "http://www.w3.org/2004/02/skos/core#scopeNote",  # skos:scopeNote
-        "https://w3id.org/polifonia/ontology/core/text",  # core:text — title-page transcription
+
+def _english_first(literals: list[Literal]) -> Literal | None:
+    """Pick the English literal, else an untagged one, else any; None if empty.
+
+    Labels and names come in several languages (``"RISM ID"@en``,
+    ``"Identificativo RISM"@it``), and ``Graph.value`` would return an arbitrary one.
+    """
+    en = next((lit for lit in literals if (lit.language or "").lower() == "en"), None)
+    if en is not None:
+        return en
+    no_lang = next((lit for lit in literals if not lit.language), None)
+    if no_lang is not None:
+        return no_lang
+    return literals[0] if literals else None
+
+
+def _declared_version(graph: Graph) -> str | None:
+    """The schema's release, from ``owl:versionInfo`` on its ``owl:Ontology`` node.
+
+    Raises:
+        ValueError: the schema states more than one version.
+    """
+    versions = {
+        str(version)
+        for ontology in graph.subjects(RDF.type, OWL.Ontology)
+        for version in graph.objects(ontology, OWL.versionInfo)
     }
-)
+    if len(versions) > 1:
+        raise ValueError(f"The schema states several versions: {', '.join(sorted(versions))}")
+    return versions.pop() if versions else None
 
 
 def _curie(uri: URIRef | BNode | None, graph: Graph) -> str | None:
@@ -123,20 +139,43 @@ def _curie(uri: URIRef | BNode | None, graph: Graph) -> str | None:
 
 
 class SchemaExtractor:
-    """Parse schema.ttl and expose SHACL NodeShape metadata as Python dicts.
+    """Parse a SHACL schema and expose SHACL NodeShape metadata as Python dicts.
 
     Results are cached after the first parse so the schema file is only read once
     per process lifetime.  Call `get_all_shapes()` or `get_shape(id)` to access
     the parsed metadata.
     """
 
-    def __init__(self, schema_path: str) -> None:
+    def __init__(
+        self,
+        schema_path: str,
+        long_text_predicates: Iterable[str] = (),
+        external_id_links: Mapping[str, str] | None = None,
+    ) -> None:
+        """Parse the schema.
+
+        Args:
+            schema_path: The SHACL schema Turtle file.
+            long_text_predicates: Full IRIs of the predicates whose fields render
+                as a multi-line input (the ``LONG_TEXT_PREDICATES`` setting). SHACL
+                has no long-text hint, so the property's ``sh:path`` decides.
+            external_id_links: Predicate IRI → URL template for identifiers stored
+                as text (the ``EXTERNAL_ID_LINKS`` setting). A matching field
+                carries its template as ``linkTemplate``.
+        """
+        self.long_text_predicates = frozenset(long_text_predicates)
+        self.external_id_links: dict[str, str] = dict(external_id_links or {})
         self.graph = Graph()
         self.graph.parse(schema_path, format="turtle")
         # rdflib pre-binds 'schema' to https://schema.org/ (TLS variant), which
-        # collides with the schema.ttl @prefix (http://) and mangles CURIEs to
+        # collides with the schema's @prefix (http://) and mangles CURIEs to
         # 'schema1:'. Rebind explicitly so compaction matches the schema file.
         self.graph.bind("schema", "http://schema.org/", override=True, replace=True)
+        # The CURIE prefix map the schema declares (sh:declare). Read here so a
+        # conflicting declaration fails at load, like a Turtle syntax error does.
+        self.prefixes: dict[str, str] = declared_prefixes(self.graph)
+        # The schema's own release (owl:versionInfo), or None if it states none.
+        self.version: str | None = _declared_version(self.graph)
         self._cache: dict[str, dict[str, Any]] | None = None
 
     # ------------------------------------------------------------------
@@ -151,27 +190,25 @@ class SchemaExtractor:
         """Return the descriptor for a single NodeShape by its full URI string, or None."""
         return self._shapes().get(shape_id)
 
-    def find_links_to_shape(self, nested_shape_id: str) -> list[tuple[str, str]]:
-        """Find every shape that links to ``nested_shape_id`` and via which predicate.
+    def file_links(self) -> list[tuple[str, str]]:
+        """Find every property that links an entity to an uploaded file.
 
-        Scans all NodeShape properties for ``sh:node`` references to the given
-        shape, so the *schema* stays the single source of truth for how entities
-        are connected — callers never hardcode parent classes or predicates.
-        Multiple parents are first-class: any shape may declare the link.
-
-        Args:
-            nested_shape_id: Full URI of the linked NodeShape
-                (e.g. ``…/schema/DigitalCopyShape``).
+        A link is a property the form renders as a file upload (``file-list``:
+        its ``sh:node`` shape targets ``schema:DigitalDocument``). Using the same
+        rule as the form means the upload widget and the file lifecycle (the
+        download route, the stats, the cleanup script) cannot disagree, whatever
+        the upload shape is called. Several upload shapes, or several classes
+        linking to one, are simply more links.
 
         Returns:
             Sorted, deduplicated ``[(parent_target_class_uri, link_predicate_uri), …]``;
-            empty when no shape links to it.
+            empty when the schema declares no file upload.
         """
         links = {
             (shape["targetClassUri"], prop["pathUri"])
             for shape in self.get_all_shapes()
             for prop in shape.get("properties", [])
-            if prop.get("nestedShape") == nested_shape_id and shape.get("targetClassUri")
+            if prop.get("type") == "file-list" and shape.get("targetClassUri")
         }
         return sorted(links)
 
@@ -270,7 +307,7 @@ class SchemaExtractor:
         if path is None:
             return None
 
-        name = g.value(prop_node, SH.name)
+        name = _english_first([o for o in g.objects(prop_node, SH.name) if isinstance(o, Literal)])
         description = g.value(prop_node, SH.description) or ""
         datatype = g.value(prop_node, SH.datatype)
 
@@ -351,7 +388,8 @@ class SchemaExtractor:
             "name": str(name) if name else path_curie.split(":")[-1],
             "description": str(description),
             "type": field_type,
-            "longText": str(path) in LONG_TEXT_PREDICATES,
+            "longText": str(path) in self.long_text_predicates,
+            "linkTemplate": self.external_id_links.get(str(path)),
             "datatype": datatype_curie,
             "datatypeOptions": [_curie(dt, g) for dt in datatype_options],
             "languageTagPolicy": language_tag_policy,
@@ -369,24 +407,13 @@ class SchemaExtractor:
         """Return the best available label for a shape, preferring English.
 
         Priority: rdfs:label (en) > rdfs:label (no lang) > rdfs:label (any) >
-                  sh:name (en) > sh:name (any) > None
+                  sh:name (en) > sh:name (no lang) > sh:name (any) > None
         """
         g = self.graph
         labels = [o for o in g.objects(shape_uri, RDFS.label) if isinstance(o, Literal)]
         if labels:
-            en = next((lbl for lbl in labels if (lbl.language or "").lower() == "en"), None)
-            if en is not None:
-                return en
-            no_lang = next((lbl for lbl in labels if not lbl.language), None)
-            if no_lang is not None:
-                return no_lang
-            return labels[0]
-
-        names = [o for o in g.objects(shape_uri, SH.name) if isinstance(o, Literal)]
-        if names:
-            en = next((n for n in names if (n.language or "").lower() == "en"), None)
-            return en or names[0]
-        return None
+            return _english_first(labels)
+        return _english_first([o for o in g.objects(shape_uri, SH.name) if isinstance(o, Literal)])
 
     def _infer_nested_shape_role(self, nested_shape: URIRef | None) -> str | None:
         """Return the shape role of a nested shape, or None if no nested shape."""

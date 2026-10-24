@@ -11,7 +11,7 @@ jobs:
   # because both services own a top-level `api` package: in a single pytest
   # process `from api.data import …` resolves to whichever service was imported
   # first. Separate jobs mean separate interpreters, so the ambiguity cannot
-  # arise. See decision D2 in the modular-services refactor plan.
+  # arise.
   #
   # The repo-wide checks (ruff, schema parse, prefix map) live on the
   # rfdb-core job so they run exactly once.
@@ -25,9 +25,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v10.3.2
         with:
-          version: '0.7.2'
+          version: '0.13.5'
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -53,11 +53,11 @@ jobs:
 
       - name: Verify SHACL schema parses
         working-directory: .
-        run: uv run python -c "from rdflib import Graph; Graph().parse('schema/schema.ttl', format='turtle'); print('schema.ttl parses OK')"
+        run: uv run python -c "from rdflib import Graph; Graph().parse('schema/rfdb_schema.ttl', format='turtle'); print('rfdb_schema.ttl parses OK')"
 
       - name: Check prefix-map coverage
         # Fails if a @prefix declared in any schema/data TTL is missing from or
-        # mismatched against rfdb_core.prefixes.PREFIXES (served by
+        # mismatched against the schema's sh:declare (the map served by
         # /api/v1/dataexplorer/meta/prefixes).
         # The script lives in curator-backend but only reads rfdb-core + the TTLs.
         working-directory: .
@@ -77,8 +77,8 @@ jobs:
         working-directory: .
         run: |
           set -euo pipefail
-          GARAGE_RPC_SECRET=ci docker compose config -q
-          GARAGE_RPC_SECRET=ci docker compose --profile full config -q
+          COMPOSE_PROJECT_NAME=rfdb-dev GARAGE_RPC_SECRET=ci docker compose config -q
+          COMPOSE_PROJECT_NAME=rfdb-dev GARAGE_RPC_SECRET=ci docker compose --profile full config -q
           PROD=(docker compose -f docker-compose.prod.yml --env-file .env.prod.example)
           COMPOSE_PROFILES= "${PROD[@]}" config -q
           COMPOSE_PROFILES=full "${PROD[@]}" config -q
@@ -99,9 +99,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v10.3.2
         with:
-          version: '0.7.2'
+          version: '0.13.5'
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -124,9 +124,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v10.3.2
         with:
-          version: '0.7.2'
+          version: '0.13.5'
 
       - name: Set up Python
         uses: actions/setup-python@v5

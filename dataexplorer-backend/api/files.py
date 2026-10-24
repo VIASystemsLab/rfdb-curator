@@ -2,13 +2,13 @@
 
 Mounted as ``GET /rdf/data/{file_id}/content`` — inside the stable data space, not
 under ``/api``, because the bytes are a **representation of the resource** whose
-IRI is ``/rdf/data/{file_id}`` (D8). This is the URL that ``schema:contentUrl``
-points at, so it is a persisted identifier and must never move again.
+IRI is ``/rdf/data/{file_id}``. This is the URL that ``schema:contentUrl``
+points at, so it is a persisted identifier and must never move.
 
 The read half of the upload-first digital-copy flow. Staging (``POST
 /files/staged``), the server-side metadata re-derivation and the promotion to
-``registered/`` all stayed in curator-backend — this service only ever hands
-bytes out.
+``registered/`` belong to curator-backend; this service only ever hands bytes
+out.
 
 Two questions get answered here, and keeping them apart is the whole design:
 
@@ -23,13 +23,13 @@ Two questions get answered here, and keeping them apart is the whole design:
    first, then ``staged/``, because a promotion can fail *after* the entity
    write succeeds (the write path logs a warning and leaves the object for
    ``curator-backend/scripts/cleanup_files.py``). Such a file is published and
-   must download — but it is also a fault, so it is served with
-   ``X-RFDB-File-State: awaiting-promotion`` and a warning rather than silently,
-   which is how a stalled reconciler used to stay invisible.
+   must download, but it is also a fault, so it is served with
+   ``X-RFDB-File-State: awaiting-promotion`` and a logged warning rather than
+   silently, which keeps a stalled reconciler visible.
 
-Deciding (1) on the storage prefix instead of on RDF is what made those two
-states indistinguishable: a legitimately-staged file and one whose promotion had
-broken both answered plain ``200``.
+(1) is decided on RDF, never on the storage prefix, because the prefix cannot
+tell those two states apart: an unsubmitted upload and a published file whose
+promotion broke both sit under ``staged/``.
 
 Downloads are proxied through the backend (never a direct browser→Garage path)
 so Garage can stay on the internal network in production.
@@ -46,9 +46,10 @@ import logging
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from core.config import settings
 from rfdb_core.file_storage import registered_key, staged_key
 from rfdb_core.files_state import FILE_ID_RE, is_file_referenced
-from rfdb_core.vocab import RFDB_BASE, SCHEMA_NAME
+from rfdb_core.vocab import SCHEMA_NAME
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ def _rdf_name(store, file_id: str) -> str | None:
     try:
         rows = store.query(
             f"SELECT ?name {store.from_clause()} "
-            f"WHERE {{ <{RFDB_BASE}{file_id}> <{SCHEMA_NAME}> ?name . }} LIMIT 1"
+            f"WHERE {{ <{settings.data_base_uri}{file_id}> <{SCHEMA_NAME}> ?name . }} LIMIT 1"
         )
         return rows[0]["name"] if rows else None
     except Exception:  # store went down between this and the reference check
@@ -146,7 +147,9 @@ def download_file(file_id: str, request: Request):
 
     store = request.app.state.store
     try:
-        published = is_file_referenced(file_id, store, request.app.state.schema_extractor)
+        published = is_file_referenced(
+            file_id, store, request.app.state.schema_extractor, settings.data_base_uri
+        )
     except Exception as exc:  # store unreachable, or a malformed query
         logger.warning("Could not check whether '%s' is referenced: %s", file_id, exc)
         return _serve_unverifiable(file_id, request)

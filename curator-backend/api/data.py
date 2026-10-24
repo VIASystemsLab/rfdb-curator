@@ -1,8 +1,8 @@
 """Data write routes: create/update and delete RDF entities.
 
 The only routes in the stack that mutate the store. Reads (list, counts, fetch
-one) live in ``dataexplorer-backend/api/data.py``; they shared nothing with this
-module but the IRI guard, which is now in ``rfdb_core.iri``.
+one) live in ``dataexplorer-backend/api/data.py``. The IRI guard both use is
+``rfdb_core.iri``.
 
 Validation merge planning lives in :mod:`core.validation_merge`.
 This module keeps the route handlers and the small request-scoped helpers they need.
@@ -27,7 +27,6 @@ from rfdb_core.file_storage import registered_key, staged_key
 from rfdb_core.files_state import FILE_ID_RE, file_content_url
 from rfdb_core.iri import iri_error
 from rfdb_core.vocab import (
-    RFDB_BASE,
     SCHEMA_CONTENT_SIZE,
     SCHEMA_CONTENT_URL,
     SCHEMA_DERIVED_TERMS,
@@ -130,7 +129,8 @@ def _reconcile_digital_copies(data_graph: Graph, request: Request) -> list[str]:
     to_promote: list[str] = []
     for node in nodes:
         iri = str(node)
-        file_id = iri[len(RFDB_BASE) :] if iri.startswith(RFDB_BASE) else ""
+        base = settings.data_base_uri
+        file_id = iri[len(base) :] if iri.startswith(base) else ""
         if not FILE_ID_RE.match(file_id):
             raise HTTPException(status_code=422, detail=f"Invalid digital-copy node IRI: {iri}")
 
@@ -162,7 +162,7 @@ def _reconcile_digital_copies(data_graph: Graph, request: Request) -> list[str]:
             (
                 node,
                 URIRef(SCHEMA_CONTENT_URL),
-                Literal(file_content_url(file_id), datatype=XSD.anyURI),
+                Literal(file_content_url(file_id, settings.data_base_uri), datatype=XSD.anyURI),
             )
         )
         data_graph.add((node, URIRef(SCHEMA_CONTENT_SIZE), Literal(size)))  # int → xsd:integer
@@ -221,9 +221,9 @@ def create_or_update_entity(payload: EntityData, request: Request):
     if isinstance(provided_id, str):
         _validate_iri(provided_id)
 
-    data = assign_entity_id(data, payload.shapeId)
+    data = assign_entity_id(data, payload.shapeId, settings.data_base_uri)
     entity_id = data.get("@id", "")
-    data = skolemize(data, entity_id)
+    data = skolemize(data, entity_id, settings.data_base_uri)
 
     store = request.app.state.store
     existing_entity_graph = None
@@ -262,8 +262,9 @@ def create_or_update_entity(payload: EntityData, request: Request):
     # Expression) even before that node exists in store.
     #
     # On updates, avoid seeding with entity IRI to prevent old store triples of
-    # the entity from masking payload intent (e.g. preserving removed fields or
-    # causing false maxCount violations via stale values).
+    # the entity from masking payload intent (e.g. keeping fields the curator
+    # deleted in the editor, or causing false maxCount violations via stale
+    # values).
     include_root_entity = bool(entity_uri is not None and not payload.originalTriples)
     seed_iris = {str(entity_uri)} if include_root_entity else set()
     seed_iris |= {

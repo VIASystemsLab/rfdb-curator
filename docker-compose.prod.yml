@@ -19,15 +19,17 @@
 #     fails immediately instead of silently deploying with a dev value.
 #
 # ---------------------------------------------------------------------------
-# TWO MODES, exactly as in dev (Task 9)
+# TWO MODES, exactly as in dev, selected by COMPOSE_PROFILES in .env.prod
 # ---------------------------------------------------------------------------
-#   COMPOSE_PROFILES unset   READ  — oxigraph, garage, dataexplorer-backend,
+#   COMPOSE_PROFILES=        READ  — oxigraph, garage, dataexplorer-backend,
 #                                    graphexplorer-frontend, proxy
 #   COMPOSE_PROFILES=full    FULL  — the above + curator-backend/-frontend
 #
+# Default: READ. An empty or missing COMPOSE_PROFILES activates no profile.
+#
 # A read-only instance does not deploy the write tier at all: there is no
 # `/api/v1/curator/*` upstream to reach, rather than a service answering 403 per
-# route. That is the payoff of D8 naming each prefix after its owning service.
+# route. That works because each prefix is named after the service that owns it.
 # Set it in .env.prod, per instance.
 #
 # ⚠ In read mode the editor is absent, so the proxy has no upstream for `/` or
@@ -53,18 +55,45 @@
 #   docker compose -f docker-compose.prod.yml down          # keeps volumes
 #   docker compose -f docker-compose.prod.yml down -v       # destroys data too
 
+# Project name. Compose names every container <project>-<service>-1 and
+# every volume <project>_<volume>, so the name says which stack each belongs
+# to, and stacks with different names run side by side. Required, read from
+# .env.prod (COMPOSE_PROJECT_NAME=rfdb-prod). Two checkouts with the same name are
+# one stack to Compose, so give each its own (a fork: e.g. moviedb-prod).
+name: ${COMPOSE_PROJECT_NAME:?Set COMPOSE_PROJECT_NAME in .env.prod, e.g. rfdb-prod}
+
 # ---------------------------------------------------------------------------
 # Shared values, defined once and aliased into each service that needs them.
 # ---------------------------------------------------------------------------
 
-# Per-shape read-only policy. **Both backends must receive the identical value**
-# (D11): the curator enforces it on writes, and the reader needs it because both
-# serve the same shape catalogue with the same `readOnly` flags — the editor
-# fetches that catalogue from the reader so it can start with the write tier
-# down. Two literals that could be edited apart would hand clients different
-# flags depending on which service answered, which is C20 in a quieter form.
-# Mirrors the anchor in docker-compose.yml.
+# Per-shape read-only policy. **Both backends must receive the identical value**:
+# the curator enforces it on writes, and the reader needs it because both serve
+# the same shape catalogue with the same `readOnly` flags — the editor fetches
+# that catalogue from the reader so it can start with the write tier down. Two
+# literals that could be edited apart would hand clients different flags
+# depending on which service answered. Mirrors the anchor in docker-compose.yml.
 x-read-only-shapes: &read_only_shapes '["https://rosfeatr.eu/rdf/schema/LanguageShape"]'
+
+# Predicates whose form fields are multi-line text (full IRIs). Both backends
+# build the same field descriptors, so they get one value. This is the rfdb
+# schema's set; a fork lists its own description and note predicates here.
+x-long-text-predicates: &long_text_predicates '["http://www.w3.org/2000/01/rdf-schema#comment", "http://purl.org/dc/terms/description", "http://purl.org/dc/terms/abstract", "http://www.w3.org/2004/02/skos/core#definition", "http://www.w3.org/2004/02/skos/core#note", "http://www.w3.org/2004/02/skos/core#scopeNote", "https://w3id.org/polifonia/ontology/core/text"]'
+
+# Predicates whose text values are external identifiers, mapped to the URL of
+# the authority's page ($1 is the identifier). Every UI shows them as links.
+# Both backends get one value. These are the rfdb schema's VIAF and RISM IDs,
+# with Wikidata's formatter URLs; a fork lists its own here.
+x-external-id-links: &external_id_links '{"http://www.wikidata.org/prop/direct/P214": "https://viaf.org/en/viaf/$$1", "http://www.wikidata.org/prop/direct/P5504": "https://rism.online/$$1"}'
+
+# CORS origins, built from RFDB_DOMAIN rather than set a second time. The proxy
+# serves every frontend and API from that one origin, so a browser never makes a
+# cross-origin request and this value is never actually consulted. That holds
+# for any host, localhost included, and for any port in front of the proxy.
+#
+# FUTURE: if a client on another origin must call the API (another site, a
+# separately hosted frontend), this cannot be derived. Add a CORS_ORIGINS
+# variable to .env.prod then, holding the extra origins on top of this one.
+x-cors-origins: &cors_origins '["https://${RFDB_DOMAIN:?Set RFDB_DOMAIN in .env.prod}"]'
 
 # Object storage, identical for both backends: the writer stages and promotes
 # blobs, the reader streams them out. Garage is unauthenticated at the S3 layer
@@ -76,14 +105,18 @@ x-s3-env: &s3_env
   S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID in .env.prod}"
   S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY in .env.prod}"
 
-# The store, identical for both backends. Mismatched values here are the one
-# misconfiguration that produces no error at all: the reader would simply report
-# an empty store, so they are declared once.
+# The store and the base IRIs, identical for both backends. Mismatched values
+# here are the one misconfiguration that produces no error at all: the reader
+# would simply report an empty store, or fail to find the records the writer
+# minted, so they are declared once. See the .env.example files for where each
+# base IRI ends up.
 x-store-env: &store_env
   TRIPLESTORE: oxigraph
   OXIGRAPH_URL: http://oxigraph:7878
-  DATA_GRAPH_URI: "https://rosfeatr.eu/rdf/graph/"
-  SCHEMA_PATH: /app/schema/schema.ttl
+  DATA_GRAPH_URI: "${DATA_GRAPH_URI:-https://rosfeatr.eu/rdf/graph/}"
+  DATA_BASE_URI: "${DATA_BASE_URI:?Set DATA_BASE_URI in .env.prod}"
+  SCHEMA_BASE_URI: "${SCHEMA_BASE_URI:?Set SCHEMA_BASE_URI in .env.prod}"
+  SCHEMA_PATH: "${SCHEMA_PATH:-/app/schema/rfdb_schema.ttl}"
 
 x-logging-env: &logging_env
   LOG_FILE: logs/app.jsonl
@@ -92,8 +125,8 @@ x-logging-env: &logging_env
   TRUNCATE_LOG_ON_FRESH_CONTAINER_START: "true"
 
 # Docker's own stdout/stderr capture. Does NOT bound /app/logs/app.jsonl —
-# that is app-level file logging in a named volume and still needs its own
-# rotation (the last open gap in docs/deployment.md).
+# that is app-level file logging in a named volume, which the application
+# rotates itself (10 MB, five backups).
 x-docker-logging: &docker_logging
   driver: json-file
   options:
@@ -110,7 +143,6 @@ services:
   # --------------------------------------------------------------------------
   oxigraph:
     image: oxigraph/oxigraph:0.5.7
-    container_name: rfdb-oxigraph
     restart: unless-stopped
     # No `ports:` — unauthenticated triple store, must stay
     # unreachable from outside the Docker network.
@@ -159,11 +191,11 @@ services:
   #   COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env.prod scripts/garage-init.sh
   garage:
     image: dxflrs/garage:v1.0.1
-    container_name: rfdb-garage
     restart: unless-stopped
     # `internal` ONLY, never `edge`. Garage has no auth at the S3 layer, so a
     # browser must never be able to reach it; blobs leave only through the
-    # reader's download route, which checks the RDF first (D7).
+    # reader's download route, which checks the RDF first: a file is served
+    # publicly only once a record references it.
     networks:
       - internal
     environment:
@@ -211,7 +243,6 @@ services:
     build:
       context: .
       dockerfile: dataexplorer-backend/Dockerfile
-    container_name: rfdb-dataexplorer-backend
     restart: unless-stopped
     depends_on:
       # Store and blob-storage health ONLY — never a seed or import step. This
@@ -226,15 +257,13 @@ services:
       - edge       # to be reached by proxy
     environment:
       <<: [*store_env, *s3_env, *logging_env]
-      # Looks like a write concern and was filed as one, which was the mistake:
-      # it states which shapes are editable, so any client needs it to render a
-      # UI (D11). Same anchor the curator uses.
+      # Looks like a write concern, but it states which shapes are editable, so
+      # any client needs it to render a UI. Same anchor the curator uses.
       READ_ONLY_SHAPES: *read_only_shapes
-      # Same-origin behind the proxy, so there is no cross-origin request to
-      # allow. Kept required rather than defaulted: an empty list is a
-      # deliberate statement, and falling back to a dev localhost origin in
-      # production would be worse than failing to start.
-      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env.prod}
+      LONG_TEXT_PREDICATES: *long_text_predicates
+      EXTERNAL_ID_LINKS: *external_id_links
+      PROJECT_NAME: "${PROJECT_NAME:-RossijskijFeatrDB}"
+      CORS_ORIGINS: *cors_origins
       # No VOCAB_PATH / DATA_PATH / RESET_DATA_ON_STARTUP / SEED_* / READ_ONLY /
       # MAX_UPLOAD_MB: every one is a write concern, and this service's Settings
       # does not define them.
@@ -290,14 +319,13 @@ services:
         # Same reasoning: /rdf/* is routed to the reader on this same domain
         # (proxy/Caddyfile), regardless of which frontend served the page, so
         # the entity-page link needs no absolute base either. Kept explicit
-        # rather than omitted: the client defaults to relative now, so this
-        # states the deployment's intent instead of relying on that default.
+        # rather than omitted: the client defaults to relative, and this states
+        # the deployment's intent instead of relying on that default.
         VITE_READ_API_BASE: ""
         VITE_APP_TITLE: "${VITE_APP_TITLE:-RFDB Explorer}"
         # Served under a path, and Vite bakes asset URLs against `base`. Set to
         # "/" for a read-only host that serves the explorer at the root.
         VITE_BASE_PATH: "${VITE_EXPLORER_BASE_PATH:-/explorer/}"
-    container_name: rfdb-graphexplorer-frontend
     restart: unless-stopped
     depends_on:
       dataexplorer-backend:
@@ -329,12 +357,11 @@ services:
   # prefix. Base, because every mode needs an edge; which upstreams exist behind
   # it is what the profile decides.
   #
-  # Routing lives in proxy/Caddyfile. D8 is what makes it plain prefix rules
-  # with no method awareness: /api/v1/curator/* → writer, /api/v1/dataexplorer/*
-  # and /rdf/* → reader.
+  # Routing lives in proxy/Caddyfile. Each prefix names the service that owns
+  # it, so routing is plain prefix rules with no method awareness:
+  # /api/v1/curator/* → writer, /api/v1/dataexplorer/* and /rdf/* → reader.
   proxy:
     image: caddy:2-alpine
-    container_name: rfdb-proxy
     restart: unless-stopped
     depends_on:
       # Base services only — a `full`-profile dependency here would make the
@@ -385,7 +412,6 @@ services:
     build:
       context: .
       dockerfile: curator-backend/Dockerfile
-    container_name: rfdb-curator-backend
     profiles: ["full"]
     restart: unless-stopped
     depends_on:
@@ -402,8 +428,8 @@ services:
       # Read timeout (seconds) for bulk Turtle loads; the ~38 MB Glottolog vocab
       # needs well over Oxigraph's default. Writer-only, so not in store_env.
       OXIGRAPH_LOAD_TIMEOUT: "${OXIGRAPH_LOAD_TIMEOUT:-300}"
-      VOCAB_PATH: '["/app/data/vocab.ttl", "/app/data/glottolog_language.ttl"]'
-      DATA_PATH: /app/data/data.ttl
+      VOCAB_PATH: '${VOCAB_PATH:-["/app/data/rfdb_vocab.ttl", "/app/data/glottolog_language.ttl"]}'
+      DATA_PATH: "${DATA_PATH:-/app/data/rfdb_data.ttl}"
 
       # Hardcoded rather than env-overridable: a stray
       # RESET_DATA_ON_STARTUP=true in a misconfigured .env.prod would
@@ -419,9 +445,12 @@ services:
       # `full` + READ_ONLY=true is a valid frozen-editor demo.
       READ_ONLY: "${READ_ONLY:-false}"
       READ_ONLY_SHAPES: *read_only_shapes
+      LONG_TEXT_PREDICATES: *long_text_predicates
+      EXTERNAL_ID_LINKS: *external_id_links
+      PROJECT_NAME: "${PROJECT_NAME:-RossijskijFeatrDB}"
       MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-500}"
 
-      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in .env.prod}
+      CORS_ORIGINS: *cors_origins
     volumes:
       # No ./curator-backend:/app — the running code is whatever the image
       # contains, not the host checkout.
@@ -470,14 +499,13 @@ services:
         # served this bundle, so the editor needs no absolute base and no CORS.
         #
         # Both stay explicit rather than omitted: the client defaults to
-        # relative now, so these state the deployment's intent instead of
-        # relying on that default.
+        # relative, and these state the deployment's intent instead of relying
+        # on that default.
         VITE_API_BASE: ""
         VITE_READ_API_BASE: ""
         # Browser-facing deep link ("Open in Explorer"), so an absolute URL on
         # the public domain — not a service name.
         VITE_EXPLORER_BASE: "https://${RFDB_DOMAIN:?Set RFDB_DOMAIN in .env.prod}/explorer"
-    container_name: rfdb-curator-frontend
     profiles: ["full"]
     restart: unless-stopped
     depends_on:
@@ -526,7 +554,7 @@ volumes:
     # after which the one-time bootstrap must be re-run.
   garage_data:
     # The digital-copy bytes. Back this up together with oxigraph_data, or a
-    # restore will have records pointing at blobs that no longer exist.
+    # restore will have records pointing at blobs that do not exist.
   curator_backend_logs:
   dataexplorer_backend_logs:
     # Separate volumes so the two services' access logs stay separable — they

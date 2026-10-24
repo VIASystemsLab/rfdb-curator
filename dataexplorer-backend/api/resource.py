@@ -2,16 +2,15 @@
 
 This is what makes RFDB's persisted IRIs *cool*: an entity's IRI is
 ``https://rosfeatr.eu/rdf/data/{local_name}``, production serves that host, so
-visiting the identifier returns the resource (D9). No ``?iri=`` parameter, which an
-earlier sketch of this endpoint had — once the IRI *is* the URL, there is nothing
-to pass.
+visiting the identifier returns the resource. There is no ``?iri=`` parameter:
+once the IRI *is* the URL, there is nothing to pass.
 
-Two things follow from being a data space rather than an application surface (D8):
+Two things follow from being a data space rather than an application surface:
 
   * **Unversioned.** Versioning an identifier that is persisted inside triples is a
     contradiction; the ``/api/v1/…`` routes carry the version instead.
   * **Local names, not encoded IRIs.** The path segment is the local name, and the
-    full IRI is rebuilt from ``RFDB_BASE``. The editor-facing
+    full IRI is rebuilt from the ``DATA_BASE_URI`` setting. The editor-facing
     ``/api/v1/dataexplorer/entities/get?id=`` still takes a URL-encoded absolute
     IRI because it answers a different question (an editor's bespoke triple list,
     not a representation), but a client that has an RFDB IRI in hand never needs
@@ -20,7 +19,7 @@ Two things follow from being a data space rather than an application surface (D8
 Five representations, none of them costing a dependency: four are rdflib
 serializations, and the HTML one is an f-string. Deliberately *not* a template
 engine — ``jinja2`` does not resolve transitively here (Starlette's
-``Jinja2Templates`` is an optional extra), so one page would have meant adding a
+``Jinja2Templates`` is an optional extra), so one page would mean adding a
 dependency, and this page has no sibling to share a layout with.
 
 So a browser gets HTML on ``/rdf/data/{id}``. ``/rdf/schema/{name}`` stays
@@ -43,8 +42,8 @@ from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import DCTERMS, RDF, RDFS, XSD
 
 from api.graph import preferred_label
-from rfdb_core.prefixes import PREFIXES
-from rfdb_core.vocab import RFDB_BASE, RFDB_SCHEMA_BASE
+from core.config import settings
+from rfdb_core.external_ids import external_id_url
 
 router = APIRouter()
 
@@ -76,8 +75,8 @@ DEFAULT_MEDIA_TYPE = "text/turtle"
 #   ``rfdb`` — the default view: every triple that mentions the resource.
 #   ``alt``  — the alternates listing (which representations exist).
 # Tokens rather than profile URIs, deliberately: a profile URI minted under
-# ``/rdf/`` would be a permanent public identifier we then owe a representation
-# (D8), and no client has asked for one. For the same reason no
+# ``/rdf/`` would be a permanent public identifier we then owe a representation,
+# and no client has asked for one. For the same reason no
 # ``Link: rel="profile"`` header is emitted — the alternates it would advertise
 # are already carried by ``rel="alternate"``, which needs no vocabulary of ours.
 PROFILES = ("rfdb", "alt")
@@ -160,8 +159,8 @@ def _variant_url(media_type: str, iri: str = "") -> str:
 
     ``quote`` is load-bearing rather than defensive: a query string is
     form-encoded, so the ``+`` in ``application/ld+json`` would reach the handler
-    as a space. Emitting it raw — which the first cut of this endpoint did in
-    ``Content-Location`` — advertises a URL that answers 400. Relative when
+    as a space. Emitting it raw, in ``Content-Location`` or a ``Link`` header,
+    would advertise a URL that answers 400. Relative when
     ``iri`` is omitted, which is what the HTML page's own links want so they
     resolve against whichever host is serving.
     """
@@ -175,8 +174,8 @@ def _alternates(iri: str, supported: tuple[str, ...]) -> Graph:
     resource that is substantially the same as the described resource, but in
     another format", which is precisely an alternate representation — rather than
     with the ALTR vocabulary Prez uses. ``dcterms:`` is already one of the
-    project's prefixes, and following the ConnegP *convention* without adopting
-    its stack is this refactor's recorded non-goal.
+    project's prefixes, and this service follows the ConnegP *convention*
+    without adopting the Prez stack.
 
     devnote: the ceiling is a client that insists on literal ALTR predicates. The
     upgrade is to add those triples alongside these, not to restructure — the
@@ -192,8 +191,14 @@ def _alternates(iri: str, supported: tuple[str, ...]) -> Graph:
     return graph
 
 
-def _respond(graph: Graph, iri: str, media_type: str, supported: tuple[str, ...]) -> Response:
-    """Serialize ``graph`` as ``media_type``, with the project's CURIE prefixes bound.
+def _respond(
+    graph: Graph,
+    iri: str,
+    media_type: str,
+    supported: tuple[str, ...],
+    prefixes: dict[str, str],
+) -> Response:
+    """Serialize ``graph`` as ``media_type``, with the schema's CURIE prefixes bound.
 
     ``Vary: Accept`` is not decoration: without it a shared cache may hand a
     JSON-LD client the Turtle it stored for someone else. ``Content-Location``
@@ -202,9 +207,9 @@ def _respond(graph: Graph, iri: str, media_type: str, supported: tuple[str, ...]
     alternates discoverable without ConnegP-specific knowledge.
     """
     if media_type == HTML_MEDIA_TYPE:
-        body = _render_html(graph, iri)
+        body = _render_html(graph, iri, _namespaces(prefixes))
     else:
-        for prefix, namespace in PREFIXES.items():
+        for prefix, namespace in prefixes.items():
             graph.bind(prefix, namespace)
         body = graph.serialize(format=MEDIA_TYPES[media_type])
 
@@ -228,21 +233,17 @@ def _respond(graph: Graph, iri: str, media_type: str, supported: tuple[str, ...]
 # ---------------------------------------------------------------------------
 
 # The path each served namespace lives at, derived from the namespace rather than
-# written out: ``RFDB_BASE`` is ``https://rosfeatr.eu/rdf/data/`` and this router
+# written out: ``DATA_BASE_URI`` is ``https://rosfeatr.eu/rdf/data/`` and this router
 # is mounted at ``/rdf``, so the namespace's path component *is* the route. That
-# identity is the whole of D9, and deriving it keeps these links correct if the
-# namespace ever moves.
+# identity is what makes a persisted IRI dereferenceable, and deriving it keeps
+# these links correct if the namespace ever moves.
 #
 # Links are emitted path-only for a second reason: a persisted IRI names
 # rosfeatr.eu, but the reader may answer on any non-production host, so an
 # absolute link would send that click to the public site instead. This is the server-side
 # twin of the frontend's ``resolveFileUrl`` re-basing.
-_LOCAL_SPACES = tuple((ns, urlsplit(ns).path) for ns in (RFDB_BASE, RFDB_SCHEMA_BASE))
-
-# Longest namespace first, so a namespace that is a prefix of another cannot
-# shadow it.
-_NAMESPACES = sorted(
-    ((ns, prefix) for prefix, ns in PREFIXES.items()), key=lambda pair: -len(pair[0])
+_LOCAL_SPACES = tuple(
+    (ns, urlsplit(ns).path) for ns in (settings.data_base_uri, settings.schema_base_uri)
 )
 
 # RDF 1.1 makes a plain literal and an ``xsd:string``-typed one the same term, so
@@ -250,9 +251,9 @@ _NAMESPACES = sorted(
 _IMPLICIT_DATATYPE = str(XSD.string)
 
 # The datatype that says a literal's text is a URL. ``schema:contentUrl`` carries
-# it, and must stay a literal rather than an IRI: ``schema.ttl`` declares
-# ``sh:datatype xsd:anyURI``, so the IRI form dereferences perfectly and fails
-# SHACL (D9, the way that was learned).
+# it, and must stay a literal rather than an IRI: the shipped schema declares
+# ``sh:datatype xsd:anyURI``, so the IRI form would dereference perfectly and
+# fail SHACL.
 _URI_DATATYPE = str(XSD.anyURI)
 
 _TYPE = str(RDF.type)
@@ -277,14 +278,22 @@ footer { margin-top: 2.6rem; padding-top: .9rem; border-top: 1px solid #8883;
 """
 
 
-def _curie(iri: str) -> str:
-    """Compact an IRI to ``prefix:local`` using the project's curated prefix map.
+def _namespaces(prefixes: dict[str, str]) -> list[tuple[str, str]]:
+    """``(namespace, prefix)`` pairs, longest namespace first.
 
-    The curated map, not the graph's namespace manager: a bare ``rdflib.Graph``
+    Longest first so a namespace that is a prefix of another cannot shadow it.
+    """
+    return sorted(((ns, prefix) for prefix, ns in prefixes.items()), key=lambda pair: -len(pair[0]))
+
+
+def _curie(iri: str, namespaces: list[tuple[str, str]]) -> str:
+    """Compact an IRI to ``prefix:local`` using the schema's declared prefix map.
+
+    The declared map, not the graph's namespace manager: a bare ``rdflib.Graph``
     pre-binds ~29 unrelated vocabularies that would leak into the output (see
     ``rfdb_core.prefixes``). Falls back to the full IRI, which is never wrong.
     """
-    for namespace, prefix in _NAMESPACES:
+    for namespace, prefix in namespaces:
         if iri.startswith(namespace):
             return f"{prefix}:{iri[len(namespace) :]}"
     return iri
@@ -304,40 +313,53 @@ def _href(iri: str) -> str | None:
     return iri if iri.startswith(("http://", "https://")) else None
 
 
-def _term(term: object) -> str:
-    """Render one RDF term as an HTML fragment — a link where it can be one."""
+def _term(term: object, namespaces: list[tuple[str, str]], link_template: str | None = None) -> str:
+    """Render one RDF term as an HTML fragment — a link where it can be one.
+
+    ``link_template`` is the ``EXTERNAL_ID_LINKS`` template for the predicate a
+    literal is the value of, if any: the literal is then an identifier stored as
+    text, and links to the authority's page.
+    """
     if isinstance(term, Literal):
         value = escape(str(term))
+        if link_template:
+            href = external_id_url(link_template, str(term))
+            value = f'<a href="{escape(href, quote=True)}">{value}</a>'
         if term.language:
             return f'{value} <span class="meta">@{escape(term.language)}</span>'
 
         datatype = str(term.datatype) if term.datatype else ""
         # An xsd:anyURI literal *is* a URL, and on a digital copy it is the one
-        # that matters: schema:contentUrl, which D9 made absolute and
-        # dereferenceable. Linking it through _href re-bases it onto the serving
-        # host, so the page a developer is reading reaches that stack's bytes
-        # rather than production's. Left as text before it was clear _href already
-        # solved that — the page it appears on is otherwise a dead end.
+        # that matters: schema:contentUrl, which is absolute and dereferenceable.
+        # Linking it through _href re-bases it onto the serving host, so the page
+        # a developer is reading reaches that stack's bytes rather than
+        # production's. Left as text, it would make the page a dead end.
         if datatype == _URI_DATATYPE and (href := _href(str(term))):
             value = f'<a href="{escape(href, quote=True)}">{value}</a>'
         if datatype and datatype != _IMPLICIT_DATATYPE:
-            value += f' <span class="meta">{escape(_curie(datatype))}</span>'
+            value += f' <span class="meta">{escape(_curie(datatype, namespaces))}</span>'
         return value
 
-    label = escape(_curie(str(term)))
+    label = escape(_curie(str(term), namespaces))
     href = _href(str(term))
     return f'<a href="{escape(href, quote=True)}">{label}</a>' if href else f"<code>{label}</code>"
 
 
-def _section(title: str, rows: list[tuple[object, object]]) -> str:
+def _section(
+    title: str, rows: list[tuple[object, object]], namespaces: list[tuple[str, str]]
+) -> str:
     """One ``<h2>`` + table, or nothing at all when there is nothing to show."""
     if not rows:
         return ""
-    cells = "".join(f"<tr><th>{_term(a)}</th><td>{_term(b)}</td></tr>" for a, b in rows)
+    cells = "".join(
+        f"<tr><th>{_term(a, namespaces)}</th>"
+        f"<td>{_term(b, namespaces, settings.external_id_links.get(str(a)))}</td></tr>"
+        for a, b in rows
+    )
     return f"<h2>{escape(title)}</h2><table>{cells}</table>"
 
 
-def _render_html(graph: Graph, iri: str) -> str:
+def _render_html(graph: Graph, iri: str, namespaces: list[tuple[str, str]]) -> str:
     """Render a resource's description as one self-contained HTML page.
 
     The field set is the one ``GET /api/v1/dataexplorer/graph/node`` assembles —
@@ -383,12 +405,12 @@ def _render_html(graph: Graph, iri: str) -> str:
     for rows in (literals, outbound, inbound):
         rows.sort(key=lambda row: (str(row[0]), str(row[1])))
 
-    heading = preferred_label(labels) or _curie(iri)
+    heading = preferred_label(labels) or _curie(iri, namespaces)
     head_links = "\n".join(
         f'<link rel="alternate" type="{media_type}" href="{_variant_url(media_type)}">'
         for media_type in MEDIA_TYPES
     )
-    type_line = " · ".join(_term(URIRef(t)) for t in sorted(types))
+    type_line = " · ".join(_term(URIRef(t), namespaces) for t in sorted(types))
     variants = " · ".join(
         f'<a href="{_variant_url(media_type)}">{media_type}</a>' for media_type in MEDIA_TYPES
     )
@@ -398,7 +420,7 @@ def _render_html(graph: Graph, iri: str) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{escape(heading)} — RossijskijFeatrDB</title>
+<title>{escape(heading)} — {escape(settings.project_name)}</title>
 {head_links}
 <style>{_STYLE}</style>
 </head>
@@ -407,9 +429,9 @@ def _render_html(graph: Graph, iri: str) -> str:
 <h1>{escape(heading)}</h1>
 <p class="iri"><code>{escape(iri)}</code></p>
 {f'<p><span class="meta">rdf:type</span> {type_line}</p>' if type_line else ""}
-{_section("Properties", literals)}
-{_section("Links", outbound)}
-{_section("Referenced by", inbound)}
+{_section("Properties", literals, namespaces)}
+{_section("Links", outbound, namespaces)}
+{_section("Referenced by", inbound, namespaces)}
 <footer>
 Also available as: {variants} ·
 <a href="?_profile={ALT_PROFILE}">alternate representations</a>
@@ -439,7 +461,7 @@ def dereference_entity(
     the graph unwalkable from an IRI, which is the whole point of dereferencing.
 
     Args:
-        local_name: The IRI's last segment; the full IRI is ``RFDB_BASE`` + this.
+        local_name: The IRI's last segment; the full IRI is ``DATA_BASE_URI`` + this.
         _mediatype: ConnegP override, beating the ``Accept`` header.
         _profile: ConnegP profile token — ``rfdb`` (default) or ``alt`` for the
             list of available representations.
@@ -455,7 +477,7 @@ def dereference_entity(
     supported = (*MEDIA_TYPES, HTML_MEDIA_TYPE)
     media_type = _negotiate(request.headers.get("accept", ""), _mediatype, supported)
     _check_profile(_profile)
-    iri = f"{RFDB_BASE}{local_name}"
+    iri = f"{settings.data_base_uri}{local_name}"
     store = request.app.state.store
 
     # Unbound template variables drop their triple, so each UNION branch
@@ -487,7 +509,7 @@ def dereference_entity(
     if _profile == ALT_PROFILE:
         graph = _alternates(iri, supported)
 
-    return _respond(graph, iri, media_type, supported)
+    return _respond(graph, iri, media_type, supported, request.app.state.schema_extractor.prefixes)
 
 
 @router.get("/schema/{shape_name}")
@@ -501,7 +523,7 @@ def dereference_shape(
 
     Shape IRIs (``rfdbs:MusicalWorkShape``) appear in data, in every shapes
     response, and in ``READ_ONLY_SHAPES``, so they should dereference like anything
-    else. Served from the parsed ``schema.ttl`` rather than the triplestore — the
+    else. Served from the parsed schema rather than the triplestore — the
     schema is a file this service already holds in memory, and it is not loaded
     into the data graph.
 
@@ -519,7 +541,7 @@ def dereference_shape(
     supported = tuple(MEDIA_TYPES)
     media_type = _negotiate(request.headers.get("accept", ""), _mediatype, supported)
     _check_profile(_profile)
-    iri = f"{RFDB_SCHEMA_BASE}{shape_name}"
+    iri = f"{settings.schema_base_uri}{shape_name}"
 
     if request.app.state.schema_extractor.get_shape(iri) is None:
         raise HTTPException(status_code=404, detail=f"Shape '{iri}' not found")
@@ -529,4 +551,4 @@ def dereference_shape(
         if _profile == ALT_PROFILE
         else request.app.state.schema_extractor.graph.cbd(URIRef(iri))
     )
-    return _respond(graph, iri, media_type, supported)
+    return _respond(graph, iri, media_type, supported, request.app.state.schema_extractor.prefixes)

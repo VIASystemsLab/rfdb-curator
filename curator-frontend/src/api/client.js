@@ -5,11 +5,10 @@
  *   - `BASE_URL` → curator-backend (:8000), the only service that writes.
  *   - `READ_BASE` → dataexplorer-backend (:8001), which answers every read.
  *
- * Routes are namespaced by owning service (D8): `/api/v1/curator/…` and
+ * Each URL prefix names the service that owns it: `/api/v1/curator/…` and
  * `/api/v1/dataexplorer/…`, plus the reader's unversioned `/rdf/…` data space for
- * anything with a persisted identifier. Pointing a call at the wrong base now
- * fails with a clean 404 rather than a 405 from a path that exists on both
- * services for different methods.
+ * anything with a persisted identifier. No path exists on both services, so a
+ * call pointed at the wrong base fails with a 404.
  *
  * Both bases are **relative in dev and in production**, deliberately: every
  * request goes to the origin that served the page, so nothing browser-facing
@@ -69,13 +68,10 @@ export const apiClient = {
   /**
    * Fetch all SHACL NodeShapes.  Called once on app mount to populate the sidebar.
    *
-   * On the **reader**, and that is the fix for C20 rather than an optimisation.
-   * This used to be pinned to the writer because only the writer stamped the
-   * `readOnly` flags the editor needs to disable protected shapes — so with the
-   * writer down the editor had no shape list and rendered an empty sidebar. Per
-   * D11 both services now build the identical stamped catalogue from one shared
-   * implementation, so the editor can start, browse and search with the write tier
-   * stopped. Only editing itself requires the writer.
+   * Served by the **reader**. Both services build the identical shape catalogue
+   * from one shared implementation, including the `readOnly` flags the editor
+   * uses to disable protected shapes, so the editor can start, browse and search
+   * with the write tier stopped. Only editing itself requires the writer.
    */
   getShapes: () => readHttp.get(`${READ_API}/shapes`).then((r) => r.data),
 
@@ -130,6 +126,12 @@ export const apiClient = {
   getPrefixes: () => readHttp.get(`${READ_API}/meta/prefixes`).then((r) => r.data.prefixes),
 
   /**
+   * Fetch what the loaded schema says about itself and the deployment's base IRIs:
+   * { version, dataBaseUri, schemaBaseUri }. Called once at app startup.
+   */
+  getSchemaInfo: () => readHttp.get(`${READ_API}/meta/schema`).then((r) => r.data),
+
+  /**
    * Stage a PDF (upload-first flow). Returns the prefilled digital-copy node
    * ({id, fileId, name, contentUrl, contentSize, sha256, numberOfPages}) that
    * the FileField appends to form state; it becomes a bridge node in the
@@ -151,7 +153,7 @@ export const apiClient = {
   /**
    * Fetchable URL for a digital copy's bytes, from the node's `schema:contentUrl`.
    *
-   * Two shapes arrive here, and the difference is not cosmetic (D7 + D9):
+   * Two shapes arrive here, and they resolve against different services:
    *
    *   relative  `/api/v1/curator/files/staged/{id}`   staged working state, served
    *                                                   by the writer that took the

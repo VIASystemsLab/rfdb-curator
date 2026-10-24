@@ -1,6 +1,7 @@
 /**
  * Details panel for the selected node: its literal fields, its relations (both
- * directions, click to jump), and any external-authority links. Relation rows
+ * directions, click to jump), and any external-authority links. A literal with
+ * a `url` (an identifier stored as text, e.g. a VIAF ID) links to that page. Relation rows
  * resolve the neighbour's label from the shared node map so they read naturally.
  */
 import { entityPageUrl } from '../api/client.js'
@@ -73,7 +74,15 @@ export default function Inspector({ node, edges, nodesById, onSelectNeighbor, on
                   {compactIri(lit.predicate)}
                   {lit.language ? ` @${lit.language}` : ''}
                 </div>
-                <div className="v">{lit.value}</div>
+                <div className="v">
+                  {lit.url ? (
+                    <a href={lit.url} target="_blank" rel="noopener noreferrer">
+                      {lit.value}
+                    </a>
+                  ) : (
+                    lit.value
+                  )}
+                </div>
               </div>
             ))}
           </>

@@ -1,62 +1,57 @@
-"""Curated CURIE prefix → namespace map for the project.
+"""The project's CURIE prefix map, read from the schema's ``sh:declare`` declarations.
 
-This is the **authoritative, hand-maintained** prefix list served by
-``GET /api/v1/dataexplorer/meta/prefixes`` (and hydrated by the frontend for IRI compaction and
-the Data Context Panel). It is declared explicitly rather than read from the
-rdflib schema graph on purpose:
+Served by ``GET /api/v1/dataexplorer/meta/prefixes`` (the frontends hydrate it for
+IRI compaction and the Data Context Panel) and used by the ``/rdf/`` pages. It is
+read from ``sh:declare`` rather than from the rdflib graph's namespaces on purpose:
 
   - a bare ``rdflib.Graph()`` pre-binds ~29 unrelated "well-known" vocabularies
-    (``brick``, ``csvw``, ``dcat``, ``qb``, ``odrl``, …) that would otherwise leak
-    into the map, and
-  - the real prefixes are spread across *several* TTL sources (``schema.ttl``,
-    ``data.ttl``, ``vocab.ttl``, ``glottolog_language.ttl``), not just the schema.
+    (``brick``, ``csvw``, ``dcat``, ``qb``, ``odrl``, …) that would leak into the map,
+  - ``@prefix`` lines are Turtle syntax and do not survive parsing, while
+    ``sh:declare`` triples do, and
+  - the schema declares the prefixes of the data files too, so one source covers
+    every TTL file the project loads.
 
-⚠️  MAINTENANCE: when you add a new ``@prefix`` to any project TTL file, add it
-here too. Run the manual sanity check to catch drift (declared-but-missing):
-
-    cd curator-backend && uv run python scripts/check_prefixes.py
-
-``scan_ttl_prefixes`` below powers that check; it is intentionally cheap (reads
-only each file's leading directive block).
+``scan_ttl_prefixes`` powers the drift check (``curator-backend/scripts/
+check_prefixes.py``): every ``@prefix`` in the schema and data files must be declared.
 """
 
 import re
 from collections.abc import Iterable
 
-# Union of the @prefix declarations across schema/data/vocab/glottolog as of
-# 2026-07-16. Keep sorted by prefix. See the maintenance note above.
-PREFIXES: dict[str, str] = {
-    "bibo": "http://purl.org/ontology/bibo/",
-    "cidoc": "http://www.cidoc-crm.org/cidoc-crm/",
-    "core": "https://w3id.org/polifonia/ontology/core/",
-    "dc": "http://purl.org/dc/elements/1.1/",
-    "dcterms": "http://purl.org/dc/terms/",
-    "dctype": "http://purl.org/dc/dcmitype/",
-    "foaf": "http://xmlns.com/foaf/0.1/",
-    "frbr": "http://purl.org/vocab/frbr/core#",
-    "geo": "http://www.w3.org/2003/01/geo/wgs84_pos#",
-    "glottolog": "http://glottolog.org/resource/languoid/id/",
-    "gold": "http://purl.org/linguistics/gold/",
-    "isbd": "http://iflastandards.info/ns/isbd/elements/",
-    "lexvo": "http://lexvo.org/ontology#",
-    "lrmoo": "http://iflastandards.info/ns/lrm/lrmoo/",
-    "mm": "https://w3id.org/polifonia/ontology/music-meta/",
-    "owl": "http://www.w3.org/2002/07/owl#",
-    "prism": "http://prismstandard.org/namespaces/basic/2.0/",
-    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
-    "rfdb": "https://rosfeatr.eu/rdf/data/",
-    "rfdbs": "https://rosfeatr.eu/rdf/schema/",
-    "schema": "http://schema.org/",
-    "sh": "http://www.w3.org/ns/shacl#",
-    "skos": "http://www.w3.org/2004/02/skos/core#",
-    "source": "https://w3id.org/polifonia/ontology/source/",
-    "vcard": "http://www.w3.org/2001/vcard-rdf/3.0#",
-    "void": "http://rdfs.org/ns/void#",
-    "wd": "http://www.wikidata.org/entity/",
-    "wdt": "http://www.wikidata.org/prop/direct/",
-    "xsd": "http://www.w3.org/2001/XMLSchema#",
-}
+from rdflib import Graph
+from rdflib.namespace import SH
+
+
+def declared_prefixes(graph: Graph) -> dict[str, str]:
+    """Collect the ``sh:declare`` prefix declarations of a schema graph.
+
+    Reads every ``[] sh:declare [ sh:prefix "p" ; sh:namespace "ns"^^xsd:anyURI ]``,
+    the SHACL-native prefix map, wherever it hangs. A declaration missing either
+    half is skipped. The same prefix declared twice with the same namespace is
+    fine; with two namespaces it is an error, because no answer would be right.
+
+    Example:
+        >>> declared_prefixes(SchemaExtractor("schema/rfdb_schema.ttl").graph)["rfdb"]
+        'https://rosfeatr.eu/rdf/data/'
+
+    Raises:
+        ValueError: a prefix is declared with two different namespaces.
+    """
+    found: dict[str, str] = {}
+    for declaration in graph.objects(None, SH.declare):
+        prefix = graph.value(declaration, SH.prefix)
+        namespace = graph.value(declaration, SH.namespace)
+        if prefix is None or namespace is None:
+            continue
+        prefix, namespace = str(prefix), str(namespace)
+        if found.get(prefix, namespace) != namespace:
+            raise ValueError(
+                f"Prefix '{prefix}' is declared with two namespaces: "
+                f"{found[prefix]} and {namespace}"
+            )
+        found[prefix] = namespace
+    return dict(sorted(found.items()))
+
 
 # Matches a Turtle ``@prefix name: <uri> .`` or SPARQL ``PREFIX name: <uri>`` line.
 # The empty (base) prefix ``@prefix : <…>`` is intentionally NOT matched.
@@ -74,7 +69,7 @@ def scan_ttl_prefixes(paths: Iterable[str]) -> dict[str, str]:
     prefix conflict, later files win. Unreadable paths are skipped silently.
 
     Example:
-        >>> scan_ttl_prefixes(["schema/schema.ttl"])["rfdb"]
+        >>> scan_ttl_prefixes(["schema/rfdb_schema.ttl"])["rfdb"]
         'https://rosfeatr.eu/rdf/data/'
     """
     found: dict[str, str] = {}

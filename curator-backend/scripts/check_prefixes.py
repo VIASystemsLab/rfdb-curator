@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Manual sanity check for the curated prefix map.
+"""Check that the schema declares every prefix the project's TTL files use.
 
-Verifies that ``rfdb_core.prefixes.PREFIXES`` covers every ``@prefix`` declared across
-the project's TTL files (``schema/*.ttl`` + ``data/*.ttl``, incl. the large
-Glottolog dump — only headers are read). Reports prefixes that are declared but
-missing from ``PREFIXES``, namespace mismatches, and entries in ``PREFIXES`` not
-found in any file. Exits non-zero on missing/mismatched so it can gate a review.
+The CURIE prefix map is read from the schema's ``sh:declare`` declarations
+(``rfdb_core.prefixes``). This verifies that every ``@prefix`` across
+``schema/*.ttl`` and ``data/*.ttl`` (the large Glottolog dump included; only
+headers are read) is declared there with the same namespace. Reports missing
+and mismatched prefixes, and declarations not used by any file. Exits non-zero
+on missing or mismatched, so it can gate a commit.
 
 Run:
     cd curator-backend && uv run python scripts/check_prefixes.py
@@ -13,40 +14,46 @@ Run:
 
 from pathlib import Path
 
-from rfdb_core.prefixes import PREFIXES, scan_ttl_prefixes
+from rdflib import Graph
+
+from rfdb_core.prefixes import declared_prefixes, scan_ttl_prefixes
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+SCHEMA_PATH = REPO_ROOT / "schema" / "rfdb_schema.ttl"
 
 
 def main() -> int:
     ttl_files = sorted(
         str(p) for p in [*REPO_ROOT.glob("schema/*.ttl"), *REPO_ROOT.glob("data/*.ttl")]
     )
-    declared = scan_ttl_prefixes(ttl_files)
+    used = scan_ttl_prefixes(ttl_files)
+    declared = declared_prefixes(Graph().parse(SCHEMA_PATH, format="turtle"))
 
-    missing = {p: ns for p, ns in declared.items() if p not in PREFIXES}
+    missing = {p: ns for p, ns in used.items() if p not in declared}
     mismatched = {
-        p: (ns, PREFIXES[p]) for p, ns in declared.items() if p in PREFIXES and PREFIXES[p] != ns
+        p: (ns, declared[p]) for p, ns in used.items() if p in declared and declared[p] != ns
     }
-    extra = sorted(set(PREFIXES) - set(declared))
+    unused = sorted(set(declared) - set(used))
 
-    print(f"Scanned {len(ttl_files)} TTL files; {len(declared)} declared prefixes.")
+    print(
+        f"Scanned {len(ttl_files)} TTL files; {len(used)} prefixes used, {len(declared)} declared."
+    )
     if missing:
-        print("\nMISSING from rfdb_core.prefixes.PREFIXES (declared in TTL, not listed):")
+        print("\nMISSING from the schema's sh:declare (used in TTL, not declared):")
         for prefix, ns in sorted(missing.items()):
-            print(f'    "{prefix}": "{ns}",')
+            print(f"    {prefix}: {ns}")
     if mismatched:
-        print("\nMISMATCHED namespace (TTL declaration != PREFIXES):")
-        for prefix, (declared_ns, current_ns) in sorted(mismatched.items()):
-            print(f"    {prefix}: TTL={declared_ns}  PREFIXES={current_ns}")
-    if extra:
-        print("\nIn PREFIXES but not declared in any scanned TTL (ok if intentional):")
-        print("    " + ", ".join(extra))
+        print("\nMISMATCHED namespace (TTL @prefix != sh:declare):")
+        for prefix, (used_ns, declared_ns) in sorted(mismatched.items()):
+            print(f"    {prefix}: TTL={used_ns}  sh:declare={declared_ns}")
+    if unused:
+        print("\nDeclared but not used by any scanned TTL (ok if intentional):")
+        print("    " + ", ".join(unused))
 
     if not missing and not mismatched:
-        print("\nOK — every declared prefix is present with a matching namespace.")
+        print("\nOK: every used prefix is declared with a matching namespace.")
         return 0
-    print("\nFAIL — update rfdb-core/rfdb_core/prefixes.py to match.")
+    print("\nFAIL: declare the prefix in the schema (sh:declare), upstream for a copied schema.")
     return 1
 
 

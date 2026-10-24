@@ -1,8 +1,8 @@
 """Tests for shape resolution in GET /api/v1/dataexplorer/entities/search.
 
 ``?shape=`` takes the full shape URI or its exact local name. A suffix match
-used to resolve "RoleShape" to whichever of RoleShape and AgentRoleShape came
-first in schema.ttl, so these tests run with the shapes in both orders.
+would resolve "RoleShape" to whichever of RoleShape and AgentRoleShape comes
+first in rfdb_schema.ttl, so these tests run with the shapes in both orders.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[2]
-SCHEMA_PATH = ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 BACKEND_DIR = ROOT / "dataexplorer-backend"
 
 if str(BACKEND_DIR) not in sys.path:

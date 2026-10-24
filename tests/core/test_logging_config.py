@@ -2,15 +2,13 @@
 
 It is called more than once in practice: ``uvicorn --reload`` re-imports the
 module on every source change, and the test suites reconfigure per imported app.
-The original implementation handled the duplicate-handler half of that
-(``root.handlers.clear()``) but not the resource half — clearing the list drops
-the reference to an already-open ``RotatingFileHandler`` without closing it, so
-each reconfiguration leaked one file descriptor.
+Each call must neither duplicate handlers nor leak resources. Clearing
+``root.handlers`` alone handles the first but not the second: it drops the
+reference to an already-open ``RotatingFileHandler`` without closing it, leaking
+one file descriptor per reconfiguration.
 
-Nothing caught it, for a reason worth keeping in mind: Python ignores
-``ResourceWarning`` by default, so a leak of exactly this shape is invisible to a
-green suite. It surfaced only when the warning filters were turned off while
-chasing Task 10's "zero warnings" acceptance criterion.
+Python ignores ``ResourceWarning`` by default, so a leak of exactly this shape is
+invisible to a green suite. The test below turns the warning on explicitly.
 """
 
 from __future__ import annotations

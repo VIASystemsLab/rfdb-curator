@@ -5,10 +5,9 @@ because the writer/reader split is the kind of boundary that erodes silently: a
 convenient import, a route added to the wrong app, one more thing on
 ``app.state``. Each check below turns one of those into a test failure.
 
-Covers the acceptance criteria for Task 5 of the modular-services refactor:
-exactly three ``app.state`` entries, no write route, no validator, ``/shapes``
-stamped with ``readOnly`` like the curator's (decision D11, which reverses D3),
-and ``/health`` without a ``seed`` key.
+Covers: exactly three ``app.state`` entries, no write route, no validator,
+``/shapes`` stamped with ``readOnly`` like the curator's, and ``/health`` without a
+``seed`` key.
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ from fastapi.routing import RouteContext, iter_route_contexts
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "dataexplorer-backend"
-SCHEMA_PATH = ROOT / "schema" / "schema.ttl"
+SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
@@ -57,12 +56,12 @@ def _run_lifespan(app_module, fake_app) -> None:
 def _effective_routes(app) -> list[RouteContext]:
     """Every registered route, flattened across ``include_router`` boundaries.
 
-    ``app.routes`` stopped being a flat list in FastAPI 0.141: ``include_router``
-    now appends a single lazy node per inclusion and resolves its children on
-    demand, so a router's routes are no longer *in* the list. Reading ``.path``
-    off that node raises ``AttributeError`` — and, worse, ``getattr(r, "methods",
-    None)`` returns ``None``, which made the read-only assertion below pass while
-    inspecting nothing but ``/health`` and the docs routes.
+    From FastAPI 0.141, ``app.routes`` is not a flat list: ``include_router``
+    appends a single lazy node per inclusion and resolves its children on demand,
+    so a router's routes are not *in* the list. Reading ``.path`` off that node
+    raises ``AttributeError``, and, worse, ``getattr(r, "methods", None)`` returns
+    ``None``, which would let the read-only assertion below pass while inspecting
+    nothing but ``/health`` and the docs routes.
 
     ``iter_route_contexts`` is FastAPI's own flattening helper — its OpenAPI
     generator uses it — and yields the effective, prefix-applied view. Preferred
@@ -81,9 +80,9 @@ def _effective_routes(app) -> list[RouteContext]:
 def test_lifespan_sets_exactly_three_state_entries(monkeypatch: pytest.MonkeyPatch) -> None:
     """schema_extractor, store, storage — and nothing else.
 
-    The requirement matrix in the refactor plan measured these three across all
-    six read routers. A fourth entry means either a write concern arrived or the
-    matrix is stale; either way it deserves a look rather than a silent pass.
+    Between them the read routers need exactly these three. A fourth entry means
+    either a write concern arrived or a router gained a dependency; either way it
+    deserves a look rather than a silent pass.
     """
     app_module = _import_app(monkeypatch)
     monkeypatch.setattr(app_module, "build_triplestore", lambda _s: object())
@@ -159,7 +158,7 @@ def test_route_set_is_exactly_the_read_surface(monkeypatch: pytest.MonkeyPatch) 
     }
     assert paths == {
         "/health",
-        # The data space: permanent public identifiers, unversioned (D8).
+        # The data space: permanent public identifiers, unversioned.
         "/rdf/data/{local_name}",
         "/rdf/data/{file_id}/content",
         "/rdf/schema/{shape_name}",
@@ -170,6 +169,7 @@ def test_route_set_is_exactly_the_read_surface(monkeypatch: pytest.MonkeyPatch) 
         "/api/v1/dataexplorer/entities/get",
         "/api/v1/dataexplorer/entities/search",
         "/api/v1/dataexplorer/graph/node",
+        "/api/v1/dataexplorer/meta/schema",
         "/api/v1/dataexplorer/meta/prefixes",
         "/api/v1/dataexplorer/meta/graphs",
         "/api/v1/dataexplorer/meta/files",
@@ -180,15 +180,14 @@ def test_no_route_uses_a_greedy_path_parameter(monkeypatch: pytest.MonkeyPatch) 
     """No ``{param:path}`` anywhere — it makes route resolution order-dependent.
 
     A greedy parameter swallows every sibling registered after it. When the siblings
-    live in a *different router* — as ``/entities/search`` and ``/entities/get`` once
-    did — the ordering that keeps them reachable is expressed in ``app.py``, files
-    away from either route, and breaking it yields a 400 from the IRI guard with no
-    visible connection to router registration.
+    live in a *different router*, the ordering that keeps them reachable is expressed
+    in ``app.py``, files away from either route, and breaking it yields a 400 from the
+    IRI guard with no visible connection to router registration.
 
     So entity IRIs travel as ``?id=`` instead (matching ``/graph/node``), and the
     collision is impossible rather than merely guarded. This test is the structural
-    version of that guarantee: it fails on *any* future greedy route, not just the
-    one that caused the trouble.
+    version of that guarantee: it fails on *any* greedy route, not only one that
+    shadows a known sibling.
     """
     app_module = _import_app(monkeypatch)
     greedy = [r.path for r in _effective_routes(app_module.app) if ":path}" in r.path]
@@ -199,14 +198,8 @@ def test_no_route_uses_a_greedy_path_parameter(monkeypatch: pytest.MonkeyPatch) 
 
 
 # ---------------------------------------------------------------------------
-# /shapes is stamped, identically to the curator's (decision D11)
+# /shapes is stamped, identically to the curator's
 # ---------------------------------------------------------------------------
-#
-# These two tests replace their D3-era opposites, which asserted that the reader
-# omitted the readOnly flag and never imported read_only_shapes. That was the
-# design until running Task 7's acceptance criterion showed what it cost: the
-# editor needs the flags, could only get them from the writer, and so rendered an
-# empty sidebar whenever the writer was down (C20).
 
 
 def test_shapes_carries_the_read_only_flag() -> None:
@@ -214,7 +207,8 @@ def test_shapes_carries_the_read_only_flag() -> None:
 
     Not a write concern leaking into a read service: the flag states which shapes
     are *editable*, which is what a client needs to render a UI. Serving it here is
-    what lets the editor start with the write tier stopped.
+    what lets the editor start with the write tier stopped, rather than show an
+    empty sidebar.
     """
     from api.shapes import list_shapes
     from rfdb_core.schema_extractor import SchemaExtractor
@@ -233,10 +227,10 @@ def test_shapes_carries_the_read_only_flag() -> None:
 def test_shapes_module_does_not_reimplement_the_stamp() -> None:
     """The flag must come from ``rfdb_core.shapes``, never from a local copy.
 
-    This is the guard D11 asks for. Both services returning the same payload is an
-    invariant maintained by *sharing the code*, not by two implementations that
-    happen to agree today — a re-implementation here would drift and reintroduce
-    C20 in a form no route test would catch.
+    Both services returning the same payload is an invariant maintained by *sharing
+    the code*, not by two implementations that happen to agree today. A
+    re-implementation here would drift and hand the editor flags that differ from
+    the writer's, in a form no route test would catch.
     """
     source = (BACKEND_DIR / "api" / "shapes.py").read_text()
     assert "rfdb_core.shapes" in source, "must delegate to the shared implementation"

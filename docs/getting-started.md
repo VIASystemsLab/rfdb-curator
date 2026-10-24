@@ -1,7 +1,7 @@
 # Getting Started with RFDB Curator
 
 A short orientation: what the editor is for, the shape of the data model you will be
-working with, and how to run it locally. For the full RDF/SHACL reference see
+working with, and how to run it locally. For what the application requires of a schema see
 [data-model.md](data-model.md); for running a development environment see
 [development.md](development.md); for configuration, data seeding, the deploy modes, and the
 production runbook see [deployment.md](deployment.md).
@@ -70,9 +70,7 @@ In short: run `scripts/env-init.sh`, `docker compose up -d --build`, and
 
 ## Running in production
 
-**Nothing has been deployed yet**, but the stack to do it with is complete: a hardened Docker
-Compose stack behind a TLS-terminating reverse proxy, with the triple store and object store
-kept internal-only. The whole topology has been exercised locally — both frontend production
-images build and the real Caddyfile was run against them route by route — so what is missing is
-a host, a domain and a certificate rather than any code. Step-by-step runbook, and the one known
-gap (log rotation): [production deployment](deployment.md#production-deployment).
+Production runs a hardened Docker Compose stack behind a TLS-terminating reverse proxy, with
+the triple store and object store kept internal-only. The stack is complete but not yet
+deployed to a host. Step-by-step runbook and status:
+[production deployment](deployment.md#production-deployment).

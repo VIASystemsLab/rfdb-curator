@@ -1,14 +1,14 @@
 """FastAPI application entrypoint for the RossijskijFeatrDB data-entry backend.
 
 Startup sequence (lifespan context manager):
-  1. Parse ``schema/schema.ttl`` into a ``SchemaExtractor`` and a
+  1. Parse ``schema/rfdb_schema.ttl`` into a ``SchemaExtractor`` and a
      ``ShaclValidator`` (both read the same file; see note in lifespan).
   2. Build a ``TripleStore`` via ``build_triplestore(settings)`` (Oxigraph today).
   3. Optionally call ``TripleStore.clear_store()`` when ``reset_data_on_startup``
      is ``true`` — wipes all named graphs and the default graph before seeding.
      If this step fails the process aborts; the app must not start with a
      partially-cleared store.
-  4. Call ``seed_store()`` to load ``vocab.ttl`` (and optionally ``data.ttl``) into
+  4. Call ``seed_store()`` to load the vocabulary files (and optionally the sample data) into
      Oxigraph.  When ``reset_data_on_startup`` is ``false`` this is idempotent;
      duplicate triples are silently merged by Oxigraph.
 
@@ -39,6 +39,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from rdflib.plugins.parsers.notation3 import BadSyntax
 
+import rfdb_core
 from api.data import router as data_router
 from api.files import router as files_router
 from api.shapes import router as shapes_router
@@ -94,11 +95,13 @@ async def lifespan(app: FastAPI):
        vocab plus optional test data.
     4. Store the returned seed report on ``app.state`` for ``/health``.
     """
-    logger.info("Starting up RossijskijFeatrDB backend…")
+    logger.info("Starting up %s curator backend…", settings.project_name)
 
     # -- 1. Schema services ------------------------------------------------
     try:
-        app.state.schema_extractor = SchemaExtractor(settings.schema_path)
+        app.state.schema_extractor = SchemaExtractor(
+            settings.schema_path, settings.long_text_predicates, settings.external_id_links
+        )
         app.state.shape_dep_graph = _build_shape_dep_graph(app.state.schema_extractor)
         app.state.shacl_validator = ShaclValidator(settings.schema_path)
     except BadSyntax as exc:
@@ -109,7 +112,11 @@ async def lifespan(app: FastAPI):
             exc_info=True,
         )
         raise
-    logger.info("Schema loaded from '%s'.", settings.schema_path)
+    logger.info(
+        "Schema loaded from '%s' (version %s).",
+        settings.schema_path,
+        app.state.schema_extractor.version or "unknown",
+    )
 
     # -- 2. Triplestore ----------------------------------------------------
     # Built through the seam's factory, keyed on settings.triplestore, so swapping
@@ -142,9 +149,9 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 
 app = FastAPI(
-    title="RossijskijFeatrDB Data Entry API",
-    description="SHACL-driven data entry backend for the Russian Theatre DB.",
-    version="0.1.0",
+    title=f"{settings.project_name} Data Entry API",
+    description="SHACL-driven data entry backend.",
+    version=rfdb_core.__version__,
     lifespan=lifespan,
 )
 
@@ -154,10 +161,11 @@ app = FastAPI(
 # note; it is load-bearing.
 configure_app(app, cors_origins=settings.cors_origins)
 
-# Writer surface only, under a prefix that names its owner (D8). Entity search,
-# graph neighbourhoods and the meta routes are reads served by
-# dataexplorer-backend; the shapes route is served here *and* there, now with an
-# identical payload from one shared implementation (D11).
+# Writer surface only, under a prefix that names the service owning it. Entity
+# search, graph neighbourhoods and the meta routes are reads served by
+# dataexplorer-backend; the shapes route is served here *and* there, with an
+# identical payload from one shared implementation, so the editor can list shapes
+# with the writer down.
 #
 # Naming the service in the path is what makes wrong-service requests legible and
 # read-only deployments trivial — the whole namespace is simply absent rather than

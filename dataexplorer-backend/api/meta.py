@@ -1,7 +1,11 @@
 """Meta routes: schema-level information not tied to individual shapes or entities.
 
 Currently exposes:
-  GET /api/v1/dataexplorer/meta/prefixes — curated CURIE prefix map (rfdb_core/prefixes.py).
+  GET /api/v1/dataexplorer/meta/schema   — the loaded schema's version (owl:versionInfo),
+                                           the project name, the base IRIs records and
+                                           shapes are named under, and the external-ID
+                                           link templates.
+  GET /api/v1/dataexplorer/meta/prefixes — CURIE prefix map declared by the schema (sh:declare).
   GET /api/v1/dataexplorer/meta/graphs   — active/named graphs, triple counts, config warnings.
   GET /api/v1/dataexplorer/meta/files    — digital-copy storage stats (staged/registered/orphans).
 
@@ -15,21 +19,43 @@ from fastapi import APIRouter, HTTPException, Request
 from core.config import settings
 from rfdb_core.file_storage import REGISTERED_PREFIX, STAGED_PREFIX, StorageError
 from rfdb_core.files_state import collect_file_state, key_file_id
-from rfdb_core.prefixes import PREFIXES
 
 router = APIRouter()
 
 
-@router.get("/meta/prefixes")
-def get_prefixes():
-    """Return the curated CURIE prefix→namespace map.
+@router.get("/meta/schema")
+def get_schema_info(request: Request):
+    """Return what the loaded schema says about itself, and the namespaces in use.
 
-    Served from the hand-maintained ``rfdb_core.prefixes.PREFIXES`` (the union of the
-    ``@prefix`` declarations across schema/data/vocab/glottolog), **not** the rdflib
-    schema graph — the latter also carries ~29 unrelated well-known vocabularies
-    (``brick``, ``dcat``, …) that rdflib pre-binds into every ``Graph`` and would
-    otherwise leak into the map. See ``rfdb_core/prefixes.py`` for the maintenance note
-    and the manual sanity check.
+    The base IRIs are served as explicit values rather than looked up by a prefix
+    name, so a deployment can declare them under any prefix. The curator frontend
+    reads ``dataBaseUri`` to tell this deployment's records from external IRIs.
+    ``projectName`` is the ``PROJECT_NAME`` setting, for the editor's header.
+    ``externalIdLinks`` is the ``EXTERNAL_ID_LINKS`` map, predicate IRI → URL
+    template, for clients that render identifiers stored as text.
+
+    Returns:
+        ``{"projectName": "…", "version": "2.2.2", "dataBaseUri": "https://…/data/",
+        "schemaBaseUri": "https://…/schema/", "externalIdLinks": {…}}``.
+        ``version`` is ``null`` when the
+        schema states no ``owl:versionInfo``.
+    """
+    return {
+        "projectName": settings.project_name,
+        "version": request.app.state.schema_extractor.version,
+        "dataBaseUri": settings.data_base_uri,
+        "schemaBaseUri": settings.schema_base_uri,
+        "externalIdLinks": settings.external_id_links,
+    }
+
+
+@router.get("/meta/prefixes")
+def get_prefixes(request: Request):
+    """Return the CURIE prefix→namespace map the schema declares.
+
+    Read from the schema's ``sh:declare`` declarations at load time (see
+    ``rfdb_core.prefixes``), **not** from the rdflib graph's namespaces, which also
+    carry ~29 unrelated vocabularies rdflib pre-binds into every ``Graph``.
 
     Returns:
         ``{"prefixes": {"cidoc": "http://…", "xsd": "http://…", …}}``
@@ -37,7 +63,7 @@ def get_prefixes():
     The frontend consumes this at startup to hydrate its prefix map for IRI
     compaction and the Data Context Panel.
     """
-    return {"prefixes": dict(PREFIXES)}
+    return {"prefixes": dict(request.app.state.schema_extractor.prefixes)}
 
 
 def _count(rows: list[dict], key: str = "count") -> int:
@@ -182,6 +208,7 @@ def get_file_stats(request: Request):
             request.app.state.storage,
             request.app.state.store,
             request.app.state.schema_extractor,
+            settings.data_base_uri,
         )
     except StorageError:
         raise  # → app-level storage handler (clean 503 + logged cause)

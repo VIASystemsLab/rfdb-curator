@@ -1,13 +1,11 @@
 """Read half of the digital-copy flow: download the bytes, report the stats.
 
-Split out of the curator's ``test_digital_copies.py`` when the download route and
-``/api/v1/dataexplorer/meta/files`` moved to the read service. The assertions are carried over
-unchanged so the contract is provably the same.
+The write half is in ``tests/curator/test_digital_copies.py``.
 
-One deliberate difference from the curator's version: fixtures put objects into
-storage **directly** rather than by calling ``stage_file``. The reader has no
-staging route to call, and setting up through the writer would have quietly made
-these tests depend on it — which is the coupling the split exists to remove.
+Fixtures put objects into storage **directly** rather than by calling
+``stage_file``. The reader has no staging route to call, and setting up through
+the writer would quietly make these tests depend on it, which is the coupling the
+writer/reader split exists to remove.
 
 Uses a real ``rdflib.Graph`` behind a small store stub (queries actually run) and
 the in-memory storage fake from ``rfdb_core.file_storage`` — no network, no
@@ -28,7 +26,7 @@ from rdflib import Graph
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "dataexplorer-backend"
-_SCHEMA_PATH = ROOT / "schema" / "schema.ttl"
+_SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
@@ -91,8 +89,8 @@ def env():
     """Fake store + storage + request wired like the reader's app.state.
 
     Exactly the three entries dataexplorer-backend puts on app.state. If a
-    handler ever needs a fourth, this fixture fails and the requirement matrix
-    in the refactor plan needs revisiting.
+    handler needs a fourth, this fixture fails, and so should
+    ``test_lifespan_sets_exactly_three_state_entries`` in ``test_app_contract.py``.
     """
     store = _FakeStore()
     storage = InMemoryStorage()
@@ -151,10 +149,10 @@ def test_download_unreferenced_staged_is_404(env):
     """Staged bytes nobody references are not a published resource.
 
     The reader is the public surface; a file becomes public when a parent entity
-    references it. Serving unsubmitted working state here is what used to make a
-    legitimately-staged file indistinguishable from a broken promotion — and
-    handed out content that was never submitted. Curators preview their own
-    uploads through the writer instead.
+    references it. Serving unsubmitted working state here would make a
+    legitimately staged file indistinguishable from a broken promotion, and would
+    hand out content that was never submitted. Curators preview their own uploads
+    through the writer instead.
     """
     file_id = "File_0123abcd"
     _stage(env, file_id, _make_pdf())  # staged, never linked
@@ -177,7 +175,8 @@ def test_download_unreferenced_registered_is_404(env):
 def test_download_awaiting_promotion_is_served_but_flagged(env, caplog):
     """Referenced but still staged: a failed promotion downloads, loudly.
 
-    This is the case the old prefix-based fallback hid. The entity write
+    Serving from whichever storage prefix holds the bytes would hide this case.
+    The entity write
     succeeded, so the file *is* published and must not 404 — but the promotion
     that should have moved it did not run, and that has to be visible rather than
     waiting for someone to notice the reconciler is behind.

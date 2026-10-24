@@ -1,184 +1,184 @@
-# RFDB Curator — Data Model
+# RFDB Curator — Data Model Contract
 
-This document records the **design principles and modeling decisions** behind the RFDB
-data model: which vocabularies are used and for what, how the WEMI layering and the bridge-node pattern work, and the literal/language/date/IRI policies that the SHACL schema alone cannot explain.
+What a SHACL schema must provide for this application to run on it. The record
+types, fields, vocabularies and modelling choices all come from the loaded
+schema. This page lists only what the application itself relies on.
 
-The active schema at [`schema/schema.ttl`](../schema/schema.ttl) is the single source of truth for record types, fields, cardinalities, datatypes, and relations. 
-For how shapes become forms and how validation runs, see [architecture.md](architecture.md).
-
-Because everything downstream (forms, validation, autocomplete, export) is derived from the schema at runtime, the schema is the only place a field or prefix is *defined*. 
-
----
-
-## Vocabularies used, and for what
-
-The model reuses established vocabularies rather than minting local terms wherever a
-suitable one exists. Each is chosen for a specific category of thing; the "used for"
-column is the durable contract, not an exhaustive property list (query `/api/v1/dataexplorer/meta/prefixes`
-for the current namespace bindings).
-
-| Prefix | Vocabulary | Used for |
-|---|---|---|
-| `rfdb:` / `rfdbs:` | RFDB local namespaces | `rfdb:` for instance data IRIs, `rfdbs:` for SHACL shapes. The schema defines **no custom predicates** — all properties are reused from the vocabularies below. |
-| `lrmoo:` | [LRMoo](https://cidoc-crm.org/lrmoo/) | The WEMI spine: Work / Expression / Manifestation / Item classes and the links between levels (embodies, exemplifies), plus Performance. |
-| `cidoc:` | [CIDOC CRM](https://cidoc-crm.org/) | Cultural-heritage relations LRMoo does not cover: subjects, ownership/custody, the Work↔Expression component link, and performance-to-manifestation evidence. |
-| `core:` | [Polifonia Core](https://github.com/polifonia-project/core-ontology) | People, roles, places, organizations, source/document types, and the Agent-Role bridge that binds an agent to a role. |
-| `mm:` | [Polifonia Music Meta](https://github.com/polifonia-project/music-meta-ontology) | The music-domain typing of a Musical Work (`mm:MusicEntity`). |
-| `source:` | [Polifonia Source](https://github.com/polifonia-project/source-ontology) | The Source/Item as a physical or documentary copy held by an institution. |
-| `dcterms:` | [Dublin Core Terms](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/) | Dates, language references, identifiers (shelfmarks), the Language controlled-vocabulary class, and the digital-copy contributor/donor link. |
-| `prism:` | [PRISM](https://www.w3.org/submissions/prism/) | Publication dates for Manifestations and Sources. |
-| `foaf:` | [FOAF](http://xmlns.com/foaf/spec/) | Donor/provenance agents (Contributor), kept deliberately distinct from `core:` creative agents — see [Intentional modeling decisions](#intentional-modeling-decisions). |
-| `schema:` | [Schema.org](https://schema.org/) | Digital-copy (PDF scan) metadata: filename, MIME type, download URL, byte size, checksum, page count. |
-| `glottolog:` | [Glottolog](https://glottolog.org/) | Stable language-identifier IRIs seeded as the Language controlled vocabulary. |
-| `skos:` | [SKOS](https://www.w3.org/TR/skos-reference/) | Alternate and preferred labels. |
-| `owl:` / `wdt:` / `rdfs:` | OWL / [Wikidata](https://www.wikidata.org/) direct props / RDFS | External authority links (`owl:sameAs`, `wdt:P214` VIAF), `rdfs:seeAlso` references, and core `rdfs:label`/`rdfs:comment` annotations. |
-| `rdf:` / `xsd:` / `sh:` | RDF / XSD / [SHACL](https://www.w3.org/TR/shacl12-core/) | Typing, datatypes, and the shape language itself. |
+The schema this repository ships is the rfdb model, maintained upstream in
+[rfdb-schema](https://github.com/VIASystemsLab/rfdb-schema). Its general
+modelling rules are in upstream's
+[application-rules.md](https://github.com/VIASystemsLab/rfdb-schema/blob/v2.2.2/docs/application-rules.md)
+and are not repeated here: model alignment, explicit `@type`, literal, language
+and date policies, IRI rules, and naming across layers. For how shapes become
+forms and how validation runs, see [architecture.md](architecture.md).
 
 ---
 
-## WEMI layering and link direction
+## The loaded schema is the source of truth
 
-The core records follow a layered **Work → Expression → Manifestation → Item** (WEMI)
-structure, each level more concrete than the one above:
+Both services parse the schema at `SCHEMA_PATH` at startup. Forms, validation,
+autocomplete, the record-type list and export are all derived from it, so a
+field or a prefix is defined there and nowhere else.
 
-- **Musical Work** — the abstract work.
-- **Expression** — an intellectual realization (e.g. a libretto).
-- **Manifestation** — an edition or product type.
-- **Source / Item** — a specific physical or documentary copy.
-
-**Design decision — links point child → parent.** Every WEMI link is asserted on the
-more concrete record and points up to its parent (Expression → Work via
-`cidoc:P148i_is_component_of`, Manifestation → Expression via `lrmoo:R4_embodies`,
-Item → Manifestation via `lrmoo:R7_exemplifies`). The practical consequence is
-**editorial order: create parents before children**, because a child's form needs an
-existing parent to reference. This one-directional convention keeps the graph acyclic
-and the create/edit flow predictable.
+This repository's [`schema/rfdb_schema.ttl`](../schema/rfdb_schema.ttl) is a copy of a
+tagged upstream release, recorded in [`schema/README.md`](../schema/README.md).
+It changes only by copying a newer release; a model change goes upstream. To run
+another model, point `SCHEMA_PATH` at it (see [custom-schema.md](custom-schema.md)).
 
 ---
 
-## Standalone entities vs. helper/bridge nodes
+## Designed around WEMI
 
-Shapes fall into two roles, and the distinction is **derived from the schema, never
-hardcoded per class**:
+The editor is designed around a layered Work → Expression → Manifestation →
+Item model. Links point from child to parent, so parents are created before
+children: a child's form needs an existing parent to reference.
 
-- **Standalone entity** — a shape that declares an `rdfs:label` property. It has its own
-  identity and lifecycle and is created/searched as a top-level record (Work, Person,
-  Place, Organization, …).
-- **Helper/bridge node** — a shape with no `rdfs:label`. It only makes sense inline as
-  part of a parent (e.g. `AgentRole`, which binds a Person to a Role). The editor renders
-  these inline and blocks top-level editing.
-
-The canonical bridge is **Agent Role**: contributor attribution (composer, librettist,
-conductor, …) is not a direct property but a small `core:AgentRole` node linking a Person
-to a Role, attached to a Work/Expression/Performance via `core:hasAgentRole`. This lets
-one person hold different roles across records without collapsing identity into role.
-
-See [architecture.md](architecture.md#helperbridge-shape-classification) for how this
-classification drives the UI.
+The code does not enforce this. No service reads an LRMoo term, and a schema
+with another structure works. The one place that assumes it is the Welcome
+guide's text in the curator frontend.
 
 ---
 
-## Class-targeted validation requires explicit `@type`
+## Standalone entities and helper nodes
 
-Shapes use `sh:targetClass`, so a shape's constraints only run against a node that
-declares the matching RDF class. **Payloads must therefore carry explicit `@type`
-values** — most importantly bridge nodes, which the schema validates by class (an
-`AgentRole` payload must include `core:AgentRole` in its `@type`). Omitting `@type` can
-silently skip constraints.
+The role of each shape is derived from the schema, never from its name:
 
-For the validation-graph merge that makes incremental top-down editing work despite
-class-targeting, see [architecture.md](architecture.md).
+- **Standalone entity**: a shape with an `rdfs:label` property. It has its own
+  identity, is listed, searched and created as a top-level record.
+- **Helper/bridge node**: a shape without one. It exists only inline in its
+  parent (for example an agent-role node binding a person to a role), and the
+  editor blocks editing it on its own.
+
+See [architecture.md](architecture.md#helperbridge-shape-classification) for how
+this drives the UI.
+
+---
+
+## Class-targeted shapes need explicit `@type`
+
+Shapes select their nodes with `sh:targetClass`, so a node is validated only if
+it declares the class. The editor writes `@type` on every node it creates,
+bridge nodes included. Data loaded from elsewhere must do the same, or its
+constraints are silently skipped. The validation-graph merge that lets a record
+validate against existing related records is in
+[architecture.md](architecture.md).
+
+---
+
+## Shape constraints the editor understands
+
+Each property shape becomes one form field. The widget follows from its
+constraints, checked in this order:
+
+| Constraint | Widget |
+|---|---|
+| `sh:in` | choice list |
+| `sh:datatype rdf:langString` | text with a language tag; a repeatable list when `sh:maxCount` is absent or above 1 |
+| `sh:datatype` among `xsd:date`, `xsd:gYear`, `xsd:gYearMonth` (directly or in a datatype `sh:or`) | date with a chosen precision; `xsd:gYear` alone is a year input |
+| `sh:datatype` `xsd:decimal`, `xsd:integer` or `xsd:int` | number |
+| any other `sh:datatype` | text |
+| `sh:node` pointing at a helper shape, or `sh:nodeKind sh:BlankNode` | inline nested editor |
+| `sh:node` whose shape targets `schema:DigitalDocument` | file upload (see below) |
+| `sh:class`, or `sh:node` pointing at a standalone shape | search over existing records |
+| `sh:nodeKind sh:IRI` without a class | IRI input |
+
+Other conventions:
+
+- **Type choice.** A shape-level `sh:or` whose branches are each one
+  `sh:class` becomes a type selector on the form (for example person or
+  organization).
+- **Language tags.** The tag is kept through JSON-LD and RDF export, and
+  `sh:uniqueLang true` is enforced per language.
+- **Date precision.** A year-only or year-month value is stored as entered,
+  never promoted to a full date.
+- **Long text.** SHACL has no long-text hint, so the predicates listed in the
+  `LONG_TEXT_PREDICATES` setting get a multi-line input. Any other text field
+  gets a single line and saves the same way.
+- **Field names.** `sh:name` gives the label, English first, then untagged,
+  then any language.
+- **External identifiers.** An identifier stored as text (a VIAF or RISM ID)
+  is shown as a link when the `EXTERNAL_ID_LINKS` setting has a URL template
+  for its predicate. A text field's `sh:pattern` is checked in the form before
+  the link appears.
+
+---
+
+## Identifiers
+
+- New records are named `<DATA_BASE_URI><ShapeName>_<8 hex>`, for example
+  `…/data/Place_4f3a9d12`.
+- Helper nodes are named nodes, not blank nodes, so they survive updates:
+  `<DATA_BASE_URI><parent>_<property>_<index>`.
+- Shapes are looked up under `SCHEMA_BASE_URI`.
+- Existing IRIs are never changed. An IRI that is not `http(s)` or contains
+  characters unsafe in SPARQL is rejected before it is stored.
+
+Both base IRIs are settings; [custom-schema.md](custom-schema.md) explains them.
+
+---
+
+## Vocabularies the application relies on
+
+- **Structural:** `rdf`, `rdfs`, `owl`, `xsd`, `sh`. `rdfs:label` marks
+  standalone entities and supplies record labels.
+- **File uploads:** `schema:` (see below).
+- **Long text:** whatever the `LONG_TEXT_PREDICATES` setting lists (see above).
+- **External identifiers:** whatever the `EXTERNAL_ID_LINKS` setting maps (see
+  above).
+
+No other ontology term is read by name. Everything else comes from the schema.
 
 ---
 
 ## Controlled vocabularies and reference data
 
-Some records are reference data curators browse and select rather than author:
-
-- **Language** records target `dcterms:LinguisticSystem` and are seeded from Glottolog
-  (e.g. `glottolog:russ1263`). They are normally locked against create/update/delete via
-  `READ_ONLY_SHAPES` — they are external reference data, not editorial content.
-- **Role** and **Source Type** are typically curated as small controlled sets
-  (composer, librettist, translator; libretto, score, …), though the schema does not lock
-  them by default.
-
-Seeding sources and reset behavior are documented in the
+Some records are reference data, browsed and selected rather than authored. They
+are ordinary shapes whose records are seeded from the files in `VOCAB_PATH`.
+`READ_ONLY_SHAPES` lists the shapes whose records cannot be created, edited or
+deleted. Seeding and reset are in the
 [deployment guide](deployment.md#data-seeding).
 
 ---
 
-## Literal, language-tag, and date policies
+## Digital documents
 
-These are **principles the UI and export must honor**; the exact per-field datatype for
-any property lives in the schema.
-
-- **Literal kinds are distinguished, not flattened.** A field is one of: plain string,
-  language-tagged string (`rdf:langString`), full date, year-only date, year-month date,
-  or IRI. The editor renders and validates each accordingly.
-- **Language tags are first-class.** Where a field is `rdf:langString`, the tag is
-  entered, validated, preserved through JSON-LD and RDF export, and — where the schema
-  sets `sh:uniqueLang true` — enforced as unique per language.
-- **Date precision is preserved.** The schema permits `xsd:date`, `xsd:gYear`, and
-  `xsd:gYearMonth`. A year-only value must **not** be silently promoted to a full date;
-  the curator's chosen precision is the datum.
+Uploads need one shape targeting `schema:DigitalDocument`, under any name, linked
+by `sh:node` from each class that takes uploads. Several such links, or several
+upload shapes, are fine. The upload endpoint fills in `schema:name`,
+`schema:encodingFormat`, `schema:contentUrl`, `schema:contentSize`,
+`schema:sha256` and `schema:numberOfPages`. Without such a shape, uploads are
+off, and the cleanup script refuses to run if file nodes or stored files exist.
 
 ---
 
-## IRI policy
+## Schema metadata
 
-Every persisted resource has a stable subject IRI in the `rfdb:` (data) or `rfdbs:`
-(shape) namespace. The rules:
-
-- existing IRIs are never silently changed;
-- new IRIs follow a consistent generation policy (helper/bridge IRIs are regular named
-  nodes, not blank nodes, so they survive updates);
-- both full and prefixed IRIs are accepted on input;
-- invalid IRIs are rejected before persistence.
+- **Prefixes:** every prefix the schema and the data files use is declared with
+  `sh:declare`. The services read their CURIE map from those declarations only.
+- **Version:** `owl:versionInfo` on the schema states its release. The services
+  log it at startup and serve it on `GET /api/v1/dataexplorer/meta/schema`.
 
 ---
 
-## Intentional modeling decisions
+## The schema this repository runs
 
-These choices in `schema/schema.ttl` are deliberate and should be preserved unless there
-is an explicit migration plan — they encode semantics a reviewer might otherwise "simplify"
-away:
+The rfdb schema, at the release recorded in
+[`schema/README.md`](../schema/README.md). It reuses these vocabularies:
 
-1. **Performance → Manifestation uses two distinct properties, by evidentiary strength.**
-   `cidoc:P19_was_intended_use_of` is the *strong* claim (the manifestation was created
-   for this performance); `cidoc:P16_used_specific_object` is the *weak* claim (it was
-   merely present or used). Do not merge them — they carry different evidence and
-   different CIDOC-CRM domain/range fit.
+| Prefix | Role in the rfdb model |
+|---|---|
+| `lrmoo:` | The Work / Expression / Manifestation / Item spine and its links. |
+| `cidoc:` | Cultural-heritage relations LRMoo does not cover: subjects, custody, performance evidence. |
+| `core:` | Polifonia Core: people, roles, places, organizations, and the agent-role bridge. |
+| `source:` | Polifonia Source: a physical or documentary copy held by an institution. |
+| `mm:` | Polifonia Music Meta: the musical work type. |
+| `dcterms:` | Dates, languages, identifiers, and digital-copy contributors. |
+| `prism:` | Publication dates. |
+| `foaf:` | Donor and provenance agents, kept apart from creative agents. |
+| `schema:` | Digital-copy metadata. |
+| `skos:` | Preferred and alternate labels. |
 
-2. **Digital-copy donors use `dcterms:contributor`, not ownership or agent-role.**
-   This keeps donor/provider attribution separate from legal ownership
-   (`cidoc:P51_has_former_or_current_owner`) and from the open creative-role vocabulary
-   (`core:hasAgentRole`). CIDOC-CRM offers no simple donor shortcut short of a full
-   acquisition event, so `dcterms:contributor` is the chosen reuse point.
-
-3. **Contributors are `foaf:*`, not `core:*`.** `rfdbs:ContributorShape` constrains a
-   contributor to `foaf:Person` or `foaf:Organization` (surfaced as a type-selection
-   dropdown). This is a schema-level guardrail keeping donor/provenance identities
-   structurally separate from composers, librettists, and holding institutions.
-
----
-
-## Naming across layers
-
-Keep three naming levels distinct in code, UI, and docs — conflating them loses either
-readability or RDF precision:
-
-- **User-facing labels** — "Musical Work", "Source", "Holding Organization".
-- **SHACL shape names** — `rfdbs:MusicalWorkShape`, `rfdbs:SourceShape`.
-- **RDF classes and predicates** — `mm:MusicEntity`, `lrmoo:F2_Expression`,
-  `core:hasAgentRole`.
-
----
-
-## Model alignment policy
-
-The model is SHACL-driven. Consequently:
-
-- the active SHACL schema is the single source of truth;
-- the frontend makes no hard-coded ontology assumptions;
-- ontology-specific behavior stays isolated in schema parsing and mapping code;
-- backend validation semantics stay consistent with the extracted shape metadata.
+Its modelling decisions and their rationale are in upstream's
+[data-model.md](https://github.com/VIASystemsLab/rfdb-schema/blob/v2.2.2/docs/data-model.md),
+and its external identifiers (VIAF, RISM) in
+[external-identifiers.md](https://github.com/VIASystemsLab/rfdb-schema/blob/v2.2.2/docs/external-identifiers.md).

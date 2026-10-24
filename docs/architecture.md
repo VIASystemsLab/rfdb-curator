@@ -2,8 +2,8 @@
 
 How the pieces fit together: the schema-driven pipeline, the writer/reader service
 split, frontend responsibilities, how SHACL shapes are extracted into form and
-validation metadata, how validation and delete behave, and the storage/runtime stack. For the RDF/SHACL
-modeling itself (ontologies, shapes, prefixes) see [data-model.md](data-model.md); for
+validation metadata, how validation and delete behave, and the storage/runtime stack. For what
+the application requires of a schema see [data-model.md](data-model.md); for
 the day-to-day workflow of changing schema/data/code see [development.md](development.md).
 
 ---
@@ -16,7 +16,7 @@ hard-coded assumptions about the current entity model.
 Data flows through the stack like this:
 
 ```text
-schema/schema.ttl
+schema/rfdb_schema.ttl
     ↓
 schema extractor (rfdb-core, loaded by both services)
     ↓
@@ -63,13 +63,11 @@ service inherits the other's web stack.
 Two things about the split are worth stating explicitly:
 
 - **Both services serve the shape catalogue, and the payloads are identical.** One
-  implementation (`rfdb_core.shapes`) over one `schema.ttl`, `readOnly` flags included. This
-  was once an asymmetry — the reader omitted the flag because `READ_ONLY_SHAPES` was filed
-  as write policy — and the asymmetry was the bug: the editor needed the flag, could only
-  get it from the writer, and so could not render a sidebar during a writer outage.
-  `READ_ONLY_SHAPES` is better read as policy metadata about *which shapes are editable*,
-  which any client needs. The remaining obligation is operational: give both services the
-  same value (a single Compose YAML anchor does that).
+  implementation (`rfdb_core.shapes`) over one schema, `readOnly` flags included.
+  `READ_ONLY_SHAPES` is policy metadata about *which shapes are editable*, which any client
+  needs to render a UI, so the editor takes its sidebar from the reader and keeps it during
+  a writer outage. The obligation is operational: give both services the same value (a
+  single Compose YAML anchor does that).
 - **Only the curator waits for the store at startup.** It is about to clear and seed,
   and a connection dropped mid-wipe is unrecoverable, so it polls `health()` until the
   store answers. For the reader an unreachable store is a per-request condition (503, or
@@ -81,7 +79,7 @@ Two things about the split are worth stating explicitly:
 Together, the two services turn RDF and SHACL semantics into stable API structures the
 frontend can consume. They:
 
-- loads the active SHACL schema from `schema/schema.ttl`
+- loads the SHACL schema at `SCHEMA_PATH` (`schema/rfdb_schema.ttl` in this repository)
 - extracts all `sh:NodeShape` definitions
 - extracts field descriptors from `sh:property` blocks
 - preserves shape labels and descriptions
@@ -129,7 +127,7 @@ precisely *because* the durable, third-party-facing identifiers live in `/rdf/`.
 |---|---|---|
 | `GET` | `/rdf/data/{id}` | **Content-negotiated dereference** of an entity: `text/html`, `text/turtle`, `application/ld+json`, `application/rdf+xml`, `application/n-triples`. Describes the resource in *both* directions, so the graph is walkable from any IRI. `?_mediatype=` overrides `Accept`, `?_profile=alt` lists the representations; `Vary: Accept` is set. |
 | `GET` | `/rdf/data/{fileId}/content` | The bytes of a **published** digital copy — what `schema:contentUrl` points at |
-| `GET` | `/rdf/schema/{ShapeName}` | A SHACL shape's own definition, served from `schema.ttl`. **RDF only** — see below |
+| `GET` | `/rdf/schema/{ShapeName}` | A SHACL shape's own definition, served from the loaded schema. **RDF only** — see below |
 
 An entity's IRI *is* its URL: `https://rosfeatr.eu/rdf/data/{id}`, and production serves
 that host, so a browser pointed at any identifier in the data gets a readable page:
@@ -143,7 +141,7 @@ Three properties of that surface are load-bearing rather than cosmetic:
 - **Links on the HTML page are path-only.** A persisted IRI names `rosfeatr.eu`, but a dev
   reader answers on `localhost:8001`, so linking the IRI as-is would send a developer's
   click to the public internet. The path each link uses is *derived from the namespace*
-  (`RFDB_BASE` is `https://rosfeatr.eu/rdf/data/`, and the router is mounted at `/rdf`) —
+  (`DATA_BASE_URI` is `https://rosfeatr.eu/rdf/data/`, and the router is mounted at `/rdf`) —
   that identity is what makes these URLs cool, and deriving it keeps the links right if the
   namespace ever moves. Same re-basing the frontend does for `schema:contentUrl`.
 - **A variant URL percent-encodes its media type.** `?_mediatype=application/ld+json`
@@ -194,26 +192,22 @@ one component a read-only deployment omits.
 | `GET` | `/api/v1/dataexplorer/entities/search` | Autocomplete for linked-resource fields |
 | `GET` | `/api/v1/dataexplorer/entities/get?id=<iri>` | All triples for one entity, in the editor's JSON shape (the RDF sibling is `GET /rdf/data/{id}`) |
 | `GET` | `/api/v1/dataexplorer/graph/node` | Schema-aware graph traversal (one node + its relation edges) |
-| `GET` | `/api/v1/dataexplorer/meta/prefixes` | Curated CURIE prefix-to-namespace map (from `rfdb_core/prefixes.py`) |
+| `GET` | `/api/v1/dataexplorer/meta/schema` | The loaded schema's version (`owl:versionInfo`), plus the deployment settings clients render with: `projectName`, `dataBaseUri`, `schemaBaseUri`, `externalIdLinks` |
+| `GET` | `/api/v1/dataexplorer/meta/prefixes` | CURIE prefix-to-namespace map the schema declares (`sh:declare`) |
 | `GET` | `/api/v1/dataexplorer/meta/graphs` | Named graphs with triple/term counts and advisory config warnings |
 | `GET` | `/api/v1/dataexplorer/meta/files` | Digital-copy storage stats (staged/registered/orphans) |
 
 **Both services serve the same shape catalogue, from one implementation**
-(`rfdb_core.shapes`) over the same `schema.ttl`, `readOnly` flags included. The flags used
-to be curator-only, on the reasoning that `READ_ONLY_SHAPES` was a write concern; it is
-better read as *policy metadata saying which shapes are editable*, which any client needs
-to render a UI. That misfiling meant the editor had to fetch its shape list from the
-writer, and therefore showed an empty sidebar whenever the writer was down. It now starts,
-browses and searches with the write tier stopped. The catch is operational: both services
-must be given the same `READ_ONLY_SHAPES`, which `docker-compose.yml` guarantees with a
-single YAML anchor rather than two editable literals.
+(`rfdb_core.shapes`), `readOnly` flags included; see [Service Split](#service-split) for
+why. Both must be given the same `READ_ONLY_SHAPES`, which `docker-compose.yml`
+guarantees with a single YAML anchor rather than two editable literals.
 
 **An entity IRI always travels as `?id=`, never as a path segment** — on both services, and
 matching `/graph/node?id=`. Two reasons. A path parameter would have to be greedy (`{iri:path}`,
 because an encoded IRI's `%2F` is decoded before route matching), and a greedy parameter under
 `/entities/` silently swallows `/entities/search` and `/entities/counts` unless every literal route
-happens to be registered first — an invariant that lived in `app.py`, files away from the routes it
-governed. Second, a path-encoded IRI needs double-encoding to survive, and a bare local name fails
+happens to be registered first — an invariant that would live in `app.py`, files away from the routes
+it governs. Second, a path-encoded IRI needs double-encoding to survive, and a bare local name fails
 the unsafe-IRI guard with a 400 that reads like a data problem. A test on each service asserts no
 route uses `:path`, so the collision is impossible rather than merely guarded.
 
@@ -289,11 +283,9 @@ Vite proxy rule sends all of `/api` to
 knowledge of the curator. That is what makes it the outage-resilient surface: it keeps working
 with the write tier stopped.
 
-**`curator-frontend` (:5173)** — talks to both tiers, over one origin. The split *used* to defeat
-the dev proxy: `GET` and `DELETE /api/data/{id}` were the same path on different services, and
-Vite's proxy keys on path prefixes, so no rule could separate them. Naming the owner in the path
-removed that collision, and the dev server now routes both by prefix — the same three rules
-`proxy/Caddyfile` applies in production:
+**`curator-frontend` (:5173)** — talks to both tiers, over one origin. Vite's proxy keys on path
+prefixes, and every path names the service that owns it, so the dev server routes both tiers by
+prefix — the same three rules `proxy/Caddyfile` applies in production:
 
 | | Prefix | Dev routing |
 |---|---|---|
@@ -306,22 +298,18 @@ production, and that is the property worth protecting: **no browser-facing value
 one config runs on localhost, on a LAN IP, through an SSH tunnel, or behind a domain, and the app's
 own frontends need no `CORS_ORIGINS` entry at all.
 
-`VITE_READ_API_BASE` was absolute in dev for a long time after the collision that required it was
-gone, kept for Network-tab visibility. The bill arrived the first time the stack ran anywhere but
-`localhost`: a remote dev host served the bundle, the browser resolved every read against *its own*
-machine, and the editor reported `Failed to load shapes: Network Error`. Set a non-empty base only
-for a deployment whose reader genuinely sits on another origin — which then needs the matching
-`CORS_ORIGINS` entry on that reader.
+An absolute base such as `http://localhost:8001` breaks the stack on any other host: a remote dev
+host serves the bundle, the browser resolves every read against *its own* machine, and the editor
+reports `Failed to load shapes: Network Error`. Set a non-empty base only for a deployment whose
+reader genuinely sits on another origin — which then needs the matching `CORS_ORIGINS` entry on
+that reader.
 
 Two consequences worth knowing:
 
-- **The editor gets its shape catalogue from the reader; only `forms` stays on the writer.** This
-  was the other way round until the shape catalogue was single-sourced, and the cost showed up
-  immediately: the editor needed the `readOnly` flags to disable protected shapes, only the writer
-  produced them, so with `curator-backend` down the editor had an empty sidebar even though every
-  data read succeeded. Both services now serve the identical catalogue from one implementation, so
-  the editor starts, browses and searches through a writer outage — only *editing* needs the
-  writer, and `forms` is writer-only precisely because form fields exist to drive an editing form.
+- **The editor gets its shape catalogue from the reader; only `forms` stays on the writer.** The
+  reader serves the identical catalogue, `readOnly` flags included, so the editor starts, browses
+  and searches through a writer outage. Only *editing* needs the writer, and `forms` is
+  writer-only because form fields exist to drive an editing form.
 - **File links resolve per lifecycle state, not per configured base.** `resolveFileUrl` picks the
   base from the path the backend handed back: `/api/v1/curator/files/staged/{id}` → writer,
   `/rdf/data/{id}/content` → reader. See the digital-copy note in the API reference above.
@@ -339,9 +327,9 @@ no CORS anywhere:
 | `/explorer/*` | graphexplorer-frontend |
 | everything else | curator-frontend |
 
-That the edge config is a plain prefix table is the point of naming the owner in each path.
-Before the re-cut, `GET` and `DELETE /api/data/{id}` were the same path on two services, which
-no prefix-keyed proxy — Vite's or Caddy's — can split.
+That the edge config is a plain prefix table is the point of naming the owner in each path: a
+path served by two services and split only by method is something no prefix-keyed proxy, Vite's
+or Caddy's, can route.
 
 Because the partition is by owner, **which kind of instance this is becomes a deploy-time
 choice**: a read-only deployment omits the `/api/v1/curator/*` namespace entirely rather than
@@ -446,7 +434,7 @@ If a later payload references the Work but does not repeat the AgentRole, Person
 
 ## Delete Behavior and Orphaned Helper Nodes
 
-`DELETE /api/v1/curator/entities/{entityId}` removes the triples where the entity is the subject.
+`DELETE /api/v1/curator/entities?id=<iri>` removes the triples where the entity is the subject.
 
 This leaves a known gap: bridge/helper nodes linked only from the deleted entity can be
 left orphaned — `AgentRole` nodes are the usual example. Several approaches could close
@@ -478,14 +466,15 @@ Three read-only metadata endpoints back the Data Context Panel
 covered by `tests/dataexplorer/test_api_meta.py`.
 
 ```text
-GET /api/v1/dataexplorer/meta/prefixes   — curated CURIE prefix map
+GET /api/v1/dataexplorer/meta/schema     — the loaded schema's version, project name, base IRIs, external-ID link templates
+GET /api/v1/dataexplorer/meta/prefixes   — CURIE prefix map declared by the schema
 GET /api/v1/dataexplorer/meta/graphs     — named graphs, triple counts, config warnings
 GET /api/v1/dataexplorer/meta/files      — digital-copy storage stats
 ```
 
 ### Prefix Metadata
 
-`GET /api/v1/dataexplorer/meta/prefixes` returns the curated CURIE prefix→namespace map:
+`GET /api/v1/dataexplorer/meta/prefixes` returns the CURIE prefix→namespace map the schema declares with `sh:declare`:
 
 ```json
 {
@@ -496,16 +485,16 @@ GET /api/v1/dataexplorer/meta/files      — digital-copy storage stats
 }
 ```
 
-The map is served from the hand-maintained `rfdb_core.prefixes.PREFIXES` — the union of the
-`@prefix` declarations across the schema, vocab, data, and Glottolog Turtle files —
-**not** from the rdflib schema graph's `namespaces()`. rdflib pre-binds ~29 unrelated
-well-known vocabularies (`brick`, `dcat`, …) into every `Graph`, which would otherwise
-leak into the map; `rfdb-core/rfdb_core/prefixes.py` carries the maintenance note and a
-sanity check (`curator-backend/scripts/check_prefixes.py`, gated in CI).
+The map is read from the schema's `sh:declare` declarations when the schema loads
+(`rfdb_core.prefixes.declared_prefixes`), **not** from the rdflib schema graph's
+`namespaces()`. rdflib pre-binds ~29 unrelated well-known vocabularies (`brick`, `dcat`, …)
+into every `Graph`, which would otherwise leak into the map. The schema declares the
+prefixes of the vocab, data and Glottolog files too; `curator-backend/scripts/check_prefixes.py`
+(pre-commit and CI) fails when a `@prefix` in any schema or data TTL file is not declared.
+A prefix declared with two namespaces stops the service at startup.
 
-This endpoint resolved the prefix-map duplication gap between `utils/prefixes.js` and
-`utils/jsonld.js` on the frontend — both now hydrate from it at app startup
-(`curator-frontend/src/App.jsx`). A richer per-entry shape (merging JSON-LD context and runtime
+The editor hydrates its one prefix map (`utils/prefixes.js`, which `utils/jsonld.js` also
+uses) from this endpoint at app startup (`curator-frontend/src/App.jsx`). A richer per-entry shape (merging JSON-LD context and runtime
 config with drift `warnings`) remains a possible future enhancement — see the Data
 Context Panel enhancements in the root [`TODO.md`](../TODO.md).
 
@@ -572,8 +561,8 @@ The application runs as a small set of Docker Compose services.
 - **Oxigraph** — the RDF triple store. All instance data lives in a single named graph
   identified by `DATA_GRAPH_URI`; every SPARQL read uses `FROM <uri>` and every Turtle
   load targets `?graph=<uri>` via the Graph Store Protocol. It is the source of truth
-  for the graph data and the only stateful volume that must be backed up
-  (`oxigraph_data`).
+  for the graph data. Its volume (`oxigraph_data`) is backed up together with Garage's;
+  see [deployment.md](deployment.md#ongoing-operations-once-live).
 - **Garage** — an S3-compatible object store for digital copies (uploaded PDFs and
   similar). A digital copy is modeled as a bridge node whose fields are machine-filled:
   a file is staged first (`POST /api/v1/curator/files/staged`, previewable meanwhile at
@@ -588,7 +577,7 @@ The application runs as a small set of Docker Compose services.
   into dev Compose via `garage.toml` and the host-side `scripts/garage-init.sh`;
   production hardening lives in the deployment notes.
 
-The planned production topology puts a reverse proxy (Caddy) in front to terminate TLS and
-route `/` to the frontends and `/api` to the two backends by path, with Oxigraph and object storage kept
-internal-only. This is not yet functional — see the
-[production deployment plan](deployment.md#production-deployment).
+In production a reverse proxy (Caddy) terminates TLS and routes by path prefix to the
+frontends and the two backends, with Oxigraph and object storage kept internal-only; see
+[In production: one origin, and a mode](#in-production-one-origin-and-a-mode) and the
+[production runbook](deployment.md#production-deployment).
