@@ -100,6 +100,10 @@
 	# asset URLs against `base`, and a bundle built for `/` would request
 	# /assets/… at the domain root, hit the fallback block below, and receive the
 	# *editor's* index.html — a blank page rather than an honest 404.
+	# A bare /explorer matches neither this block nor the API blocks, so it
+	# would fall through to the editor's index.html. Send it to /explorer/.
+	redir /explorer /explorer/ 308
+
 	handle_path /explorer/* {
 		reverse_proxy graphexplorer-frontend:80
 	}
