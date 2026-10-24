@@ -11,16 +11,22 @@ thing the suite checks: a record written through the writer must be readable
 through the reader, over the same store, with no coordination between the two
 beyond that store.
 
-It lives under ``tests/curator/`` because writes drive every scenario; it is
-skipped unless both services answer ``/health``.
+It lives under ``tests/curator/`` because writes drive every scenario. It skips
+when no stack answers ``/health``, and fails when one answers but does not settle
+(see ``api_client``). It writes into the stack's data graph and does not clean up:
+run it against a dev stack whose store may be wiped afterwards.
 """
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import os
+import time
 import uuid
 from collections.abc import Iterator
+from email.message import Message
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request as UrlRequest
@@ -116,30 +122,76 @@ def _read_text(path: str) -> tuple[int, str]:
     return _request_text("GET", path, base=READ_API_BASE_URL)
 
 
+# The dev stack runs both backends with ``uvicorn --reload`` over the source
+# tree, so an edit or a branch switch restarts them. One /health answer does not
+# show the stack is settled: it is polled until it answers healthy several times
+# in a row.
+_PROBE_TRIES = 30
+_PROBE_INTERVAL_S = 1.0
+_PROBE_STABLE = 3
+_PROBE_TIMEOUT_S = 5
+
+
+def _probe_once() -> tuple[bool, bool, str]:
+    """One /health round on both services: ``(reachable, healthy, detail)``.
+
+    Reachable means both services answered at all; healthy means both report
+    their store as up.
+    """
+    answers = []
+    healthy = True
+    for name, base, key in (
+        ("curator-backend", API_BASE_URL, "oxigraph"),
+        ("dataexplorer-backend", READ_API_BASE_URL, "store"),
+    ):
+        try:
+            with urlopen(f"{base}/health", timeout=_PROBE_TIMEOUT_S) as response:
+                status, body = response.status, response.read()
+        except HTTPError as exc:
+            status, body = exc.code, b""
+        except (URLError, OSError) as exc:
+            return False, False, f"{name} at {base}: {exc}"
+        try:
+            health = json.loads(body or b"{}")
+        except ValueError:
+            health = {}
+        ok = status == 200 and health.get(key) == "up"
+        healthy = healthy and ok
+        answers.append(f"{name} {status} {key}={health.get(key)!r}")
+    return True, healthy, "; ".join(answers)
+
+
 @pytest.fixture(scope="session")
 def api_client() -> Iterator[None]:
-    """Skip the module unless BOTH services and Oxigraph are up in the stack.
+    """Skip when no stack is running; fail when one runs but does not settle.
 
-    Both, because every scenario writes through one and reads back through the
-    other. The two /health payloads differ by design: the writer reports its seed
-    report under an "oxigraph" key, the reader reports "store" and has no seed
-    report.
+    Both services, because every scenario writes through one and reads back
+    through the other. The two /health payloads differ by design: the writer
+    reports its store under "oxigraph", the reader under "store".
+
+    A first probe that reaches nothing means no stack, and the module skips. Once
+    the stack answers, it must report healthy ``_PROBE_STABLE`` times in a row
+    within ``_PROBE_TRIES`` probes; otherwise the module fails with every answer,
+    so a reloading stack can pass neither as green nor as skipped.
     """
-    try:
-        status, health = _request_json("GET", "/health")
-    except RuntimeError as exc:  # pragma: no cover - environment guard
-        pytest.skip(f"curator-backend is not available at {API_BASE_URL}: {exc}")
+    reachable, _, detail = _probe_once()
+    if not reachable:
+        pytest.skip(f"live stack not running: {detail}")
 
-    if status != 200 or health.get("oxigraph") != "up":
-        pytest.skip(f"curator-backend health check reports unhealthy service: {health}")
-
-    try:
-        read_status, read_health = _request_json("GET", "/health", base=READ_API_BASE_URL)
-    except RuntimeError as exc:  # pragma: no cover - environment guard
-        pytest.skip(f"dataexplorer-backend is not available at {READ_API_BASE_URL}: {exc}")
-
-    if read_status != 200 or read_health.get("store") != "up":
-        pytest.skip(f"dataexplorer-backend health check reports unhealthy service: {read_health}")
+    log: list[str] = []
+    streak = 0
+    for attempt in range(1, _PROBE_TRIES + 1):
+        _, healthy, detail = _probe_once()
+        log.append(f"try {attempt}: {detail}")
+        streak = streak + 1 if healthy else 0
+        if streak >= _PROBE_STABLE:
+            break
+        time.sleep(_PROBE_INTERVAL_S)
+    else:
+        pytest.fail(
+            f"stack did not answer healthy {_PROBE_STABLE} times in a row "
+            f"in {_PROBE_TRIES} tries:\n" + "\n".join(log)
+        )
 
     yield None
 
@@ -933,3 +985,127 @@ def test_contributor_appears_in_shape_scoped_list(api_client):
     status, listing = _read_json(f"/api/v1/dataexplorer/entities?{query}")
     assert status == 200
     assert any(item["id"] == entity_id for item in listing["items"])
+
+
+# ---------------------------------------------------------------------------
+# Digital copies: upload on the writer, download from the reader
+# ---------------------------------------------------------------------------
+
+STAGE_FILE = "/api/v1/curator/files/staged"
+META_FILES = "/api/v1/dataexplorer/meta/files"
+SOURCE_SHAPE = "https://rosfeatr.eu/rdf/schema/SourceShape"
+P138I_HAS_REPRESENTATION = "http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation"
+SCHEMA_ORG = "http://schema.org/"
+XSD = "http://www.w3.org/2001/XMLSchema#"
+
+
+def _make_pdf() -> bytes:
+    """A one-page PDF, unique per call so its checksum identifies this run."""
+    from pypdf import PdfWriter  # noqa: PLC0415 - only the upload test needs it
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    writer.add_metadata({"/Title": _make_suffix()})
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def _upload_pdf(name: str, data: bytes) -> tuple[int, dict]:
+    """POST one file as multipart/form-data, the way the editor's file field does."""
+    boundary = uuid.uuid4().hex
+    body = (
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="file"; filename="{name}"\r\n'
+            "Content-Type: application/pdf\r\n\r\n"
+        ).encode()
+        + data
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
+    request = UrlRequest(
+        f"{API_BASE_URL}{STAGE_FILE}",
+        data=body,
+        method="POST",
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    try:
+        with urlopen(request, timeout=20) as response:
+            return response.status, json.loads(response.read())
+    except HTTPError as exc:
+        return exc.code, json.loads(exc.read() or b"{}")
+
+
+def _get_bytes(url: str) -> tuple[int, bytes, Message]:
+    """GET a URL and return status, body and headers, without decoding.
+
+    The headers stay a ``Message``, whose lookups ignore case as HTTP does.
+    """
+    try:
+        with urlopen(UrlRequest(url), timeout=20) as response:
+            return response.status, response.read(), response.headers
+    except HTTPError as exc:
+        return exc.code, exc.read(), exc.headers
+
+
+def _digital_copy_node(staged: dict) -> dict:
+    """The inline schema:DigitalDocument node the editor sends for a staged file."""
+    return {
+        "@id": staged["id"],
+        "@type": f"{SCHEMA_ORG}DigitalDocument",
+        f"{SCHEMA_ORG}name": staged["name"],
+        f"{SCHEMA_ORG}encodingFormat": "application/pdf",
+        f"{SCHEMA_ORG}contentUrl": {"@value": staged["contentUrl"], "@type": f"{XSD}anyURI"},
+        f"{SCHEMA_ORG}contentSize": {
+            "@value": str(staged["contentSize"]),
+            "@type": f"{XSD}integer",
+        },
+        f"{SCHEMA_ORG}sha256": staged["sha256"],
+    }
+
+
+def test_uploaded_copy_is_served_by_the_reader_once_submitted(api_client):
+    """A PDF staged on the writer is published by the reader only after its Source is saved.
+
+    Covers what the unit tests fake: real multipart parsing, real S3 storage in
+    Garage, the promotion from staged to registered on submit, and the reader
+    finding the file through the store and serving the same bytes.
+    """
+    status, files = _read_json(META_FILES)
+    assert status == 200
+    if not files.get("configured"):
+        pytest.skip("file storage not configured: run scripts/garage-init.sh")
+    registered_before = files["registered"]["count"]
+
+    pdf = _make_pdf()
+    status, staged = _upload_pdf("live-suite.pdf", pdf)
+    assert status == 200, staged
+    assert staged["sha256"] == hashlib.sha256(pdf).hexdigest()
+    assert staged["contentSize"] == len(pdf)
+    file_id = staged["fileId"]
+    published_url = f"{READ_API_BASE_URL}/rdf/data/{file_id}/content"
+
+    # Staged: the writer previews it, the reader does not publish it.
+    status, preview, _ = _get_bytes(f"{API_BASE_URL}{staged['contentUrl']}")
+    assert status == 200 and preview == pdf
+    status, _, _ = _get_bytes(published_url)
+    assert status == 404
+
+    suffix = _make_suffix()
+    source = _make_source_payload(suffix, f"https://rosfeatr.eu/rdf/data/{suffix}_manifestation")
+    source[P138I_HAS_REPRESENTATION] = _digital_copy_node(staged)
+    status, body = _request_json("POST", WRITE_ENTITIES, {"shapeId": SOURCE_SHAPE, "data": source})
+    assert status == 200, body
+    assert body["success"] is True
+
+    # Submitted: the reader serves the same bytes, the staged copy is gone.
+    status, served, headers = _get_bytes(published_url)
+    assert status == 200
+    assert hashlib.sha256(served).hexdigest() == staged["sha256"]
+    assert headers.get("X-RFDB-File-State") == "registered"
+    status, _, _ = _get_bytes(f"{API_BASE_URL}{staged['contentUrl']}")
+    assert status == 404
+
+    status, files = _read_json(META_FILES)
+    assert status == 200
+    assert files["registered"]["count"] == registered_before + 1
