@@ -448,6 +448,19 @@ services:
       # node_modules (correct OS/arch binaries) always win over any
       # node_modules that may exist on the host.
       - /app/node_modules
+    healthcheck:
+      # The node:slim image has no wget or curl; node's own fetch does the probe.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5173/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
     ports:
       - "5173:5173"
 
@@ -485,6 +498,19 @@ services:
       # Anonymous volume keeps the image's node_modules over the bind-mount
       # (correct OS/arch binaries), same rationale as the curator-frontend service.
       - /app/node_modules
+    healthcheck:
+      # The node:slim image has no wget or curl; node's own fetch does the probe.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5174/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
     ports:
       # Host-facing port is 80 so the explorer is reachable at
       # http://localhost with no port suffix, matching how a browser would hit

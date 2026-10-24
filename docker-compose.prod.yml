@@ -330,6 +330,14 @@ services:
     depends_on:
       dataexplorer-backend:
         condition: service_healthy
+    healthcheck:
+      # caddy:2-alpine ships busybox wget. A 200 for / means Caddy is up and
+      # serving the built bundle's index.html.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - edge
     # No `ports:`, no bind-mounts, no anonymous node_modules volume: this image
@@ -394,6 +402,15 @@ services:
       - caddy_config:/config
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      # Caddy's admin API on localhost:2019 answers once the Caddyfile is
+      # loaded. The sites themselves sit behind the domain and HTTPS, which a
+      # probe from inside the container cannot address.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     logging: *docker_logging
     deploy:
       resources:
@@ -516,6 +533,14 @@ services:
         condition: service_healthy
       dataexplorer-backend:
         condition: service_healthy
+    healthcheck:
+      # caddy:2-alpine ships busybox wget. A 200 for / means Caddy is up and
+      # serving the built bundle's index.html.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - edge
     # No `ports:` — only `proxy` reaches this.
