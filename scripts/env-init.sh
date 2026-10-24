@@ -41,6 +41,9 @@ GARAGE_RPC_SECRET="$(openssl rand -hex 32)"          # 64 hex
 S3_ACCESS_KEY_ID="GK$(openssl rand -hex 12)"         # GK + 24 hex
 S3_SECRET_ACCESS_KEY="$(openssl rand -hex 32)"       # 64 hex
 
+# Owner-only from creation: the file holds secrets, and a chmod after the write
+# would leave it readable for a moment under the default umask.
+umask 077
 cat > .env <<EOF
 # Dev-only secrets. Gitignored. Generated $(date +%F).
 # Regenerate freely — dev data is disposable.
