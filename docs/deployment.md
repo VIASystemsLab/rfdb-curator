@@ -94,11 +94,17 @@ persisted volume. The application rotates that file itself (10 MB, five backups)
 
 Startup behavior is controlled by `RESET_DATA_ON_STARTUP`.
 
-**Clean slate (empty store)** — clears all triples from `DATA_GRAPH_URI` before seeding.
+**Clean slate (empty store)** — erases every graph in the store (`DROP ALL` plus
+`CLEAR DEFAULT`), not only `DATA_GRAPH_URI`, before seeding.
 
 ```bash
-RESET_DATA_ON_STARTUP=true docker compose up --build
+RESET_DATA_ON_STARTUP=true docker compose up -d --build
+docker compose up -d   # straight after: recreate the curator without the reset
 ```
+
+Run the second command as soon as the first is up. In dev the curator restarts on
+every code change (`uvicorn --reload`), and each restart runs the startup again: a
+container still carrying `RESET_DATA_ON_STARTUP=true` wipes the store on every save.
 
 **Preserve existing data (default)** — keeps existing triples and merges new seed data on top.
 
