@@ -1,6 +1,6 @@
 [project]
 name = "rfdb-dataexplorer-backend"
-version = "0.1.0"
+version = "0.4.0"
 description = "FastAPI read backend for RossijskijFeatrDB: queries and Linked Data publishing, never writes"
 requires-python = ">=3.11"
 

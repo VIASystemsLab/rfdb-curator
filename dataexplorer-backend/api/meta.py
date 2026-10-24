@@ -1,8 +1,10 @@
 """Meta routes: schema-level information not tied to individual shapes or entities.
 
 Currently exposes:
-  GET /api/v1/dataexplorer/meta/schema   — the loaded schema's version (owl:versionInfo)
-                                           and the base IRIs records and shapes are named under.
+  GET /api/v1/dataexplorer/meta/schema   — the loaded schema's version (owl:versionInfo),
+                                           the project name, the base IRIs records and
+                                           shapes are named under, and the external-ID
+                                           link templates.
   GET /api/v1/dataexplorer/meta/prefixes — CURIE prefix map declared by the schema (sh:declare).
   GET /api/v1/dataexplorer/meta/graphs   — active/named graphs, triple counts, config warnings.
   GET /api/v1/dataexplorer/meta/files    — digital-copy storage stats (staged/registered/orphans).

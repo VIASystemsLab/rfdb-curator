@@ -176,7 +176,7 @@ Shapes with a `sh:property` on `rdfs:label` are treated as standalone entities; 
 
 All settings are loaded from environment variables; each service fails fast if a required variable is missing or malformed. The source of truth is the `environment:` blocks in `docker-compose.yml` plus the settings models.
 
-Both services share a base (`rfdb-core/rfdb_core/config.py`: store connection, schema path, CORS, logging, S3). `curator-backend/core/config.py` extends it with the write-side surface — seeding, data reset, `READ_ONLY`, `READ_ONLY_SHAPES`, `MAX_UPLOAD_MB`. `dataexplorer-backend` adds nothing: everything a reader needs is already in the base. Because the base ignores unknown variables, one shared `.env` across both services is safe — the writer-only values are simply invisible to the reader.
+Both services share a base (`rfdb-core/rfdb_core/config.py`: store connection, schema path, base IRIs, project name, read-only shapes, long-text fields, external-ID links, CORS, logging, S3). `curator-backend/core/config.py` extends it with the write-side surface — seeding, data reset, `READ_ONLY`, `MAX_UPLOAD_MB`. `dataexplorer-backend` adds nothing: everything a reader needs is already in the base. Because the base ignores unknown variables, one shared `.env` across both services is safe — the writer-only values are simply invisible to the reader.
 
 The full environment-variable reference, data-reset modes, and seed sources (controlled vocabulary + Glottolog languages) are documented in the [development & testing deployment guide](docs/deployment.md#development--testing-deployment). The production stack is complete but not yet deployed to a host. Runbook: [docs/deployment.md](docs/deployment.md#production-deployment).
 
@@ -236,7 +236,8 @@ rfdb-curator/
 │       ├── files_state.py        # Digital-copy state snapshot (RDF vs. storage)
 │       ├── app_factory.py        # Shared CORS / access log / storage-error wiring
 │       ├── config.py             # BaseServiceSettings — the fields both services read
-│       ├── prefixes.py           # Curated CURIE map
+│       ├── prefixes.py           # CURIE map read from the schema's sh:declare
+│       ├── external_ids.py       # URL for an external identifier stored as text
 │       ├── iri.py                # IRI guard for SPARQL interpolation
 │       ├── models_data.py        # Record-list response models
 │       └── vocab.py              # Digital-copy vocabulary terms
@@ -259,7 +260,8 @@ rfdb-curator/
 │   └── pyproject.toml
 │
 ├── curator-frontend/
-│   ├── src/                      # React components, API client, JSON-LD/prefix utils
+│   ├── src/                      # React components, API client, JSON-LD/prefix utils;
+│   │                             #   src/project/ holds the Welcome guide text a fork replaces
 │   ├── Dockerfile
 │   ├── vite.config.js            # Dev server + proxy: /api/v1/curator → :8000,
 │   └── package.json               #   /api/v1/dataexplorer + /rdf → :8001
