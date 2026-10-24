@@ -186,6 +186,32 @@ The whole repository carries one version.
 - That commit carries an annotated tag, `vX.Y.Z`.
 - The bump and the tag each need the exact number confirmed first, as
   `code-style.md` requires.
+- **Tag only a commit whose CI has passed.** Push the branch first, ask the user
+  to confirm the run on GitHub is green (no `gh`), and only then create and push
+  the tag. A tag on a commit with red CI has to be moved and force-pushed, which
+  changes a published reference.
+
+## GitHub Actions and CI
+
+`.github/workflows/ci.yml` cannot be run locally, so every change to it is
+checked before it is pushed, and confirmed after.
+
+- **A ref in `uses:` must exist.** Before writing `owner/action@<ref>`, confirm
+  that exact tag or commit exists in the action's repository. Do not assume a
+  moving major tag (`@v10`) exists because a release (`v10.3.2`) does: some
+  actions, `astral-sh/setup-uv` among them, publish only full version tags.
+  Prefer a full version tag. Checking needs the network, so ask first.
+- **Check the inputs at that ref.** Read the action's `action.yml` at the new
+  tag, not at `main`. Every `with:` key the workflow passes must still exist,
+  and any changed default that matters (caching, for example) goes in the commit
+  message.
+- **Tool pins follow the lockfile.** CI pins uv to the version that writes
+  `uv.lock` locally. When the local uv changes, update all three jobs in the
+  same change, run `uv lock`, and confirm `uv lock --check` passes.
+- **Validate what can be validated.** Parse the file as YAML, and run the
+  compose `config` commands the workflow runs. Anything else waits for a real
+  run: after pushing a CI change, say that it is unverified and ask the user to
+  check the run.
 
 ## Commits
 
@@ -231,6 +257,24 @@ invocation that also covers `rfdb-core/` and `tests/`. The ruff version comes fr
 dev dependency, resolved through the workspace's single root `.venv`. The hook
 drops any stale `VIRTUAL_ENV` (`env -u`) so `uv` resolves that venv without a
 warning.
+
+### PR descriptions: changes grouped by topic
+
+This replaces `git-workflow.md`'s "one line per commit, in commit order" for this
+repository. In a PR body's **Changes** section, group the commits by topic, so
+the section reads as what the PR does rather than the order the work happened
+in. One bullet per topic, a short line saying what changed, with the commits it
+covers. Keep commit order within a topic, and keep a single-commit topic as one
+line. Follow-up fixes to work in the same PR (a CI pin corrected, a doc
+adjusted) join the topic they fix rather than standing alone.
+
+### Lockfile changes and the hooks
+
+pre-commit stashes unstaged changes while it runs, so the hooks see the
+committed `uv.lock`, not the working copy. If `uv.lock` has unstaged changes,
+`uv run --offline` resyncs to the old lock and fails when a wheel it pins is not
+in the cache. Commit a lockfile change before, or together with, any other
+commit made while it is pending, rather than leaving it unstaged.
 
 ## Waiting and polling
 
