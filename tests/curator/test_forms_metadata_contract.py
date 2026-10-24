@@ -10,21 +10,17 @@ rendering without any obvious error.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from api.shapes import router
+from rfdb_core.schema_extractor import SchemaExtractor
+
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
-BACKEND_DIR = ROOT / "curator-backend"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.shapes import router  # noqa: E402
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
 
 BASE = "https://rosfeatr.eu/rdf/schema/"
 PLACE_SHAPE = BASE + "PlaceShape"

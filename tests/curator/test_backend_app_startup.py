@@ -10,14 +10,11 @@ from __future__ import annotations
 import asyncio
 import importlib
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from rdflib import Graph
 from rdflib.plugins.parsers.notation3 import BadSyntax
-
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "curator-backend"
 
 
 def _import_backend_app(monkeypatch: pytest.MonkeyPatch, reset_data_on_startup: bool = False):
@@ -36,9 +33,6 @@ def _import_backend_app(monkeypatch: pytest.MonkeyPatch, reset_data_on_startup: 
 
     sys.modules.pop("app", None)
     sys.modules.pop("core.config", None)
-
-    if str(BACKEND_DIR) not in sys.path:
-        sys.path.insert(0, str(BACKEND_DIR))
 
     return importlib.import_module("app")
 

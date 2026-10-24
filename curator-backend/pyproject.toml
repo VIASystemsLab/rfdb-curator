@@ -45,6 +45,9 @@ dev = [
 # service is imported first wins sys.modules). Separate runs, separate
 # interpreters, no ambiguity.
 testpaths = ["../tests/curator"]
+# The service directory on sys.path, so tests import `api`, `core` and `models`
+# as the service itself does.
+pythonpath = ["."]
 filterwarnings = [
     'ignore:ConjunctiveGraph is deprecated, use Dataset instead\.:DeprecationWarning:rdflib.plugins.parsers.jsonld',
 ]

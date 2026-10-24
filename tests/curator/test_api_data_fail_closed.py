@@ -8,7 +8,6 @@ it tests backend branch semantics when related-entity merge fails.
 from __future__ import annotations
 
 import importlib
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,8 +20,6 @@ SHAPE_NS = "https://rosfeatr.eu/rdf/schema"
 
 def _load_backend_symbols() -> SimpleNamespace:
     """Load service symbols directly from curator-backend/ for unit-level tests."""
-    if str(BACKEND_DIR) not in sys.path:
-        sys.path.insert(0, str(BACKEND_DIR))
 
     from fastapi import HTTPException
 
@@ -388,8 +385,6 @@ def test_shapes_endpoint_stamps_read_only_flag() -> None:
     wiring: that this service still applies the flag, and applies it from its own
     settings rather than from a hardcoded list.
     """
-    if str(BACKEND_DIR) not in sys.path:
-        sys.path.insert(0, str(BACKEND_DIR))
 
     import importlib
 

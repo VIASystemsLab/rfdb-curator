@@ -2,22 +2,17 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 from rdflib import Graph
 
+from api.data import create_or_update_entity
+from core.shacl_validator import ShaclValidator
+from models.data import EntityData
+
 ROOT = Path(__file__).resolve().parents[2]
-BACKEND_DIR = ROOT / "curator-backend"
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
-
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.data import create_or_update_entity  # noqa: E402
-from core.shacl_validator import ShaclValidator  # noqa: E402
-from models.data import EntityData  # noqa: E402
 
 
 class _ValidationOxigraph:

@@ -8,22 +8,18 @@ CONSTRUCT of the node itself plus grouped inbound/outbound neighbor queries.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from rdflib import Graph
 
+from api.graph import relation_predicates, router
+from rfdb_core.schema_extractor import SchemaExtractor
+
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
-BACKEND_DIR = ROOT / "dataexplorer-backend"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.graph import relation_predicates, router  # noqa: E402
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
 
 DATA = "https://rosfeatr.eu/rdf/data/"
 NODE_URL = "/api/v1/dataexplorer/graph/node"

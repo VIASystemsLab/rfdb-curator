@@ -11,7 +11,6 @@ suites.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -19,15 +18,12 @@ import pytest
 from fastapi import HTTPException
 from rdflib import Graph
 
+from api.data import count_data_by_shape, get_entity, list_data
+from rfdb_core.schema_extractor import SchemaExtractor
+
 ROOT = Path(__file__).resolve().parents[2]
-BACKEND_DIR = ROOT / "dataexplorer-backend"
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.data import count_data_by_shape, get_entity, list_data  # noqa: E402
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
 
 _EXTRACTOR = SchemaExtractor(str(SCHEMA_PATH))
 PLACE_SHAPE = "https://rosfeatr.eu/rdf/schema/PlaceShape"

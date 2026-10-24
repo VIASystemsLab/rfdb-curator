@@ -9,21 +9,15 @@ execution against a live store.
 from __future__ import annotations
 
 import socket
-import sys
 import time
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from rdflib import Graph
 
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "curator-backend"
-
 
 def _load_backend_symbols() -> SimpleNamespace:
     """Load planner and Oxigraph symbols from the backend package."""
-    if str(BACKEND_DIR) not in sys.path:
-        sys.path.insert(0, str(BACKEND_DIR))
 
     from core.validation_merge import (
         _bfs_shape_edges,

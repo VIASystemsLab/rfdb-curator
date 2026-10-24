@@ -11,18 +11,11 @@ from __future__ import annotations
 
 import importlib
 import sys
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 from pydantic_settings import SettingsError
-
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "curator-backend"
-
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -24,9 +24,6 @@ ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "dataexplorer-backend"
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
 
 def _import_app(monkeypatch: pytest.MonkeyPatch):
     """Import the read app with deterministic environment values."""

@@ -15,7 +15,6 @@ removed and an orphan stays in the store.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -24,18 +23,15 @@ from fastapi import HTTPException
 from rdflib import Graph, URIRef
 from rdflib.namespace import RDF
 
+from api.data import create_or_update_entity
+from core.shacl_validator import ShaclValidator
+from core.validation_merge import _build_shape_dep_graph
+from models.data import EntityData, TripleObject
+from rfdb_core.schema_extractor import SchemaExtractor
+
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
-BACKEND_DIR = ROOT / "curator-backend"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.data import create_or_update_entity  # noqa: E402
-from core.shacl_validator import ShaclValidator  # noqa: E402
-from core.validation_merge import _build_shape_dep_graph  # noqa: E402
-from models.data import EntityData, TripleObject  # noqa: E402
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
 
 CORE = "https://w3id.org/polifonia/ontology/core/"
 DATA = "https://rosfeatr.eu/rdf/data/"

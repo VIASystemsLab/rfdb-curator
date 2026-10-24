@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import io
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -24,22 +23,18 @@ import pytest
 from fastapi import HTTPException
 from rdflib import Graph
 
-ROOT = Path(__file__).resolve().parents[2]
-BACKEND_DIR = ROOT / "dataexplorer-backend"
-_SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
-
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-import api.meta as meta_mod  # noqa: E402
-from api.files import FILE_STATE_HEADER, download_file  # noqa: E402
-from api.meta import get_file_stats  # noqa: E402
-from rfdb_core.file_storage import (  # noqa: E402
+import api.meta as meta_mod
+from api.files import FILE_STATE_HEADER, download_file
+from api.meta import get_file_stats
+from rfdb_core.file_storage import (
     InMemoryStorage,
     registered_key,
     staged_key,
 )
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
+from rfdb_core.schema_extractor import SchemaExtractor
+
+ROOT = Path(__file__).resolve().parents[2]
+_SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
 RFDB = "https://rosfeatr.eu/rdf/data/"
 P138I = "http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation"

@@ -7,22 +7,18 @@ first in rfdb_schema.ttl, so these tests run with the shapes in both orders.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from api.entities import router
+from rfdb_core.schema_extractor import SchemaExtractor
+
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
-BACKEND_DIR = ROOT / "dataexplorer-backend"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.entities import router  # noqa: E402
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
 
 SEARCH_URL = "/api/v1/dataexplorer/entities/search"
 SCHEMA_NS = "https://rosfeatr.eu/rdf/schema/"
