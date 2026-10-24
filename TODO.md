@@ -29,6 +29,20 @@ on it; where an open task builds on something already shipped, that context is n
 - [ ] Records pagination with a default page size of 20 (frontend side; pairs with cursor-based SPARQL pagination under [Backend](#backend)).
 - [ ] Real-time validation — debounced SHACL checking on blur/change via `POST /api/v1/curator/validate`.
 - [ ] UI language switch (English / Italian). The schema names shapes and fields in both languages (`sh:name`), and vocabulary concepts carry an Italian `rdfs:label` with an English `skos:altLabel`, but the backend picks English for every label (`_english_first` in [schema_extractor.py](rfdb-core/rfdb_core/schema_extractor.py), `preferred_label` in [graph.py](dataexplorer-backend/api/graph.py)). Let the user pick the language in each UI, defaulting to the browser's: the shapes and entity endpoints return every language (or take a `lang` parameter), and the frontends choose. Cover shape and field names, controlled-vocabulary labels, and entity labels.
+- [ ] **Editor: stale and racing requests.** Three fetches can show the wrong data:
+  - the record list's search (`ShapeRecordList.jsx`) fires on every keystroke, has no stale
+    guard, so an older answer can land last, and only logs errors to the console;
+  - the inspector's record fetch (`ValidationPanel.jsx`) has the same pattern;
+  - on the first render after Edit, `recordLoading` is still false, so the form briefly
+    renders the previous record (the comment in `App.jsx` marks it). Deriving the loading
+    state as "a record is selected and the loaded one is not it" closes it.
+  Fix with an ignore flag per effect (as the record fetch in `App.jsx` now has) and a short
+  debounce on the search.
+- [ ] **Editor: two small correctness fixes.** Bridge-node IRIs are minted with
+  `Math.random().toString(16)` (`AnonymousEntityEditor.jsx`), which can return fewer than 8 hex
+  digits and is not collision-safe: use `crypto.getRandomValues`, keeping the format the
+  backend's `assign_entity_id` expects. `compactIri` (`utils/prefixes.js`) returns the first
+  matching namespace instead of the longest; latent, since no namespaces nest today.
 - [ ] Warn on duplicate `owl:sameAs`: when a same-as value is entered, check whether another record already has it and warn the user (needs a backend lookup).
 - [ ] Data Context Panel enhancements on top of the shipped read-only baseline (the panel plus its metadata API — `GET /api/v1/dataexplorer/meta/prefixes`, `GET /api/v1/dataexplorer/meta/graphs` with per-graph active/empty status, `GET /api/v1/dataexplorer/meta/files`):
   - [ ] Prefixes: per-entry `source` attribution (`schema` / `jsonld-context` / `runtime`); explicit prefix-drift warnings when mappings differ across schema, JSON-LD context, and runtime; copy Turtle prefix declaration / copy namespace IRI; search by prefix or namespace substring.
@@ -50,7 +64,9 @@ on it; where an open task builds on something already shipped, that context is n
   bulk-loader / native import instead of HTTP, streaming/chunked upload, or splitting vocab from
   large reference data. Decide and get user sign-off before implementing. (The Glottolog
   vocabulary itself is wired to `rfdbs:SourceShape` `dcterms:language`;
-  this task concerns only how it is loaded, not the feature.)
+  this task concerns only how it is loaded, not the feature.) Dev stacks seed
+  `data/glottolog_language_dev_subset.ttl` instead, which hides the cost there; production
+  still loads the full file.
 
 - [ ] **REQUIRES BRAINSTORM + USER APPROVAL — separate the reference data from the records.**
   Today one Oxigraph store, on one volume, holds both the data that rarely changes (the
@@ -104,6 +120,12 @@ in this repository too.
   node's full edge list even when the client only needs a link *count*, so a cheap degree/COUNT
   (a general node-stats capability, not a bespoke route) may beat reusing `getNode` for counts.
   Profile first, then decide which — if any — are worth it. Pairs with cursor-based pagination above.
+- [ ] **DECIDE — reads when the store is down.** The reader's list, count and search routes
+  answer with empty results when Oxigraph is unreachable (now with a logged warning), while
+  fetching one entity, the graph and the meta routes answer 503. Empty keeps the sidebar
+  usable, but the editor then shows "no records", which reads as data loss. Options: 503
+  everywhere and a "store unreachable" state in both UIs, or keep empty answers and add a
+  store-health indicator (see the Data Context Panel's Phase 2 under [UI](#ui)).
 - [ ] Verify that search autocomplete also matches on alternative labels (`skos:altLabel`), not only the primary label.
 - [ ] Smarter search ranking that favours edit distance without relying on a server-side cap or limit.
 - [ ] Bulk import (Excel/CSV → RDF).
@@ -211,6 +233,18 @@ in this repository too.
   committed, but the script that cut it from `data/glottolog_language.ttl` is not, so nobody
   can rebuild it or change the language list. Decide whether to commit it (and where:
   `scripts/`, or beside the data), and whether it should run as part of updating Glottolog.
+- [ ] **Live HTTP suite: two gaps.** `tests/curator/test_backend_api_data.py` cannot tell
+  whether the stack serves the checkout under test: expose the served commit (or a source
+  hash) on `/health` in dev and have the fixture compare it. And its payloads hardcode the
+  rfdb base IRIs and shapes, so it runs only against the rfdb schema: read the base IRIs
+  from `meta/schema`, and skip the rfdb-specific scenarios on another schema.
+- [ ] **Test structure cleanup.** Store doubles have drifted: test files each write their own
+  capturing or rdflib-backed store; share one of each. The live-store probes in
+  `tests/core/test_triplestore_contract.py` and `tests/curator/test_validation_merge_planner.py`
+  only open a TCP connection, once: share one helper that checks `/health`, as the live
+  suite's fixture now does. App-import helpers are repeated in four files; a per-suite
+  fixture would do. The docstring of `tests/curator/test_seeder.py` lists only the
+  `VOCAB_PATH` cases, though the file also tests `bootstrap_store`.
 - [ ] Investigate what dominates build/deploy time (backend especially) and whether it can be sped up.
 - [ ] Set up automated release to GitHub Releases and the GitHub package registry.
 - [ ] Verify versioning and commit tagging work with GitHub Actions (automatic release from tagged commits).
