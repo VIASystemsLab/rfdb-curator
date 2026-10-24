@@ -24,8 +24,8 @@
  * --- IMPORTANT: CREATE vs UPDATE ---
  * - When editing, App fetches the full entity and passes it as the record prop to ShapeForm.
  * - ShapeForm must ensure @id is included in the form state and payload for updates.
- * - If the fetch fails, loadedRecord stays null and ShapeForm renders as a blank create
- *   form rather than an error (a known gap).
+ * - If the fetch fails, the form panel shows the error with Retry instead of the form:
+ *   a blank form there would look like the record and save as a new one.
  *
  * View details flow:
  *   1. User clicks eye (see details) button in records list.
@@ -86,6 +86,8 @@ export default function App() {
   const [recordsRefreshKey, setRecordsRefreshKey] = useState(0) // bump to re-fetch list
   const [activeView, setActiveView] = useState('form') // 'form' | 'records'
   const [recordLoading, setRecordLoading] = useState(false) // true while fetching entity data for editing
+  const [recordError, setRecordError] = useState(null) // {id, message} of a failed fetch, shown instead of the form
+  const [recordAttempt, setRecordAttempt] = useState(0) // bumped by Retry to fetch the same record again
   const [guideOpen, setGuideOpen] = useState(false) // first-time curator welcome guide (WEMI overlay)
   const [showContext, setShowContext] = useState(false) // read-only Data Context Panel in the main area
   const [toast, setToast] = useState('') // transient bottom-right confirmation (e.g. after save)
@@ -168,6 +170,16 @@ export default function App() {
       return `Failed to load shapes: ${error.message}`
     }
     return 'Failed to load shapes: unknown error.'
+  }
+
+  function getRecordLoadErrorMessage(error) {
+    const status = error?.response?.status
+    const detail = error?.response?.data?.detail
+    if (typeof detail === 'string' && detail.trim()) {
+      return `Failed to load the record (${status ?? 'error'}): ${detail}`
+    }
+    if (error?.message) return `Failed to load the record: ${error.message}`
+    return 'Failed to load the record: unknown error.'
   }
 
   function loadShapes() {
@@ -283,23 +295,37 @@ export default function App() {
   // --- Effect: when a record is selected, for editing or for viewing, fetch its full data ---
   // The result feeds ShapeForm's record prop in both cases.
   useEffect(() => {
+    setRecordError(null)
     if (!selectedRecord) {
       setLoadedRecord(null)
       setRecordLoading(false)
       return
     }
+    // Ignore a response for a record that is no longer selected, so a slow or
+    // failed earlier fetch cannot overwrite the current one or its error.
+    let ignore = false
     setRecordLoading(true)
     apiClient
       .getEntity(selectedRecord.id)
       .then((res) => {
+        if (ignore) return
         setLoadedRecord(res)
         setRecordLoading(false)
       })
-      .catch(() => {
+      .catch((error) => {
+        if (ignore) return
         setLoadedRecord(null)
+        setRecordError({ id: selectedRecord.id, message: getRecordLoadErrorMessage(error) })
         setRecordLoading(false)
       })
-  }, [selectedRecord])
+    return () => {
+      ignore = true
+    }
+  }, [selectedRecord, recordAttempt])
+
+  // Keyed by record so a previous record's error never shows for the one just picked.
+  const recordErrorMessage =
+    selectedRecord && recordError?.id === selectedRecord.id ? recordError.message : null
 
   // Helper-bridge shapes (no rdfs:label — e.g. AgentRole, DigitalCopy) are set
   // aside at the bottom of the nav and are browse-only; everything else is a
@@ -418,11 +444,30 @@ export default function App() {
                   {selectedRecord && recordLoading && (
                     <div className="form-loading">Loading record…</div>
                   )}
+                  {selectedRecord && !recordLoading && recordErrorMessage && (
+                    <div className="form-error" role="alert">
+                      <p>{recordErrorMessage}</p>
+                      <button
+                        type="button"
+                        className="form-error-retry"
+                        onClick={() => setRecordAttempt((n) => n + 1)}
+                      >
+                        Retry
+                      </button>{' '}
+                      <button
+                        type="button"
+                        className="form-error-retry"
+                        onClick={() => setSelectedRecord(null)}
+                      >
+                        New record instead
+                      </button>
+                    </div>
+                  )}
                   {/*
                     This guard has a known gap: on the first render after onEdit,
                     recordLoading is still false, so ShapeForm briefly renders with the previous loadedRecord.
                   */}
-                  {(!selectedRecord || !recordLoading) && (
+                  {(!selectedRecord || (!recordLoading && !recordErrorMessage)) && (
                     <ShapeForm
                       shape={activeShape}
                       allShapes={shapes}
