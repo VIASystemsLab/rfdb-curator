@@ -52,6 +52,20 @@ on it; where an open task builds on something already shipped, that context is n
   vocabulary itself is wired to `rfdbs:SourceShape` `dcterms:language`;
   this task concerns only how it is loaded, not the feature.)
 
+- [ ] **REQUIRES BRAINSTORM + USER APPROVAL — separate the reference data from the records.**
+  Today one Oxigraph store, on one volume, holds both the data that rarely changes (the
+  schema, the controlled vocabulary, Glottolog and any other external vocabulary such as
+  LRMoo) and the records curators edit. So wiping the records means wiping everything and
+  reloading it all: after a live-suite run, a reset (`RESET_DATA_ON_STARTUP` erases every
+  graph) or a fresh install, the reseed takes over 90 s. Goal: the reference data is loaded
+  once and kept, the records can be wiped on their own, and a schema change replaces only
+  the schema's data, never LRMoo or Glottolog. Options to study: two Oxigraph services, each
+  with its own volume (the reader would query both, and SHACL validation needs both: check
+  whether that means a federated `SERVICE` query or loading the reference data in memory);
+  or one store with each source in its own named graph, wiped one graph at a time. Decide
+  the layout, then revisit the startup-load item above, the seeder, the wipe procedure in
+  `.agent-defs/testing.md` and `meta/graphs`.
+
 - [ ] **REQUIRES BRAINSTORM — manage Julian vs Gregorian calendar dates.** Historical sources
   (especially pre-1918 Russian material) record dates in the Julian calendar, but XSD date
   datatypes carry no calendar-system information, so a value like `prism:publicationDate "1736"`
