@@ -63,6 +63,12 @@ GARAGE_RPC_SECRET=$GARAGE_RPC_SECRET
 S3_ACCESS_KEY_ID=$S3_ACCESS_KEY_ID
 S3_SECRET_ACCESS_KEY=$S3_SECRET_ACCESS_KEY
 S3_BUCKET=sources
+
+# Seed files. Dev seeds a Glottolog subset (Italian, English, German, Russian,
+# with their families and dialects) instead of the full 38 MB file, so a fresh
+# store is ready in seconds rather than about 90 s. Delete this line to seed
+# every language, as production does.
+VOCAB_PATH='["/app/data/rfdb_vocab.ttl", "/app/data/glottolog_language_dev_subset.ttl"]'
 EOF
 
 chmod 600 .env

@@ -123,6 +123,10 @@ policy: seed vocabulary on, seed test data off, preserve existing data on.
   sed -i '' 's/geo1:/geo:/g' data/glottolog_language.ttl
   ```
 
+- `data/glottolog_language_dev_subset.ttl` is a cut of `data/glottolog_language.ttl` for dev
+  stacks: Italian, English, German and Russian with their families and dialects. The dev
+  `.env` written by `scripts/env-init.sh` seeds it through `VOCAB_PATH`; production seeds
+  the full file. See [development.md](development.md#running-the-full-application).
 - `data/rfdb_data.ttl` is test-only fixture data.
 
 ---
