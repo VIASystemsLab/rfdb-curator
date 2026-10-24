@@ -506,7 +506,9 @@ export default function ShapeForm({
               numberOfPages: pages != null ? Number(pages) : null,
             }
           } catch {
-            // Skip a broken node rather than blocking the whole form load.
+            // As for nested cards: skip the copy so the rest of the form loads, but
+            // record the field, because saving now would drop the copy's link.
+            if (!failedNested.includes(field.name)) failedNested.push(field.name)
             return null
           }
         })
