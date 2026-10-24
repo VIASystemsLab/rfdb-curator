@@ -12,7 +12,13 @@ carries `uri`, `label`, and (when present) `comment` — the dropdown shows the
 comment as a secondary line to help tell similarly-named entities apart.
 """
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Query, Request
+
+from rfdb_core.sparql_text import regex_literal
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -35,7 +41,8 @@ def search_entities(
     name (e.g., `"PlaceShape"`) for convenience; anything else is a 404.  The target class is
     resolved from the shape metadata so the SPARQL query is always correct.
 
-    Text matching is case-insensitive regex over both the primary label and
+    Text matching is a case-insensitive, literal substring match (the text is
+    escaped, so `(` or `.` match themselves) over both the primary label and
     the entity URI, so users can paste a partial IRI directly into the field.
     An empty `query` string returns all entities up to `limit` (used for the
     initial dropdown population on field focus).
@@ -57,11 +64,11 @@ def search_entities(
     if not target_class:
         return []
 
-    safe_query = query.replace('"', "").replace("\\", "")
+    pattern = regex_literal(query)
     filter_clause = (
-        f'FILTER(regex(COALESCE(str(?label_raw), ""), "{safe_query}", "i") '
-        f'|| regex(str(?uri), "{safe_query}", "i"))'
-        if safe_query
+        f'FILTER(regex(COALESCE(str(?label_raw), ""), "{pattern}", "i") '
+        f'|| regex(str(?uri), "{pattern}", "i"))'
+        if query
         else ""
     )
 
@@ -87,9 +94,12 @@ def search_entities(
         LIMIT {limit}
     """
 
+    # An unreachable store degrades to no suggestions, as the list routes do,
+    # but never silently: the warning is what tells an operator why.
     try:
         rows = store.query(sparql)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Entity search for shape %s failed: %s", matched["id"], exc)
         return []
 
     return [
