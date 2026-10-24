@@ -475,7 +475,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 12
-      start_period: 10s
+      # The first start seeds the vocabulary into an empty store, which takes
+      # over 90 s; failures before start_period ends do not count, and the
+      # first healthy answer ends it early.
+      start_period: 210s
     security_opt:
       - no-new-privileges:true
     logging: *docker_logging
