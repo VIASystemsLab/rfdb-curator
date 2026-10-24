@@ -193,6 +193,14 @@ in this repository too.
 
 - [ ] **OPERATIONAL — run the file-storage cleanup periodically:** `docker compose exec curator-backend python scripts/cleanup_files.py` (add `--dry-run` to preview). Purges abandoned staged uploads (>24h), unreferenced registered files (>24h grace), and orphaned digital-copy nodes. The Data Context Panel "File storage" section shows when counts grow.
 - [x] **DONE — production digital-copy storage.** `garage` is in [docker-compose.prod.yml](docker-compose.prod.yml) on the `internal` network only (never on `edge`), with `read_only`, `no-new-privileges` and tmpfs hardening; [proxy/Caddyfile](proxy/Caddyfile) sets `request_body max_size {$RFDB_MAX_UPLOAD}` on the curator prefix, which is the only prefix that accepts uploads; the S3 wiring reaches both backends from one YAML anchor. Documented in [deployment.md](docs/deployment.md#production-deployment) (topology table + runbook). **Not yet deployed anywhere** — see the status note at that heading.
+- [ ] **FUTURE — scale the production deployment.** The curator runs one uvicorn worker
+  (`docker-compose.prod.yml`), enough for a few curators: every worker runs the startup seed,
+  so two workers load the vocabulary twice at once into an Oxigraph capped at one CPU. Before
+  adding workers: seed once with `scripts/seed.py` and set `SEED_VOCAB_ON_STARTUP=false` for
+  the web process, then raise `--workers` and the CPU and memory limits of the curator and of
+  Oxigraph together. The reader seeds nothing, so its workers can grow on their own. Past one
+  host, the single Oxigraph and Garage instances are the limit; multi-user editing (above)
+  also has to land before several curators write at once.
 - [ ] **DECIDE — the script that makes `data/glottolog_language_dev_subset.ttl`.** The file is
   committed, but the script that cut it from `data/glottolog_language.ttl` is not, so nobody
   can rebuild it or change the language list. Decide whether to commit it (and where:
