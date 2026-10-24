@@ -69,19 +69,22 @@ S3_SECRET_ACCESS_KEY="$(from_env S3_SECRET_ACCESS_KEY)"
 # Every Garage command is one exec of the distroless binary (-T: no TTY).
 g() { "${COMPOSE[@]}" exec -T garage /garage "$@"; }
 
-echo "› waiting for garage RPC…"
+printf "› waiting for garage RPC"
 tries=0
 until g status >/dev/null 2>&1; do
   tries=$((tries + 1))
+  printf "."   # one dot per attempt, so a long wait is visibly a wait
   # Bounded, and it prints why on the way out rather than only that it gave up.
   [ "$tries" -gt 60 ] && {
-    echo "✗ garage not reachable after ${tries}s. Last attempt said:"
+    echo
+    echo "✗ garage not reachable after ${tries} attempts. Last attempt said:"
     g status || true
     echo "  (is the service defined in ${COMPOSE_FILE:-docker-compose.yml} and up?)"
     exit 1
   }
   sleep 1
 done
+echo
 
 echo "› cluster layout"
 # `node id -q` prints the FULL 64-hex pubkey ("<hex>@host:port"); `layout show`
@@ -89,7 +92,10 @@ echo "› cluster layout"
 # already-applied role and skips (re-assigning + `apply --version 1` would fail
 # with "Invalid new layout version" once version 1 already exists).
 NODE_ID="$(g node id -q | cut -d@ -f1 | tr -d '\r')"
-if ! g layout show | grep -q "${NODE_ID:0:16}"; then
+# Matched against captured output, not a pipe: with pipefail, grep -q exiting
+# on the first match can kill `layout show` with SIGPIPE, which would read as
+# no match and re-run an apply that then fails.
+if ! grep -q "${NODE_ID:0:16}" <<<"$(g layout show)"; then
   g layout assign -z dc1 -c 1GB "$NODE_ID"   # -c is a balancing weight, not a quota
   g layout apply --version 1                 # first (and only) layout version is 1
 fi
