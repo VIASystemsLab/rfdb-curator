@@ -168,8 +168,8 @@ in this repository too.
   update flow in `curator-backend/api/data.py`), and cross-store operations (Oxigraph triples +
   Garage objects) are not atomic. Needed before multiple curators work simultaneously: conflict
   detection (e.g. ETag/version triple per entity) and a saga/compensation pattern for
-  file-upload + triple-write. File-id minting is already race-safe (random 8-hex suffixes,
-  never reused).
+  file-upload + triple-write. File ids are random 12-hex suffixes; nothing checks them against
+  existing ones.
 - [ ] **FUTURE — storage.** Evaluate LanceDB for digital-copy storage once basic PDF upload (Garage)
   ships in production. Idea: store PDF text + page embeddings alongside blobs to make scanned
   sources semantically searchable, not just downloadable. Kept low-risk by the

@@ -102,7 +102,7 @@ class BaseServiceSettings(BaseSettings):
 
     data_base_uri: str
     """Namespace every record this deployment mints is named under, digital-copy
-    nodes included: ``<data_base_uri>Place_ab12cd34``, and a copy's
+    nodes included: ``<data_base_uri>Place_ab12cd34ef56``, and a copy's
     ``schema:contentUrl`` is ``<data_base_uri>File_x/content``. Both services slice
     it off an IRI to recover a local id, and the reader serves the IRIs under it
     on ``/rdf/data/{local_name}``."""

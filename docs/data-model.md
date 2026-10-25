@@ -105,10 +105,11 @@ Other conventions:
 
 ## Identifiers
 
-- New records are named `<DATA_BASE_URI><ShapeName>_<8 hex>`, for example
-  `…/data/Place_4f3a9d12`.
-- Helper nodes are named nodes, not blank nodes, so they survive updates:
-  `<DATA_BASE_URI><parent>_<property>_<index>`.
+- New records are named `<DATA_BASE_URI><ShapeName>_<12 hex>`, for example
+  `…/data/Place_4f3a9d12c07e`.
+- Helper nodes are named nodes, not blank nodes, so they survive updates. The
+  editor names them the same way (`…/data/AgentRole_4f3a9d12c07e`); a blank node
+  sent through the API becomes `<DATA_BASE_URI><parent>_<property>_<index>`.
 - Shapes are looked up under `SCHEMA_BASE_URI`.
 - Existing IRIs are never changed. An IRI that is not `http(s)` or contains
   characters unsafe in SPARQL is rejected before it is stored.

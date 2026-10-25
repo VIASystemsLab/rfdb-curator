@@ -14,7 +14,7 @@
  *   standalone-entity - the nested shape has its own label; a note is shown directing the user to create it separately then reference it via search.
  *
  * Node creation:
- *   - When adding a bridge/helper entry, generate a regular node IRI (<DATA_BASE_URI><ShapeName>_<8hex>), not a blank node.
+ *   - When adding a bridge/helper entry, generate a regular node IRI (<DATA_BASE_URI><ShapeName>_<12hex>), not a blank node.
  *
  * Props:
  *   field      {object}  - Property descriptor (path, nestedShape, parentShape if nested)
@@ -44,7 +44,7 @@ export default function AnonymousEntityEditor({ field, allShapes, control }) {
 
   function addHelperEntry() {
     // A named node under DATA_BASE_URI, minted like the backend's records
-    // (e.g. https://rosfeatr.eu/rdf/data/AgentRole_a3f2b1c9). See utils/nodeIds.js.
+    // (e.g. https://rosfeatr.eu/rdf/data/AgentRole_a3f2b1c9d4e5). See utils/nodeIds.js.
     const entry = {
       '@id': mintNodeId(nestedShape?.id),
       '@type': nestedShape?.targetClass ?? '',

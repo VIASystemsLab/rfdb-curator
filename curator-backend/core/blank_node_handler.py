@@ -74,10 +74,10 @@ def assign_entity_id(data: dict, shape_id: str, data_base: str) -> dict:
     """Assign a generated IRI when `@id` is absent or a blank-node stub.
 
     The IRI is ``data_base`` (the ``DATA_BASE_URI`` setting) plus the shape name
-    and a random 8-hex-character suffix to keep it short and collision-resistant::
+    and a random 12-hex-character suffix to keep it short and collision-resistant::
 
         shape_id  = "https://rosfeatr.eu/rdf/schema/PlaceShape"
-        result    = "https://rosfeatr.eu/rdf/data/Place_4f3a9d12"
+        result    = "https://rosfeatr.eu/rdf/data/Place_4f3a9d12c07e"
 
     If the entity already carries a non-blank `@id` it is returned unchanged.
     """
@@ -87,5 +87,5 @@ def assign_entity_id(data: dict, shape_id: str, data_base: str) -> dict:
 
     short = shape_id.split("#")[-1].split("/")[-1].replace("Shape", "")
     result = dict(data)
-    result["@id"] = f"{data_base}{short}_{uuid.uuid4().hex[:8]}"
+    result["@id"] = f"{data_base}{short}_{uuid.uuid4().hex[:12]}"
     return result

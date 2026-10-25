@@ -30,7 +30,7 @@ SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "rfdb_schema.ttl"
 
 _EXTRACTOR = SchemaExtractor(str(SCHEMA_PATH))
 DATA_BASE = "https://rosfeatr.eu/rdf/data/"
-FILE_ID = "File_0123abcd"
+FILE_ID = "File_0123abcd0123"
 
 
 class _FakeStore:
@@ -91,11 +91,12 @@ def test_an_unrelated_predicate_does_not_publish_a_file() -> None:
     [
         "not-a-file-id",
         "File_XYZ",
-        "File_0123abc",  # 7 hex, one short
+        "File_0123abcd012",  # 11 hex, one short
+        "File_0123abcd",  # 8 hex, the old length
         "../etc/passwd",
         "",
         # Would close the IRI and append a second pattern if interpolated raw.
-        "File_0123abcd> . ?s ?p ?o . <x",
+        "File_0123abcd0123> . ?s ?p ?o . <x",
     ],
 )
 def test_malformed_ids_are_refused_before_reaching_the_store(bad_id: str) -> None:

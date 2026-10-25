@@ -129,7 +129,7 @@ def _drain(resp) -> bytes:
 def test_download_registered_referenced(env):
     """The normal case: a referenced file, bytes in registered/, state header set."""
     pdf = _make_pdf()
-    file_id = "File_0123abcd"
+    file_id = "File_0123abcd0123"
     _stage(env, file_id, pdf)
     env.storage.move(staged_key(file_id), registered_key(file_id))
     _link(env, file_id)
@@ -149,7 +149,7 @@ def test_download_unreferenced_staged_is_404(env):
     hand out content that was never submitted. Curators preview their own uploads
     through the writer instead.
     """
-    file_id = "File_0123abcd"
+    file_id = "File_0123abcd0123"
     _stage(env, file_id, _make_pdf())  # staged, never linked
 
     with pytest.raises(HTTPException) as exc:
@@ -159,7 +159,7 @@ def test_download_unreferenced_staged_is_404(env):
 
 def test_download_unreferenced_registered_is_404(env):
     """An orphaned registered object (entity deleted, GC pending) is also not public."""
-    file_id = "File_0123abcd"
+    file_id = "File_0123abcd0123"
     env.storage.put_pdf(registered_key(file_id), io.BytesIO(_make_pdf()))
 
     with pytest.raises(HTTPException) as exc:
@@ -177,7 +177,7 @@ def test_download_awaiting_promotion_is_served_but_flagged(env, caplog):
     waiting for someone to notice the reconciler is behind.
     """
     pdf = _make_pdf()
-    file_id = "File_0123abcd"
+    file_id = "File_0123abcd0123"
     _stage(env, file_id, pdf)
     _link(env, file_id)  # persisted, but never promoted
 
@@ -192,7 +192,7 @@ def test_download_awaiting_promotion_is_served_but_flagged(env, caplog):
 
 def test_download_referenced_with_missing_bytes_is_404(env, caplog):
     """Referenced in RDF but absent from both prefixes: genuine data loss, logged."""
-    file_id = "File_0123abcd"
+    file_id = "File_0123abcd0123"
     _link(env, file_id)  # no object staged or registered
 
     with caplog.at_level("ERROR"), pytest.raises(HTTPException) as exc:
@@ -203,7 +203,7 @@ def test_download_referenced_with_missing_bytes_is_404(env, caplog):
 
 def test_download_unknown_id_404(env):
     """Unknown or malformed file ids return 404."""
-    for bad in ("File_deadbeef", "not-a-file-id", "../etc/passwd"):
+    for bad in ("File_deadbeefdead", "not-a-file-id", "../etc/passwd"):
         with pytest.raises(HTTPException) as exc:
             download_file(bad, env.request)
         assert exc.value.status_code == 404
@@ -211,7 +211,7 @@ def test_download_unknown_id_404(env):
 
 def test_download_filename_from_rdf(env):
     """A persisted node's schema:name becomes the attachment filename."""
-    file_id = "File_0123abcd"
+    file_id = "File_0123abcd0123"
     _stage(env, file_id, _make_pdf())
     env.storage.move(staged_key(file_id), registered_key(file_id))
     _link(env, file_id)
@@ -229,7 +229,7 @@ def test_registered_file_survives_an_unreachable_store(env):
     evidence enough on its own — objects only land there via a promotion, and a
     promotion only ever follows a successful entity write.
     """
-    file_id = "File_0123abcd"
+    file_id = "File_0123abcd0123"
     pdf = _make_pdf()
     env.storage.put_pdf(registered_key(file_id), io.BytesIO(pdf))
     env.store.query = _unreachable
@@ -247,7 +247,7 @@ def test_staged_file_is_refused_when_the_store_is_unreachable(env):
     outage nobody is watching. Nothing about a ``staged/`` object says it was ever
     submitted, so the honest answer is "cannot verify", not the bytes.
     """
-    file_id = "File_0123abcd"
+    file_id = "File_0123abcd0123"
     _stage(env, file_id, _make_pdf())
     env.store.query = _unreachable
 
@@ -265,9 +265,9 @@ def test_file_stats_shape(env, monkeypatch):
     """/api/v1/dataexplorer/meta/files reports counts, bytes, and orphan indicators."""
     monkeypatch.setattr(meta_mod.settings, "s3_endpoint", "http://garage:3900")
     pdf = _make_pdf()
-    _stage(env, "File_aaaaaaaa", pdf)  # staged, unreferenced
-    env.storage.put_pdf(registered_key("File_eeeeeeee"), io.BytesIO(b"%PDF-e"))
-    _link(env, "File_eeeeeeee")
+    _stage(env, "File_aaaaaaaaaaaa", pdf)  # staged, unreferenced
+    env.storage.put_pdf(registered_key("File_eeeeeeeeeeee"), io.BytesIO(b"%PDF-e"))
+    _link(env, "File_eeeeeeeeeeee")
 
     stats = get_file_stats(env.request)
     assert stats["configured"] is True

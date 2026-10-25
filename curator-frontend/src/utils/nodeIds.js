@@ -2,8 +2,8 @@
  * IRIs for nodes the editor creates inline (bridge/helper entries such as AgentRole).
  *
  * Minted the way the backend's `assign_entity_id` mints a record's IRI:
- * `DATA_BASE_URI`, the shape's name without "Shape", `_`, and 8 random hex
- * digits, e.g. `https://rosfeatr.eu/rdf/data/AgentRole_4f3a9d12`.
+ * `DATA_BASE_URI`, the shape's name without "Shape", `_`, and 12 random hex
+ * digits, e.g. `https://rosfeatr.eu/rdf/data/AgentRole_4f3a9d12c07e`.
  *
  * The base is hydrated at app startup via `hydrateDataBaseUri()`, from
  * `GET /api/v1/dataexplorer/meta/schema`. See App.jsx for the startup fetch.
@@ -21,8 +21,8 @@ export function hydrateDataBaseUri(uri) {
   dataBaseUri = uri || null
 }
 
-function randomHex8() {
-  const bytes = crypto.getRandomValues(new Uint8Array(4))
+function randomHex12() {
+  const bytes = crypto.getRandomValues(new Uint8Array(6))
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
@@ -38,5 +38,5 @@ function randomHex8() {
 export function mintNodeId(shapeId) {
   if (!dataBaseUri) throw new Error('DATA_BASE_URI is not loaded; cannot name a new node.')
   const name = (shapeId || 'Entity').split(/[#/]/).pop().replaceAll('Shape', '')
-  return `${dataBaseUri}${name}_${randomHex8()}`
+  return `${dataBaseUri}${name}_${randomHex12()}`
 }
