@@ -25,7 +25,6 @@ export default [
         alert: "readonly",
         clearTimeout: "readonly",
         console: "readonly",
-        crypto: "readonly",
         document: "readonly",
         fetch: "readonly",
         localStorage: "readonly",

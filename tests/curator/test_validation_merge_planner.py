@@ -25,7 +25,8 @@ def _load_backend_symbols() -> SimpleNamespace:
         _build_validation_construct,
         _ShapeEdge,
         _ShapeNode,
-        bridge_link_predicates,
+        all_bridge_link_predicates,
+        bridge_links,
     )
     from rfdb_core.triplestore import OxigraphStore
 
@@ -34,7 +35,8 @@ def _load_backend_symbols() -> SimpleNamespace:
         ShapeEdge=_ShapeEdge,
         ShapeNode=_ShapeNode,
         bfs_shape_edges=_bfs_shape_edges,
-        bridge_link_predicates=bridge_link_predicates,
+        all_bridge_link_predicates=all_bridge_link_predicates,
+        bridge_links=bridge_links,
         build_shape_dep_graph=_build_shape_dep_graph,
         build_validation_construct=_build_validation_construct,
     )
@@ -365,7 +367,7 @@ def test_planner_scale_topologies_have_stable_runtime(topology: str) -> None:
     assert elapsed < 2.0
 
 
-def test_bridge_link_predicates_only_covers_inline_nested_links() -> None:
+def test_bridge_links_only_cover_inline_nested_links() -> None:
     """Only inline-edited bridge links are deletable-with-the-link.
 
     The write path deletes a bridge node when its link is rewritten, so this set
@@ -406,6 +408,9 @@ def test_bridge_link_predicates_only_covers_inline_nested_links() -> None:
     )
     dep_graph = symbols.build_shape_dep_graph(extractor)
 
-    assert symbols.bridge_link_predicates(dep_graph, "urn:shape:root") == {"urn:pred:agentrole"}
+    assert symbols.bridge_links(dep_graph, "urn:shape:root") == {
+        "urn:pred:agentrole": "urn:shape:bridge"
+    }
+    assert symbols.all_bridge_link_predicates(dep_graph) == {"urn:pred:agentrole"}
     # Unknown shape: nothing is deletable (fail safe, not fail destructive).
-    assert symbols.bridge_link_predicates(dep_graph, "urn:shape:absent") == set()
+    assert symbols.bridge_links(dep_graph, "urn:shape:absent") == {}

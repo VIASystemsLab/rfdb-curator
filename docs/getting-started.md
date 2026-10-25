@@ -50,9 +50,9 @@ parents before children:
 5. Create the Source / Item, linked to the Manifestation (one Manifestation can have
    many Sources).
 
-The editor also supports incremental cascade insertion — you can create a parent and
-inline-create its nested referenced entities in one step. A built-in "Getting started"
-overlay in the app walks through this WEMI flow the first time you open it.
+Each record is its own save, and a record can cite only records that already exist,
+hence the order. A built-in "Getting started" overlay in the app walks through this WEMI
+flow the first time you open it.
 
 ---
 

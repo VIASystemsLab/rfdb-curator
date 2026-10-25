@@ -112,7 +112,7 @@ def stage_file(request: Request, file: UploadFile) -> DigitalCopy:
 
     size, sha256, pages = derive_metadata(spool)
 
-    # Random 12-hex id (assign_entity_id idiom).
+    # Random 12-hex id, like the record IRIs core.node_ids mints.
     file_id = f"File_{uuid.uuid4().hex[:12]}"
     original_name = os.path.basename(file.filename or "") or f"{file_id}.pdf"
 

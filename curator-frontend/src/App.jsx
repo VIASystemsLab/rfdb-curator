@@ -43,7 +43,6 @@ import ShapeRecordList from './components/ShapeRecordList.jsx'
 import ValidationPanel from './components/ValidationPanel.jsx'
 import WelcomeGuide from './components/WelcomeGuide.jsx'
 import { hydratePrefixes } from './utils/prefixes.js'
-import { hydrateDataBaseUri } from './utils/nodeIds.js'
 
 // localStorage flag: once a curator dismisses the welcome guide it stays closed on reload.
 const GUIDE_SEEN_KEY = 'rfdb.guideSeen'
@@ -172,9 +171,9 @@ export default function App() {
   }
 
   // Shapes, schema info and prefixes load together, and the editor does not
-  // open without all three: new connections are minted under DATA_BASE_URI
-  // (utils/nodeIds.js), and the prefixes are the JSON-LD @context every save
-  // sends (utils/jsonld.js), without which the backend cannot expand a CURIE.
+  // open without all three: DATA_BASE_URI tells the inspector which IRIs are
+  // records, and the prefixes are the JSON-LD @context every save sends
+  // (utils/jsonld.js), without which the backend cannot expand a CURIE.
   function loadShapes() {
     setLoadingShapes(true)
     setShapesError(null)
@@ -207,7 +206,6 @@ export default function App() {
       .then(([data, info, prefixes]) => {
         hydratePrefixes(prefixes)
         setDataBaseUri(info.dataBaseUri)
-        hydrateDataBaseUri(info.dataBaseUri)
         if (info.projectName) {
           setProjectName(info.projectName)
           document.title = `${info.projectName} — Editor`

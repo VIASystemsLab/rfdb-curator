@@ -16,22 +16,49 @@ SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
 
 class _ValidationOxigraph:
-    """Oxigraph stub that validates through the real SHACL validator."""
+    """Oxigraph stub that validates through the real SHACL validator.
 
-    def __init__(self) -> None:
+    ``referenced`` is Turtle for the records a payload cites: what the validation
+    merge would fetch from a real store.
+    """
+
+    def __init__(self, referenced: str = "") -> None:
         self.loaded_turtle = ""
+        self.referenced = Graph().parse(data=referenced, format="turtle")
 
     def from_clause(self) -> str:
         """Return an empty SPARQL FROM clause for tests."""
         return ""
 
     def construct(self, _sparql: str) -> Graph:
-        """Return no existing triples for the payload under test."""
-        return Graph()
+        """Return the cited records, whatever the query."""
+        return self.referenced
+
+    def query(self, _sparql: str) -> list:
+        """No stored triples: every minted IRI is free."""
+        return []
 
     def load_turtle(self, turtle: str) -> None:
         """Capture the Turtle payload that would be written to Oxigraph."""
         self.loaded_turtle = turtle
+
+
+# The Expression a Manifestation embodies, and the Work it is part of
+# (Expression → Work via cidoc:P148i_is_component_of, child → parent).
+_STORED_EXPRESSION = """
+@prefix cidoc: <http://www.cidoc-crm.org/cidoc-crm/> .
+@prefix lrmoo: <http://iflastandards.info/ns/lrm/lrmoo/> .
+@prefix mm: <https://w3id.org/polifonia/ontology/music-meta/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rfdb: <https://rosfeatr.eu/rdf/data/> .
+
+rfdb:api_unit_expression a lrmoo:F2_Expression ;
+  rdfs:label "API Expression"@en ;
+  cidoc:P148i_is_component_of rfdb:api_unit_work .
+
+rfdb:api_unit_work a mm:MusicEntity, lrmoo:F1_Work ;
+  rdfs:label "API Work"@en .
+"""
 
 
 def _request(oxigraph: _ValidationOxigraph):
@@ -58,7 +85,6 @@ def test_api_write_accepts_place_plain_label_and_multiple_same_as() -> None:
                 "owl": "http://www.w3.org/2002/07/owl#",
                 "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
             },
-            "@id": "https://rosfeatr.eu/rdf/data/api_unit_place",
             "@type": "core:Place",
             "rdfs:label": {"@value": "API Place"},
             "owl:sameAs": [
@@ -79,7 +105,7 @@ def test_api_write_accepts_place_plain_label_and_multiple_same_as() -> None:
 
 def test_api_write_accepts_manifestation_plain_comment() -> None:
     """POST /api/v1/curator/entities accepts an untranslated manifestation comment."""
-    oxigraph = _ValidationOxigraph()
+    oxigraph = _ValidationOxigraph(_STORED_EXPRESSION)
     payload = EntityData(
         shapeId="https://rosfeatr.eu/rdf/schema/ManifestationShape",
         data={
@@ -89,21 +115,10 @@ def test_api_write_accepts_manifestation_plain_comment() -> None:
                 "mm": "https://w3id.org/polifonia/ontology/music-meta/",
                 "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
             },
-            "@id": "https://rosfeatr.eu/rdf/data/api_unit_manifestation",
             "@type": "lrmoo:F3_Manifestation",
             "rdfs:label": {"@value": "API Manifestation", "@language": "en"},
             "rdfs:comment": {"@value": "Generic API comment"},
-            "lrmoo:R4_embodies": {
-                "@id": "https://rosfeatr.eu/rdf/data/api_unit_expression",
-                "@type": "lrmoo:F2_Expression",
-                "rdfs:label": {"@value": "API Expression", "@language": "en"},
-                # Expression → Work via cidoc:P148i_is_component_of (child → parent).
-                "cidoc:P148i_is_component_of": {
-                    "@id": "https://rosfeatr.eu/rdf/data/api_unit_work",
-                    "@type": ["mm:MusicEntity", "lrmoo:F1_Work"],
-                    "rdfs:label": {"@value": "API Work", "@language": "en"},
-                },
-            },
+            "lrmoo:R4_embodies": {"@id": "https://rosfeatr.eu/rdf/data/api_unit_expression"},
         },
         originalTriples=None,
     )

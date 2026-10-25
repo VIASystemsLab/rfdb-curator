@@ -264,6 +264,9 @@ def test_first_write_can_read_shape_dep_graph_after_startup(
         def construct(self, _sparql: str):
             return Graph()
 
+        def query(self, _sparql: str) -> list:
+            return []
+
         def update(self, _sparql: str) -> None:
             raise AssertionError("update should not run in this readiness test")
 
@@ -271,7 +274,11 @@ def test_first_write_can_read_shape_dep_graph_after_startup(
             raise AssertionError("load_turtle should not run in this readiness test")
 
     def build_shape_dep_graph_stub(extractor):
-        return {"urn:shape:manifestation": SimpleNamespace(target_class_uri=None, edges=[])}
+        return {
+            "urn:shape:manifestation": SimpleNamespace(
+                target_class_uri=None, edges=[], field_predicates=set()
+            )
+        }
 
     def seed_store_stub(**_kwargs):
         return {"seedVocab": False, "seedTestData": False, "results": []}
@@ -314,7 +321,6 @@ def test_first_write_can_read_shape_dep_graph_after_startup(
     payload = entity_models.EntityData(
         shapeId="urn:shape:manifestation",
         data={
-            "@id": "https://rosfeatr.eu/rdf/data/startup_manifestation",
             "@type": "https://rosfeatr.eu/rdf/data/Manifestation",
             "https://rosfeatr.eu/rdf/data/embodies": {
                 "@id": "https://rosfeatr.eu/rdf/data/startup_expression"
@@ -329,7 +335,7 @@ def test_first_write_can_read_shape_dep_graph_after_startup(
     assert response.success is False
     assert captured["dep_graph"] is fake_app.state.shape_dep_graph
     assert captured["root_shape_id"] == "urn:shape:manifestation"
-    assert "https://rosfeatr.eu/rdf/data/startup_manifestation" in captured["seed_iris"]
+    assert response.entityId in captured["seed_iris"]
     assert "https://rosfeatr.eu/rdf/data/startup_expression" in captured["seed_iris"]
 
 

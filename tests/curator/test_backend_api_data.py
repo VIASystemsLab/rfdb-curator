@@ -23,6 +23,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import time
 import uuid
 from collections.abc import Iterator
@@ -199,243 +200,149 @@ def api_client() -> Iterator[None]:
 # ---------------------------------------------------------------------------
 # Payload factories
 #
-# These build nested JSON-LD documents mirroring the LRMoo / Polifonia
-# ontologies used by the SHACL shapes under test. Each "positive" factory
-# produces a payload that should conform to its shape; each "invalid" factory
-# starts from a valid payload and removes exactly the triple(s) needed to
-# violate one specific constraint, so the resulting negative test can be
-# traced back to a single expected cause.
+# The backend names every new record and card, so a payload never carries an
+# ``@id`` on create, and a record is cited by the IRI the save that created it
+# returned. A payload describes one record and its cards: everything it cites
+# is created first, by its own save. Each "invalid" scenario starts from a valid
+# payload and removes exactly what violates one constraint, so a negative test
+# traces back to a single expected cause.
 # ---------------------------------------------------------------------------
 
+SCHEMA = "https://rosfeatr.eu/rdf/schema/"
+SOURCE_TYPES = [
+    "https://w3id.org/polifonia/ontology/source/Source",
+    "http://iflastandards.info/ns/lrm/lrmoo/F5_Item",
+]
+CORE_TYPE = "https://w3id.org/polifonia/ontology/core/Type"
+CORE_ORGANIZATION = "https://w3id.org/polifonia/ontology/core/Organization"
+CORE_PLACE = "https://w3id.org/polifonia/ontology/core/Place"
+CORE_HAS_PLACE = "https://w3id.org/polifonia/ontology/core/hasPlace"
+CORE_HAS_TYPE = "https://w3id.org/polifonia/ontology/core/hasType"
+PRISM_PUBLICATION_DATE = "http://prismstandard.org/namespaces/basic/2.0/publicationDate"
+LRMOO_R7_EXEMPLIFIES = "http://iflastandards.info/ns/lrm/lrmoo/R7_exemplifies"
+P51_OWNER = "http://www.cidoc-crm.org/cidoc-crm/P51_has_former_or_current_owner"
 
-def _make_agent_role(person_id: str, person_label: str, role_id: str, role_label: str) -> dict:
+
+def _label(text: str) -> dict:
+    return {"@value": text, "@language": "en"}
+
+
+def _save(shape: str, data: dict, original: list[dict] | None = None) -> tuple[int, dict]:
+    payload = {"shapeId": f"{SCHEMA}{shape}", "data": data}
+    if original is not None:
+        payload["originalTriples"] = original
+    return _request_json("POST", WRITE_ENTITIES, payload)
+
+
+def _create(shape: str, data: dict) -> str:
+    """Save a new record, check it was stored, return the IRI the backend minted."""
+    assert "@id" not in data
+    status, body = _save(shape, data)
+    assert status == 200, body
+    assert body["success"] is True, body.get("validationReport")
+    return body["entityId"]
+
+
+def _delete(iri: str) -> tuple[int, dict]:
+    return _request_json("DELETE", f"{WRITE_ENTITIES}?{urlencode({'id': iri})}")
+
+
+def _card(person_id: str, role_id: str) -> dict:
+    """A new AgentRole card: no ``@id``, the backend names it."""
     return {
-        "@id": f"https://rosfeatr.eu/rdf/data/{_make_suffix()}_agentrole",
         "@type": CORE_AGENT_ROLE,
-        CORE_HAS_AGENT: {
-            "@id": person_id,
-            "@type": CORE_PERSON,
-            RDFS_LABEL: {"@value": person_label, "@language": "en"},
-        },
-        CORE_HAS_ROLE: {
-            "@id": role_id,
-            "@type": CORE_ROLE,
-            RDFS_LABEL: {"@value": role_label, "@language": "en"},
-        },
+        CORE_HAS_AGENT: {"@id": person_id},
+        CORE_HAS_ROLE: {"@id": role_id},
     }
 
 
-def _make_manifestation_payload(*, suffix: str, include_work_label: bool = True) -> dict:
-    work = {
-        "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_work",
-        "@type": [MM_MUSIC_ENTITY, LRMOO_F1_WORK],
-        CORE_HAS_AGENT_ROLE: [
-            _make_agent_role(
-                person_id=f"https://rosfeatr.eu/rdf/data/{suffix}_person",
-                person_label="Test Person",
-                role_id=f"https://rosfeatr.eu/rdf/data/{suffix}_role",
-                role_label="Test Role",
-            )
-        ],
-    }
-    if include_work_label:
-        work[RDFS_LABEL] = {"@value": "Test Work", "@language": "en"}
+def _work_data(label: str, *cards: dict) -> dict:
+    data = {"@type": [MM_MUSIC_ENTITY, LRMOO_F1_WORK], RDFS_LABEL: _label(label)}
+    if cards:
+        data[CORE_HAS_AGENT_ROLE] = list(cards)
+    return data
 
-    return {
-        "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_manifestation",
-        "@type": LRMOO_F3_MANIFESTATION,
-        RDFS_LABEL: {"@value": "Test Manifestation", "@language": "en"},
-        LRMOO_R4_EMBODIES: {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_expression",
+
+def _person_and_role(prefix: str) -> tuple[str, str]:
+    person = _create("PersonShape", {"@type": CORE_PERSON, RDFS_LABEL: _label(f"{prefix} Person")})
+    role = _create("RoleShape", {"@type": CORE_ROLE, RDFS_LABEL: _label(f"{prefix} Role")})
+    return person, role
+
+
+def _work_chain(prefix: str) -> dict[str, str]:
+    """Person, Role, a Work with one card, and an Expression of it; their IRIs."""
+    person, role = _person_and_role(prefix)
+    work = _create("MusicalWorkShape", _work_data(f"{prefix} Work", _card(person, role)))
+    expression = _create(
+        "ExpressionShape",
+        {
             "@type": LRMOO_F2_EXPRESSION,
-            RDFS_LABEL: {"@value": "Test Expression", "@language": "en"},
-            P148I_IS_COMPONENT_OF: work,
+            RDFS_LABEL: _label(f"{prefix} Expression"),
+            P148I_IS_COMPONENT_OF: {"@id": work},
         },
-    }
+    )
+    return {"person": person, "role": role, "work": work, "expression": expression}
 
 
-def _make_work_payload(suffix: str) -> dict:
+def _manifestation_data(label: str, expression_id: str) -> dict:
     return {
-        "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_work",
-        "@type": [MM_MUSIC_ENTITY, LRMOO_F1_WORK],
-        RDFS_LABEL: {"@value": "Chain Work", "@language": "en"},
-        CORE_HAS_AGENT_ROLE: [
-            _make_agent_role(
-                person_id=f"https://rosfeatr.eu/rdf/data/{suffix}_person",
-                person_label="Chain Person",
-                role_id=f"https://rosfeatr.eu/rdf/data/{suffix}_role",
-                role_label="Chain Role",
-            )
-        ],
-    }
-
-
-def _make_expression_payload(suffix: str) -> dict:
-    return {
-        "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_expression",
-        "@type": LRMOO_F2_EXPRESSION,
-        RDFS_LABEL: {"@value": "Chain Expression", "@language": "en"},
-        P148I_IS_COMPONENT_OF: {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_work",
-            "@type": [MM_MUSIC_ENTITY, LRMOO_F1_WORK],
-            RDFS_LABEL: {"@value": "Chain Work", "@language": "en"},
-            CORE_HAS_AGENT_ROLE: [
-                _make_agent_role(
-                    person_id=f"https://rosfeatr.eu/rdf/data/{suffix}_person",
-                    person_label="Chain Person",
-                    role_id=f"https://rosfeatr.eu/rdf/data/{suffix}_role",
-                    role_label="Chain Role",
-                )
-            ],
-        },
-    }
-
-
-def _make_manifestation_chain_payload(suffix: str) -> dict:
-    return {
-        "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_manifestation",
         "@type": LRMOO_F3_MANIFESTATION,
-        RDFS_LABEL: {"@value": "Chain Manifestation", "@language": "en"},
-        LRMOO_R4_EMBODIES: {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_expression",
-            "@type": LRMOO_F2_EXPRESSION,
-            RDFS_LABEL: {"@value": "Chain Expression", "@language": "en"},
-            P148I_IS_COMPONENT_OF: {
-                "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_work",
-                "@type": [MM_MUSIC_ENTITY, LRMOO_F1_WORK],
-                RDFS_LABEL: {"@value": "Chain Work", "@language": "en"},
-                CORE_HAS_AGENT_ROLE: [
-                    _make_agent_role(
-                        person_id=f"https://rosfeatr.eu/rdf/data/{suffix}_person",
-                        person_label="Chain Person",
-                        role_id=f"https://rosfeatr.eu/rdf/data/{suffix}_role",
-                        role_label="Chain Role",
-                    )
-                ],
-            },
-        },
+        RDFS_LABEL: _label(label),
+        LRMOO_R4_EMBODIES: {"@id": expression_id},
     }
 
 
-def _make_source_payload(suffix: str, manifestation_id: str) -> dict:
-    return {
-        "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_source",
-        "@type": [
-            "https://w3id.org/polifonia/ontology/source/Source",
-            "http://iflastandards.info/ns/lrm/lrmoo/F5_Item",
-        ],
-        RDFS_LABEL: {"@value": "Chain Source", "@language": "en"},
-        "http://www.w3.org/2000/01/rdf-schema#seeAlso": {
-            "@id": "https://example.org/catalog/chain"
+def _source_data(prefix: str, manifestation_id: str) -> dict:
+    """A Source with publication metadata, citing a new type, owner and place."""
+    source_type = _create("SourceTypeShape", {"@type": CORE_TYPE, RDFS_LABEL: _label("Libretto")})
+    place = _create("PlaceShape", {"@type": CORE_PLACE, RDFS_LABEL: _label(f"{prefix} City")})
+    owner = _create(
+        "HoldingOrganizationShape",
+        {
+            "@type": CORE_ORGANIZATION,
+            RDFS_LABEL: _label(f"{prefix} Library"),
+            CORE_HAS_PLACE: {"@id": place},
         },
-        "http://prismstandard.org/namespaces/basic/2.0/publicationDate": {
+    )
+    return {
+        "@type": SOURCE_TYPES,
+        RDFS_LABEL: _label(f"{prefix} Source"),
+        "http://www.w3.org/2000/01/rdf-schema#seeAlso": {"@id": "https://example.org/catalog/1"},
+        PRISM_PUBLICATION_DATE: {
             "@value": "1736",
             "@type": "http://www.w3.org/2001/XMLSchema#gYear",
         },
-        "https://w3id.org/polifonia/ontology/core/hasType": {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_type",
-            "@type": "https://w3id.org/polifonia/ontology/core/Type",
-            RDFS_LABEL: {"@value": "Libretto a Stampa", "@language": "en"},
-        },
-        "http://purl.org/dc/terms/identifier": "Shelfmark-Chain",
-        "http://www.cidoc-crm.org/cidoc-crm/P51_has_former_or_current_owner": {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_owner",
-            "@type": "https://w3id.org/polifonia/ontology/core/Organization",
-            RDFS_LABEL: {"@value": "Chain Library", "@language": "en"},
-            "https://w3id.org/polifonia/ontology/core/hasPlace": {
-                "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_place",
-                "@type": "https://w3id.org/polifonia/ontology/core/Place",
-                RDFS_LABEL: {"@value": "Chain City", "@language": "en"},
-            },
-        },
-        "http://iflastandards.info/ns/lrm/lrmoo/R7_exemplifies": {
-            "@id": manifestation_id,
-            "@type": LRMOO_F3_MANIFESTATION,
-            RDFS_LABEL: {"@value": "Chain Manifestation", "@language": "en"},
-            LRMOO_R4_EMBODIES: {
-                "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_expression",
-                "@type": LRMOO_F2_EXPRESSION,
-                RDFS_LABEL: {"@value": "Chain Expression", "@language": "en"},
-                P148I_IS_COMPONENT_OF: {
-                    "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_work",
-                    "@type": [MM_MUSIC_ENTITY, LRMOO_F1_WORK],
-                    RDFS_LABEL: {"@value": "Chain Work", "@language": "en"},
-                },
-            },
-        },
+        CORE_HAS_TYPE: {"@id": source_type},
+        "http://purl.org/dc/terms/identifier": f"Shelfmark-{prefix}",
+        P51_OWNER: {"@id": owner},
+        LRMOO_R7_EXEMPLIFIES: {"@id": manifestation_id},
     }
 
 
-def _make_manifestation_reference_only_payload(suffix: str) -> dict:
-    return {
-        "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_manifestation_ref_only",
-        "@type": LRMOO_F3_MANIFESTATION,
-        RDFS_LABEL: {"@value": "Chain Manifestation Ref Only", "@language": "en"},
-        LRMOO_R4_EMBODIES: {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_expression",
-        },
-    }
+def _triples(entity_id: str) -> list[dict]:
+    status, body = _read_json(_entity_url(entity_id))
+    assert status == 200, entity_id
+    return body["triples"]
 
 
-def _make_invalid_expression_payload(suffix: str) -> dict:
-    """Valid manifestation payload with the nested work's rdfs:label stripped.
-
-    Targets the ExpressionShape/WorkShape min-count-on-label constraint via
-    a cascade insert rooted at ManifestationShape.
-    """
-    payload = _make_manifestation_payload(suffix=suffix)
-    work = payload[LRMOO_R4_EMBODIES][P148I_IS_COMPONENT_OF]
-    work.pop(RDFS_LABEL, None)
-    return payload
-
-
-def _make_invalid_agent_role_payload(suffix: str) -> dict:
-    """Valid manifestation payload with both hasAgent and hasRole stripped
-    from the nested agent-role node.
-
-    Note: this removes two properties at once, so a failure here confirms
-    *some* AgentRoleShape constraint fired, not specifically which one. If
-    you need to verify hasAgent and hasRole are independently enforced,
-    split this into two payload factories that each remove only one.
-    """
-    payload = _make_manifestation_payload(suffix=suffix)
-    agent_role = payload[LRMOO_R4_EMBODIES][P148I_IS_COMPONENT_OF][CORE_HAS_AGENT_ROLE][0]
-    agent_role.pop(CORE_HAS_AGENT, None)
-    agent_role.pop(CORE_HAS_ROLE, None)
-    return payload
+def _objects(entity_id: str, predicate: str) -> set[str]:
+    return {t["object"] for t in _triples(entity_id) if t["predicate"] == predicate}
 
 
 def _assert_entity_has_label_and_type(entity_id: str, expected_type: str, expected_label: str):
-    status, body = _read_json(_entity_url(entity_id))
-    assert status == 200
-    triples = body["triples"]
+    triples = _triples(entity_id)
     assert any(t["predicate"] == RDFS_LABEL and t["object"] == expected_label for t in triples)
     assert any(t["predicate"] == RDF_TYPE and t["object"] == expected_type for t in triples)
     return triples
 
 
-def _collect_all_ids(node) -> set[str]:
-    """Recursively collect every @id in a nested JSON-LD structure.
+def _assert_not_stored(entity_id: str) -> None:
+    status, _ = _read_text(_entity_url(entity_id))
+    assert status == 404, f"{entity_id} was stored"
 
-    Used to verify full-cascade rollback on a rejected insert: rather than
-    hardcoding the suffix -> IRI naming scheme used by each payload factory
-    (which would silently go stale if a factory changed), this walks the
-    actual payload sent to the API and returns every IRI it touches. That
-    set is exactly "everything the backend would have had to persist for
-    this insert to fully succeed" -- and therefore exactly what must NOT
-    exist in the store after the insert is rejected.
-    """
-    ids: set[str] = set()
-    if isinstance(node, dict):
-        node_id = node.get("@id")
-        if isinstance(node_id, str) and node_id.startswith("http"):
-            ids.add(node_id)
-        for value in node.values():
-            ids |= _collect_all_ids(value)
-    elif isinstance(node, list):
-        for item in node:
-            ids |= _collect_all_ids(item)
-    return ids
+
+def _assert_minted(iri: str, name: str) -> None:
+    assert re.fullmatch(rf"https://rosfeatr\.eu/rdf/data/{name}_[0-9a-f]{{12}}", iri), iri
 
 
 # ---------------------------------------------------------------------------
@@ -444,19 +351,20 @@ def _collect_all_ids(node) -> set[str]:
 
 
 def test_positive_manifestation_insert_persists(api_client):
-    """POST /api/v1/curator/entities persists a valid manifestation with required links."""
-    suffix = _make_suffix()
-    payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ManifestationShape",
-        "data": _make_manifestation_payload(suffix=suffix),
-    }
+    """A Manifestation citing a stored Expression is validated against it and stored.
 
-    status, body = _request_json("POST", WRITE_ENTITIES, payload)
+    The payload gives only the Expression's ``@id``. For the Manifestation to
+    validate against ExpressionShape's constraints, the backend must merge the
+    Expression's stored triples into the validation graph.
+    """
+    chain = _work_chain(f"Manifestation {_make_suffix()}")
+    status, body = _save(
+        "ManifestationShape", _manifestation_data("Test Manifestation", chain["expression"])
+    )
     assert status == 200
-
     assert body["success"] is True
-    assert body["entityId"] == f"https://rosfeatr.eu/rdf/data/{suffix}_manifestation"
     assert body["validationReport"]["conforms"] is True
+    _assert_minted(body["entityId"], "Manifestation")
 
     triples = _assert_entity_has_label_and_type(
         body["entityId"], LRMOO_F3_MANIFESTATION, "Test Manifestation"
@@ -465,200 +373,34 @@ def test_positive_manifestation_insert_persists(api_client):
 
 
 def test_positive_work_insert_persists(api_client):
-    """POST /api/v1/curator/entities persists a standalone work with an agent-role relation."""
-    suffix = _make_suffix()
-    payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/MusicalWorkShape",
-        "data": {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_work",
-            "@type": [MM_MUSIC_ENTITY, LRMOO_F1_WORK],
-            RDFS_LABEL: {"@value": "Standalone Work", "@language": "en"},
-            CORE_HAS_AGENT_ROLE: [
-                _make_agent_role(
-                    person_id=f"https://rosfeatr.eu/rdf/data/{suffix}_person",
-                    person_label="Composer Person",
-                    role_id=f"https://rosfeatr.eu/rdf/data/{suffix}_role",
-                    role_label="Composer Role",
-                )
-            ],
-        },
-    }
+    """A Work and its card are stored under IRIs the backend minted."""
+    person, role = _person_and_role(f"Work {_make_suffix()}")
+    work = _create("MusicalWorkShape", _work_data("Standalone Work", _card(person, role)))
+    _assert_minted(work, "MusicalWork")
+    _assert_entity_has_label_and_type(work, LRMOO_F1_WORK, "Standalone Work")
 
-    status, body = _request_json("POST", WRITE_ENTITIES, payload)
-    assert status == 200
-    assert body["success"] is True
-
-    triples = _assert_entity_has_label_and_type(body["entityId"], LRMOO_F1_WORK, "Standalone Work")
-    assert any(t["predicate"] == CORE_HAS_AGENT_ROLE for t in triples)
-
-
-def test_positive_source_insert_persists(api_client):
-    """POST /api/v1/curator/entities persists a valid source including publication metadata."""
-    suffix = _make_suffix()
-    payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/SourceShape",
-        "data": {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_source",
-            "@type": [
-                "https://w3id.org/polifonia/ontology/source/Source",
-                "http://iflastandards.info/ns/lrm/lrmoo/F5_Item",
-            ],
-            RDFS_LABEL: {"@value": "Source Example", "@language": "en"},
-            "http://www.w3.org/2000/01/rdf-schema#seeAlso": {
-                "@id": "https://example.org/catalog/123"
-            },
-            "http://prismstandard.org/namespaces/basic/2.0/publicationDate": {
-                "@value": "1736",
-                "@type": "http://www.w3.org/2001/XMLSchema#gYear",
-            },
-            "https://w3id.org/polifonia/ontology/core/hasType": {
-                "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_type",
-                "@type": "https://w3id.org/polifonia/ontology/core/Type",
-                RDFS_LABEL: {"@value": "Libretto a Stampa", "@language": "en"},
-            },
-            "http://purl.org/dc/terms/identifier": "Shelfmark-123",
-            "http://www.cidoc-crm.org/cidoc-crm/P51_has_former_or_current_owner": {
-                "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_owner",
-                "@type": "https://w3id.org/polifonia/ontology/core/Organization",
-                RDFS_LABEL: {"@value": "Test Library", "@language": "en"},
-                "https://w3id.org/polifonia/ontology/core/hasPlace": {
-                    "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_place",
-                    "@type": "https://w3id.org/polifonia/ontology/core/Place",
-                    RDFS_LABEL: {"@value": "Test City", "@language": "en"},
-                },
-            },
-            "http://iflastandards.info/ns/lrm/lrmoo/R7_exemplifies": {
-                "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_manifestation",
-                "@type": LRMOO_F3_MANIFESTATION,
-                RDFS_LABEL: {"@value": "Source Manifestation", "@language": "en"},
-                LRMOO_R4_EMBODIES: {
-                    "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_expression",
-                    "@type": LRMOO_F2_EXPRESSION,
-                    RDFS_LABEL: {"@value": "Source Expression", "@language": "en"},
-                    P148I_IS_COMPONENT_OF: {
-                        "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_work",
-                        "@type": [MM_MUSIC_ENTITY, LRMOO_F1_WORK],
-                        RDFS_LABEL: {"@value": "Source Work", "@language": "en"},
-                    },
-                },
-            },
-        },
-    }
-
-    status, body = _request_json("POST", WRITE_ENTITIES, payload)
-    assert status == 200
-    assert body["success"] is True
-
-    triples = _assert_entity_has_label_and_type(
-        body["entityId"],
-        "https://w3id.org/polifonia/ontology/source/Source",
-        "Source Example",
-    )
-    assert any(
-        t["predicate"] == "http://prismstandard.org/namespaces/basic/2.0/publicationDate"
-        for t in triples
-    )
+    (card,) = _objects(work, CORE_HAS_AGENT_ROLE)
+    _assert_minted(card, "AgentRole")
+    assert _objects(card, CORE_HAS_AGENT) == {person}
+    assert _objects(card, CORE_HAS_ROLE) == {role}
 
 
 def test_full_stack_valid_insert_sequence(api_client):
-    """Sequential Work->Expression->Manifestation->Source inserts stay valid end-to-end."""
-    suffix = _make_suffix()
-
-    work_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/MusicalWorkShape",
-        "data": _make_work_payload(suffix),
-    }
-    work_status, work_body = _request_json("POST", WRITE_ENTITIES, work_payload)
-    assert work_status == 200
-    assert work_body["success"] is True
-    _assert_entity_has_label_and_type(work_body["entityId"], LRMOO_F1_WORK, "Chain Work")
-
-    expression_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ExpressionShape",
-        "data": _make_expression_payload(suffix),
-    }
-    expression_status, expression_body = _request_json("POST", WRITE_ENTITIES, expression_payload)
-    assert expression_status == 200
-    assert expression_body["success"] is True
+    """Work -> Expression -> Manifestation -> Source, each its own save, stay valid."""
+    prefix = f"Chain {_make_suffix()}"
+    chain = _work_chain(prefix)
+    _assert_entity_has_label_and_type(chain["work"], LRMOO_F1_WORK, f"{prefix} Work")
     _assert_entity_has_label_and_type(
-        expression_body["entityId"], LRMOO_F2_EXPRESSION, "Chain Expression"
+        chain["expression"], LRMOO_F2_EXPRESSION, f"{prefix} Expression"
     )
-
-    manifestation_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ManifestationShape",
-        "data": _make_manifestation_chain_payload(suffix),
-    }
-    manifestation_status, manifestation_body = _request_json(
-        "POST", WRITE_ENTITIES, manifestation_payload
+    manifestation = _create(
+        "ManifestationShape", _manifestation_data(f"{prefix} Manifestation", chain["expression"])
     )
-    assert manifestation_status == 200
-    assert manifestation_body["success"] is True
-    _assert_entity_has_label_and_type(
-        manifestation_body["entityId"], LRMOO_F3_MANIFESTATION, "Chain Manifestation"
-    )
+    source = _create("SourceShape", _source_data(prefix, manifestation))
 
-    source_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/SourceShape",
-        "data": _make_source_payload(suffix, manifestation_body["entityId"]),
-    }
-    source_status, source_body = _request_json("POST", WRITE_ENTITIES, source_payload)
-    assert source_status == 200
-    assert source_body["success"] is True
-
-    triples = _assert_entity_has_label_and_type(
-        source_body["entityId"],
-        "https://w3id.org/polifonia/ontology/source/Source",
-        "Chain Source",
-    )
-    assert any(
-        t["predicate"] == "http://iflastandards.info/ns/lrm/lrmoo/R7_exemplifies" for t in triples
-    )
-
-
-def test_manifestation_reference_only_insert_uses_merged_context(api_client):
-    """Reference-only manifestation insert succeeds via backend merge context fetch.
-
-    The manifestation payload here supplies only an @id for the embodied
-    expression (no inline properties). For this to validate against
-    ExpressionShape, the backend must fetch the expression's already-stored
-    triples (inserted by the two calls above) and merge them with the
-    incoming payload before running SHACL -- a stub reference can't satisfy
-    a shape's constraints on its own.
-    """
-    suffix = _make_suffix()
-
-    work_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/MusicalWorkShape",
-        "data": _make_work_payload(suffix),
-    }
-    work_status, work_body = _request_json("POST", WRITE_ENTITIES, work_payload)
-    assert work_status == 200
-    assert work_body["success"] is True
-
-    expression_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ExpressionShape",
-        "data": _make_expression_payload(suffix),
-    }
-    expression_status, expression_body = _request_json("POST", WRITE_ENTITIES, expression_payload)
-    assert expression_status == 200
-    assert expression_body["success"] is True
-
-    manifestation_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ManifestationShape",
-        "data": _make_manifestation_reference_only_payload(suffix),
-    }
-    manifestation_status, manifestation_body = _request_json(
-        "POST", WRITE_ENTITIES, manifestation_payload
-    )
-    assert manifestation_status == 200
-    assert manifestation_body["success"] is True
-
-    triples = _assert_entity_has_label_and_type(
-        manifestation_body["entityId"],
-        LRMOO_F3_MANIFESTATION,
-        "Chain Manifestation Ref Only",
-    )
-    assert any(t["predicate"] == LRMOO_R4_EMBODIES for t in triples)
+    triples = _assert_entity_has_label_and_type(source, SOURCE_TYPES[0], f"{prefix} Source")
+    assert any(t["predicate"] == LRMOO_R7_EXEMPLIFIES for t in triples)
+    assert any(t["predicate"] == PRISM_PUBLICATION_DATE for t in triples)
 
 
 # ---------------------------------------------------------------------------
@@ -666,127 +408,55 @@ def test_manifestation_reference_only_insert_uses_merged_context(api_client):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "payload_factory",
-    [
-        _make_invalid_expression_payload,
-        _make_invalid_agent_role_payload,
-    ],
-)
-def test_negative_manifestation_insert_is_rejected(api_client, payload_factory):
-    """Invalid manifestation payloads are rejected and not persisted in store.
-
-    Note: this only checks the top-level manifestation IRI. It does not
-    check whether the nested work/expression/person/role IRIs the same
-    cascade would have touched were left un-persisted -- see
-    test_negative_cascade_insert_rolls_back_every_nested_entity below for
-    that stronger, full-transaction check.
-    """
-    suffix = _make_suffix()
-    payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ManifestationShape",
-        "data": payload_factory(suffix),
-    }
-
-    status, body = _request_json("POST", WRITE_ENTITIES, payload)
+def test_negative_agent_role_card_is_rejected(api_client):
+    """A card without its person and role fails AgentRoleShape; nothing is stored."""
+    card = {"@type": CORE_AGENT_ROLE}
+    status, body = _save("MusicalWorkShape", _work_data("Work With Empty Card", card))
     assert status == 200
     assert body["success"] is False
     assert body["validationReport"]["conforms"] is False
     assert body["validationReport"]["violations"]
-
-    stored_status, _ = _read_text(_entity_url(payload["data"]["@id"]))
-    assert stored_status == 404
-
-
-def test_negative_cascade_insert_rolls_back_every_nested_entity(api_client):
-    """A validation failure anywhere in a cascade must leave no trace anywhere
-    in the cascade -- not just at the top-level focus node.
-
-    test_negative_manifestation_insert_is_rejected only checks that the
-    manifestation IRI is absent after rejection. It asserts nothing about
-    the work, expression, person, role, or agent-role nodes the same POST
-    would have created had validation passed. If the backend writes children
-    before validating the full closure, or validates node-by-node instead of
-    as a single transaction, those nodes can survive a "rejected" insert as
-    orphaned triples with no entity properly referencing them -- a
-    transactional-integrity bug this suite would otherwise never catch.
-
-    This also strengthens the violation check itself: instead of asserting
-    `violations` is merely non-empty, it confirms the report actually
-    implicates the node/property that was removed, so a spurious violation
-    caused by an unrelated bug can't masquerade as the expected rejection.
-    """
-    suffix = _make_suffix()
-    payload_data = _make_invalid_expression_payload(suffix)  # nested work is missing rdfs:label
-    all_ids = _collect_all_ids(payload_data)
-    # Sanity check on the test fixture itself: if this cascade doesn't touch
-    # at least manifestation + expression + work + person + role, the payload
-    # factory has changed shape and this test needs to be revisited.
-    assert len(all_ids) >= 5
-
-    status, body = _request_json(
-        "POST",
-        WRITE_ENTITIES,
-        {"shapeId": "https://rosfeatr.eu/rdf/schema/ManifestationShape", "data": payload_data},
-    )
-    assert status == 200
-    assert body["success"] is False
-    assert body["validationReport"]["conforms"] is False
-    assert body["validationReport"]["violations"]
-
-    # The report must implicate the actual failing node/property, not just
-    # contain *some* violation. The backend exposes violations with explicit
-    # `focusNode` and `path` keys.
-    #
-    # FUTURE / consider improving: the missing work label can be reported more
-    # than once. ExpressionShape declares cidoc:P148i_is_component_of with
-    # sh:node MusicalWorkShape, so the same work-label violation surfaces both via
-    # MusicalWorkShape's targetClass and via the Expression's sh:node traversal.
-    # `any(...)` tolerates duplicates, so this test is unaffected, but do NOT
-    # tighten it to assert an exact violation *count* without first
-    # de-duplicating by (focusNode, path).
-    violations = body["validationReport"]["violations"]
-    work_id = f"https://rosfeatr.eu/rdf/data/{suffix}_work"
-    assert any(v.get("focusNode") == work_id and v.get("path") == RDFS_LABEL for v in violations), (
-        "validation report doesn't reference the expected failing work node and rdfs:label path"
-    )
-
-    # Full-graph rollback: nothing in the cascade should have been
-    # persisted, not just the manifestation.
-    for entity_id in all_ids:
-        stored_status, _ = _read_text(_entity_url(entity_id))
-        assert stored_status == 404, (
-            f"orphaned triples found for {entity_id} after a rejected "
-            f"cascade insert -- transaction is not atomic"
-        )
+    _assert_not_stored(body["entityId"])
 
 
 def test_negative_work_insert_without_label_is_rejected(api_client):
     """Work missing required label fails SHACL validation and is not stored."""
-    suffix = _make_suffix()
-    payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/MusicalWorkShape",
-        "data": {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_work",
-            "@type": [MM_MUSIC_ENTITY, LRMOO_F1_WORK],
-            CORE_HAS_AGENT_ROLE: [
-                _make_agent_role(
-                    person_id=f"https://rosfeatr.eu/rdf/data/{suffix}_person",
-                    person_label="Composer Person",
-                    role_id=f"https://rosfeatr.eu/rdf/data/{suffix}_role",
-                    role_label="Composer Role",
-                )
-            ],
-        },
-    }
-
-    status, body = _request_json("POST", WRITE_ENTITIES, payload)
+    data = _work_data("unused")
+    del data[RDFS_LABEL]
+    status, body = _save("MusicalWorkShape", data)
     assert status == 200
     assert body["success"] is False
     assert body["validationReport"]["conforms"] is False
+    assert any(
+        v.get("focusNode") == body["entityId"] and v.get("path") == RDFS_LABEL
+        for v in body["validationReport"]["violations"]
+    )
+    _assert_not_stored(body["entityId"])
 
-    stored_status, _ = _read_text(_entity_url(payload["data"]["@id"]))
-    assert stored_status == 404
+
+def test_payload_describing_a_cited_record_is_refused(api_client):
+    """A save describes its own record only: an inline Expression is a 422.
+
+    Accepted, the Manifestation's save would write the Expression's triples
+    without validating it as an Expression in its own right.
+    """
+    suffix = _make_suffix()
+    inline_expression = f"https://rosfeatr.eu/rdf/data/inline_expression_{suffix}"
+    data = _manifestation_data("Cascade Manifestation", inline_expression)
+    data[LRMOO_R4_EMBODIES].update(
+        {"@type": LRMOO_F2_EXPRESSION, RDFS_LABEL: _label("Inline Expression")}
+    )
+    status, body = _save("ManifestationShape", data)
+    assert status == 422, body
+    _assert_not_stored(inline_expression)
+
+
+def test_create_with_an_id_is_refused(api_client):
+    """``@id`` means update: a record that does not exist is a 404."""
+    iri = f"https://rosfeatr.eu/rdf/data/chosen_by_the_client_{_make_suffix()}"
+    status, _ = _save("MusicalWorkShape", {"@id": iri, **_work_data("Chosen IRI")})
+    assert status == 404
+    _assert_not_stored(iri)
 
 
 # ---------------------------------------------------------------------------
@@ -794,40 +464,31 @@ def test_negative_work_insert_without_label_is_rejected(api_client):
 # ---------------------------------------------------------------------------
 
 
+def _created_manifestation() -> tuple[str, dict]:
+    chain = _work_chain(f"Update {_make_suffix()}")
+    data = _manifestation_data("Test Manifestation", chain["expression"])
+    return _create("ManifestationShape", data), data
+
+
 def test_failed_update_keeps_existing_entity(api_client):
     """Failed update leaves previously persisted entity triples unchanged."""
-    suffix = _make_suffix()
-    entity_id = f"https://rosfeatr.eu/rdf/data/{suffix}_manifestation"
-    valid_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ManifestationShape",
-        "data": _make_manifestation_payload(suffix=suffix),
-    }
-
-    create_status, create_body = _request_json("POST", WRITE_ENTITIES, valid_payload)
-    assert create_status == 200
-    assert create_body["success"] is True
-
-    invalid_update = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ManifestationShape",
-        "data": _make_manifestation_payload(suffix=suffix, include_work_label=False),
-        "originalTriples": [
-            {
-                "predicate": LRMOO_R4_EMBODIES,
-                "object": f"https://rosfeatr.eu/rdf/data/{suffix}_expression",
-                "objectType": "iri",
-            }
-        ],
-    }
-    invalid_update["data"].pop(RDFS_LABEL, None)
-
-    update_status, body = _request_json("POST", WRITE_ENTITIES, invalid_update)
-    assert update_status == 200
+    entity_id, data = _created_manifestation()
+    invalid = {"@id": entity_id, **data}
+    del invalid[RDFS_LABEL]
+    original = [
+        {
+            "predicate": RDFS_LABEL,
+            "object": "Test Manifestation",
+            "objectType": "literal",
+            "language": "en",
+        }
+    ]
+    status, body = _save("ManifestationShape", invalid, original)
+    assert status == 200
     assert body["success"] is False
     assert body["validationReport"]["conforms"] is False
 
-    stored_status, stored_body = _read_json(_entity_url(entity_id))
-    assert stored_status == 200
-    triples = stored_body["triples"]
+    triples = _triples(entity_id)
     assert any(
         t["predicate"] == RDFS_LABEL and t["object"] == "Test Manifestation" for t in triples
     )
@@ -836,38 +497,19 @@ def test_failed_update_keeps_existing_entity(api_client):
 
 def test_valid_update_replaces_label_without_dropping_type(api_client):
     """Valid update replaces label while preserving rdf:type and other structure."""
-    suffix = _make_suffix()
-    entity_id = f"https://rosfeatr.eu/rdf/data/{suffix}_manifestation"
-    create_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ManifestationShape",
-        "data": _make_manifestation_payload(suffix=suffix),
-    }
-
-    create_status, create_body = _request_json("POST", WRITE_ENTITIES, create_payload)
-    assert create_status == 200
-    assert create_body["success"] is True
-
-    updated_data = json.loads(json.dumps(create_payload["data"]))
-    updated_data[RDFS_LABEL] = {
-        "@value": "Test Manifestation Updated",
-        "@language": "en",
-    }
-    update_payload = {
-        "shapeId": "https://rosfeatr.eu/rdf/schema/ManifestationShape",
-        "data": updated_data,
-        "originalTriples": [
-            {
-                "predicate": RDFS_LABEL,
-                "object": "Test Manifestation",
-                "objectType": "literal",
-                "language": "en",
-            }
-        ],
-    }
-
-    update_status, update_body = _request_json("POST", WRITE_ENTITIES, update_payload)
-    assert update_status == 200
-    assert update_body["success"] is True
+    entity_id, data = _created_manifestation()
+    updated = {"@id": entity_id, **data, RDFS_LABEL: _label("Test Manifestation Updated")}
+    original = [
+        {
+            "predicate": RDFS_LABEL,
+            "object": "Test Manifestation",
+            "objectType": "literal",
+            "language": "en",
+        }
+    ]
+    status, body = _save("ManifestationShape", updated, original)
+    assert status == 200
+    assert body["success"] is True
 
     triples = _assert_entity_has_label_and_type(
         entity_id, LRMOO_F3_MANIFESTATION, "Test Manifestation Updated"
@@ -875,6 +517,85 @@ def test_valid_update_replaces_label_without_dropping_type(api_client):
     assert not any(
         t["predicate"] == RDFS_LABEL and t["object"] == "Test Manifestation" for t in triples
     )
+
+
+def test_cards_are_edited_in_place_and_new_ones_named(api_client):
+    """Changing a card's role keeps its IRI; a card added next to it gets a new one.
+
+    The client lists only the label as changed: the payload's cards replace the
+    stored ones regardless, so the edited card ends with one role, not two.
+    """
+    prefix = f"Cards {_make_suffix()}"
+    person, role = _person_and_role(prefix)
+    other_person, other_role = _person_and_role(f"{prefix} Other")
+    work = _create("MusicalWorkShape", _work_data(f"{prefix} Work", _card(person, role)))
+    (card,) = _objects(work, CORE_HAS_AGENT_ROLE)
+
+    edited = {"@id": card, **_card(person, other_role)}
+    data = {"@id": work, **_work_data(f"{prefix} Work renamed", edited, _card(other_person, role))}
+    original = [
+        {
+            "predicate": RDFS_LABEL,
+            "object": f"{prefix} Work",
+            "objectType": "literal",
+            "language": "en",
+        }
+    ]
+    status, body = _save("MusicalWorkShape", data, original)
+    assert status == 200, body
+    assert body["success"] is True, body.get("validationReport")
+
+    cards = _objects(work, CORE_HAS_AGENT_ROLE)
+    assert card in cards and len(cards) == 2
+    assert _objects(card, CORE_HAS_ROLE) == {other_role}
+    (new,) = cards - {card}
+    _assert_minted(new, "AgentRole")
+    assert _objects(new, CORE_HAS_AGENT) == {other_person}
+
+
+def test_another_records_card_is_refused(api_client):
+    """A card belongs to one record: citing another Work's card is a 409."""
+    prefix = f"Owned {_make_suffix()}"
+    person, role = _person_and_role(prefix)
+    first = _create("MusicalWorkShape", _work_data(f"{prefix} First", _card(person, role)))
+    second = _create("MusicalWorkShape", _work_data(f"{prefix} Second"))
+    (card,) = _objects(first, CORE_HAS_AGENT_ROLE)
+
+    data = {"@id": second, **_work_data(f"{prefix} Second", {"@id": card, **_card(person, role)})}
+    status, _ = _save("MusicalWorkShape", data, [])
+    assert status == 409
+    assert CORE_HAS_AGENT_ROLE not in {t["predicate"] for t in _triples(second)}
+
+
+# ---------------------------------------------------------------------------
+# Delete tests
+# ---------------------------------------------------------------------------
+
+
+def test_delete_is_refused_while_a_card_cites_the_record(api_client):
+    """A Person in a Work's card cannot be deleted; the 409 names the Work."""
+    prefix = f"Cited {_make_suffix()}"
+    person, role = _person_and_role(prefix)
+    work = _create("MusicalWorkShape", _work_data(f"{prefix} Work", _card(person, role)))
+
+    status, body = _delete(person)
+    assert status == 409, body
+    assert work in body["detail"] and f"{prefix} Work" in body["detail"]
+    _assert_entity_has_label_and_type(person, CORE_PERSON, f"{prefix} Person")
+
+
+def test_delete_removes_the_record_and_its_cards(api_client):
+    """An uncited Work goes, and its cards with it; the Person it cited stays."""
+    prefix = f"Deleted {_make_suffix()}"
+    person, role = _person_and_role(prefix)
+    work = _create("MusicalWorkShape", _work_data(f"{prefix} Work", _card(person, role)))
+    (card,) = _objects(work, CORE_HAS_AGENT_ROLE)
+
+    status, body = _delete(work)
+    assert status == 204, body
+    _assert_not_stored(work)
+    _assert_not_stored(card)
+    _assert_entity_has_label_and_type(person, CORE_PERSON, f"{prefix} Person")
 
 
 # ---------------------------------------------------------------------------
@@ -889,51 +610,26 @@ def test_valid_update_replaces_label_without_dropping_type(api_client):
 # ---------------------------------------------------------------------------
 
 
-def _make_contributor_payload(suffix: str, concrete_type: str) -> dict:
+def _make_contributor_payload(label: str, concrete_type: str) -> dict:
     return {
-        "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_contributor",
         "@type": [FOAF_AGENT, concrete_type],
-        RDFS_LABEL: {"@value": "Test Donor", "@language": "en"},
-        FOAF_NAME: {"@value": "Test Donor Full Name", "@language": "en"},
+        RDFS_LABEL: _label(label),
+        FOAF_NAME: _label(f"{label} Full Name"),
     }
 
 
 def test_positive_contributor_person_insert_persists(api_client):
     """A Contributor typed [foaf:Agent, foaf:Person] satisfies sh:or and persists."""
-    suffix = _make_suffix()
-    payload = {
-        "shapeId": CONTRIBUTOR_SHAPE,
-        "data": _make_contributor_payload(suffix, FOAF_PERSON),
-    }
-
-    status, body = _request_json("POST", WRITE_ENTITIES, payload)
-    assert status == 200
-    assert body["success"] is True, body.get("validationReport")
-
-    entity_id = payload["data"]["@id"]
-    stored_status, stored_body = _read_json(_entity_url(entity_id))
-    assert stored_status == 200
-    types = {t["object"] for t in stored_body["triples"] if t["predicate"] == RDF_TYPE}
-    assert types == {FOAF_AGENT, FOAF_PERSON}
+    entity_id = _create("ContributorShape", _make_contributor_payload("Test Donor", FOAF_PERSON))
+    assert _objects(entity_id, RDF_TYPE) == {FOAF_AGENT, FOAF_PERSON}
 
 
 def test_positive_contributor_organization_insert_persists(api_client):
     """A Contributor typed [foaf:Agent, foaf:Organization] also satisfies sh:or."""
-    suffix = _make_suffix()
-    payload = {
-        "shapeId": CONTRIBUTOR_SHAPE,
-        "data": _make_contributor_payload(suffix, FOAF_ORGANIZATION),
-    }
-
-    status, body = _request_json("POST", WRITE_ENTITIES, payload)
-    assert status == 200
-    assert body["success"] is True, body.get("validationReport")
-
-    entity_id = payload["data"]["@id"]
-    stored_status, stored_body = _read_json(_entity_url(entity_id))
-    assert stored_status == 200
-    types = {t["object"] for t in stored_body["triples"] if t["predicate"] == RDF_TYPE}
-    assert types == {FOAF_AGENT, FOAF_ORGANIZATION}
+    entity_id = _create(
+        "ContributorShape", _make_contributor_payload("Test Donor", FOAF_ORGANIZATION)
+    )
+    assert _objects(entity_id, RDF_TYPE) == {FOAF_AGENT, FOAF_ORGANIZATION}
 
 
 def test_negative_contributor_missing_concrete_type_is_rejected(api_client):
@@ -942,24 +638,13 @@ def test_negative_contributor_missing_concrete_type_is_rejected(api_client):
     This is the payload a client sends when it emits `@type = shape.targetClass`
     alone, which is what the typeOptions selector exists to prevent.
     """
-    suffix = _make_suffix()
-    payload = {
-        "shapeId": CONTRIBUTOR_SHAPE,
-        "data": {
-            "@id": f"https://rosfeatr.eu/rdf/data/{suffix}_contributor",
-            "@type": FOAF_AGENT,
-            RDFS_LABEL: {"@value": "Test Donor", "@language": "en"},
-            FOAF_NAME: {"@value": "Test Donor Full Name", "@language": "en"},
-        },
-    }
-
-    status, body = _request_json("POST", WRITE_ENTITIES, payload)
+    data = _make_contributor_payload("Test Donor", FOAF_PERSON)
+    data["@type"] = FOAF_AGENT
+    status, body = _save("ContributorShape", data)
     assert status == 200
     assert body["success"] is False
     assert body["validationReport"]["conforms"] is False
-
-    stored_status, _ = _read_text(_entity_url(payload["data"]["@id"]))
-    assert stored_status == 404
+    _assert_not_stored(body["entityId"])
 
 
 def test_contributor_appears_in_shape_scoped_list(api_client):
@@ -972,15 +657,9 @@ def test_contributor_appears_in_shape_scoped_list(api_client):
     the entity from every shape-scoped listing.
     """
     suffix = _make_suffix()
-    payload = {
-        "shapeId": CONTRIBUTOR_SHAPE,
-        "data": _make_contributor_payload(suffix, FOAF_PERSON),
-    }
-    status, body = _request_json("POST", WRITE_ENTITIES, payload)
-    assert status == 200
-    assert body["success"] is True
-
-    entity_id = payload["data"]["@id"]
+    entity_id = _create(
+        "ContributorShape", _make_contributor_payload(f"Donor {suffix}", FOAF_PERSON)
+    )
     query = urlencode({"shapeId": CONTRIBUTOR_SHAPE, "q": suffix})
     status, listing = _read_json(f"/api/v1/dataexplorer/entities?{query}")
     assert status == 200
@@ -1091,8 +770,12 @@ def test_uploaded_copy_is_served_by_the_reader_once_submitted(api_client):
     status, _, _ = _get_bytes(published_url)
     assert status == 404
 
-    suffix = _make_suffix()
-    source = _make_source_payload(suffix, f"https://rosfeatr.eu/rdf/data/{suffix}_manifestation")
+    prefix = f"Upload {_make_suffix()}"
+    chain = _work_chain(prefix)
+    manifestation = _create(
+        "ManifestationShape", _manifestation_data(f"{prefix} Manifestation", chain["expression"])
+    )
+    source = _source_data(prefix, manifestation)
     source[P138I_HAS_REPRESENTATION] = _digital_copy_node(staged)
     status, body = _request_json("POST", WRITE_ENTITIES, {"shapeId": SOURCE_SHAPE, "data": source})
     assert status == 200, body

@@ -15,8 +15,8 @@
  *   - `number`           → `{"@value": "42", "@type": "xsd:decimal"}`
  *   - `uri`              → `{"@id": "https://..."}`
  *   - `entity-search`    → `{"@id": "rfdb:Place_abc"}` (from AsyncSelect option)
- *   - `nested`           → inline node whose `@id` is an IRI under DATA_BASE_URI
- *                          minted by the frontend (utils/nodeIds.js, AgentRole pattern)
+ *   - `nested`           → inline node (AgentRole pattern): an existing one keeps its
+ *                          `@id`, a new one has none and the backend names it
  *   - `file-list`        → inline schema:DigitalDocument nodes (FileField entries)
  *   - `text` / other     → plain string
  *
@@ -143,7 +143,8 @@ function toTypedLiteral(field, value) {
 /**
  * Collapse an AnonymousEntityEditor entry (which may carry react-hook-form
  * internal keys like `id` and `label`) into a clean JSON-LD node.
- * Blank `@id` values are left for `skolemize()` on the backend to resolve.
+ * An entry without `@id` is a new node: it is sent as a blank node and the
+ * backend names it.
  */
 function toNestedNode(entry) {
   if (!entry || typeof entry !== 'object') return undefined

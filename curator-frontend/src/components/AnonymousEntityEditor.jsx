@@ -14,7 +14,8 @@
  *   standalone-entity - the nested shape has its own label; a note is shown directing the user to create it separately then reference it via search.
  *
  * Node creation:
- *   - When adding a bridge/helper entry, generate a regular node IRI (<DATA_BASE_URI><ShapeName>_<12hex>), not a blank node.
+ *   - A new bridge/helper entry has no @id: it is sent as a blank node and the backend names it
+ *     (<DATA_BASE_URI><ShapeName>_<12hex>). Entries loaded from the store keep their IRI.
  *
  * Props:
  *   field      {object}  - Property descriptor (path, nestedShape, parentShape if nested)
@@ -23,7 +24,6 @@
  */
 import { useFieldArray } from 'react-hook-form'
 import EntitySearch from './EntitySearch.jsx'
-import { mintNodeId } from '../utils/nodeIds.js'
 import './AnonymousEntityEditor.css'
 
 function getNestedShape(field, allShapes) {
@@ -43,13 +43,8 @@ export default function AnonymousEntityEditor({ field, allShapes, control }) {
   const isHelperBridge = nestedShape?.shapeRole === 'helper-bridge'
 
   function addHelperEntry() {
-    // A named node under DATA_BASE_URI, minted like the backend's records
-    // (e.g. https://rosfeatr.eu/rdf/data/AgentRole_a3f2b1c9d4e5). See utils/nodeIds.js.
-    const entry = {
-      '@id': mintNodeId(nestedShape?.id),
-      '@type': nestedShape?.targetClass ?? '',
-    }
-    append(entry)
+    // No @id: the backend names a new entry when the record is saved.
+    append({ '@type': nestedShape?.targetClass ?? '' })
   }
 
   return (
