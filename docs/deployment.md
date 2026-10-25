@@ -67,6 +67,7 @@ an empty store or fail to find what the writer minted.
 | `S3_ENDPOINT` | both | No | Object-storage endpoint for digital copies. Empty disables it: `GET /api/v1/dataexplorer/meta/files` then reports `configured: false` instead of erroring. |
 | `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | both | No | Object-storage credentials. The writer stages and promotes objects; the reader streams them out. |
 | `LOG_FILE`, `LOG_LEVEL`, `TRUNCATE_LOG_ON_STARTUP`, `TRUNCATE_LOG_ON_FRESH_CONTAINER_START` | both | Yes / No | Structured JSON-lines logging. Each service writes to its own volume. `LOG_LEVEL` is one of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; default `INFO`. |
+| `REPORT_SOURCE_HASH` | both | No | `true` makes `/health` report `source`, a hash of the Python code the service loaded, which the live test suite compares with the checkout. Default `false`; the dev compose file turns it on. Leave it off in production. |
 | `VOCAB_PATH` | **curator** | Yes | JSON array of controlled-vocabulary Turtle files (`data/rfdb_vocab.ttl` and the Glottolog languages in this repository). Loaded at startup when `SEED_VOCAB_ON_STARTUP=true`. |
 | `DATA_PATH` | **curator** | Yes | Path to the sample-data Turtle file (`data/rfdb_data.ttl` in this repository). Loaded at startup only when `SEED_TEST_DATA_ON_STARTUP=true`. |
 | `RESET_DATA_ON_STARTUP` | **curator** | Yes | `true`/`false`. Destructive: wipes every graph in the store before seeding on every startup. Must be `false` in production. |

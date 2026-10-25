@@ -69,8 +69,11 @@ and half the new.
    start a run in the same command as one.
 2. **Let the fixture judge the stack.** `api_client` skips when nothing answers
    `/health`, and fails, listing every answer, when the stack answers but is not
-   healthy three times in a row within 30 one-second tries. A skip is not a pass:
-   report it as a skip.
+   healthy three times in a row within 30 one-second tries. It then fails when a
+   backend's `source` hash differs from this checkout's (another worktree, an
+   unfinished reload, an old image) or is missing (`REPORT_SOURCE_HASH` off), and
+   skips when the stack does not serve the rfdb shapes the payloads follow. A skip
+   is not a pass: report it as a skip.
 3. **Check the checkout did not move.** Compare `git rev-parse HEAD` and
    `git status --short` before and after; if either changed, the run is void.
 4. **Report every run.** A failed run followed by a passing one is reported as

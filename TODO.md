@@ -228,11 +228,10 @@ in this repository too.
   committed, but the script that cut it from `data/glottolog_language.ttl` is not, so nobody
   can rebuild it or change the language list. Decide whether to commit it (and where:
   `scripts/`, or beside the data), and whether it should run as part of updating Glottolog.
-- [ ] **Live HTTP suite: two gaps.** `tests/curator/test_backend_api_data.py` cannot tell
-  whether the stack serves the checkout under test: expose the served commit (or a source
-  hash) on `/health` in dev and have the fixture compare it. And its payloads hardcode the
-  rfdb base IRIs and shapes, so it runs only against the rfdb schema: read the base IRIs
-  from `meta/schema`, and skip the rfdb-specific scenarios on another schema.
+- [ ] **Live HTTP suite on another schema.** `tests/curator/test_backend_api_data.py`
+  follows the rfdb shapes, so against another schema it skips (it reads the namespaces from
+  `meta/schema`, so another `DATA_BASE_URI` is fine). Covering any schema would mean
+  building the payloads from the form schemas.
 - [ ] **Test structure cleanup.** Store doubles have drifted: test files each write their own
   capturing or rdflib-backed store; share one of each. The live-store probes in
   `tests/core/test_triplestore_contract.py` and `tests/curator/test_validation_merge_planner.py`

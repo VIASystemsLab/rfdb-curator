@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from rdflib.plugins.parsers.notation3 import BadSyntax
@@ -52,6 +53,7 @@ from rfdb_core.app_factory import configure_app
 from rfdb_core.file_storage import build_storage
 from rfdb_core.logging_config import configure_logging
 from rfdb_core.schema_extractor import SchemaExtractor
+from rfdb_core.source_hash import service_source_hash
 from rfdb_core.triplestore import build_triplestore
 
 # Configure structured file + console logging before anything else runs.
@@ -148,6 +150,10 @@ async def lifespan(app: FastAPI):
 # Application instance
 # ---------------------------------------------------------------------------
 
+# The code this process loaded, for the live suite's check (REPORT_SOURCE_HASH).
+# Taken at import, so a dev reload reports the code it reloaded.
+_SOURCE_HASH = service_source_hash(Path(__file__).parent) if settings.report_source_hash else None
+
 app = FastAPI(
     title=f"{settings.project_name} Data Entry API",
     description="SHACL-driven data entry backend.",
@@ -205,10 +211,16 @@ def health():
           ``"down"`` otherwise.
         - ``seed``: the seed report dict produced during startup, or ``null``
           if startup has not yet completed (should not occur in normal operation).
+
+        Plus ``source``, the hash of the code loaded, when ``REPORT_SOURCE_HASH``
+        is on (dev stacks).
     """
     ox_ok = app.state.store.health()
-    return {
+    body = {
         "status": "ok",
         "oxigraph": "up" if ox_ok else "down",
         "seed": getattr(app.state, "seed_report", None),
     }
+    if _SOURCE_HASH:
+        body["source"] = _SOURCE_HASH
+    return body

@@ -107,7 +107,8 @@ docker compose logs --tail=50
 
 ```bash
 # The two payloads differ by design: the writer reports {"status","oxigraph","seed"},
-# the reader {"status","store"} with no seed report.
+# the reader {"status","store"} with no seed report. On a dev stack both add
+# "source", the hash of the code loaded (REPORT_SOURCE_HASH).
 curl http://localhost:8000/health
 curl http://localhost:8001/health
 curl -s -o /dev/null -w "%{http_code}" http://localhost:5173

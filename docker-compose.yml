@@ -229,6 +229,9 @@ services:
       # Keep crash/restart history, but truncate once when a fresh container is created.
       TRUNCATE_LOG_ON_STARTUP: "false"
       TRUNCATE_LOG_ON_FRESH_CONTAINER_START: "true"
+      # /health reports a hash of the code loaded; the live suite checks it
+      # against the checkout. Dev only: production leaves it off.
+      REPORT_SOURCE_HASH: "true"
     volumes:
       # Source bind-mount for hot-reload in development.
       # Safe with this Dockerfile: pip installs packages into the system
@@ -347,6 +350,7 @@ services:
       LOG_LEVEL: INFO
       TRUNCATE_LOG_ON_STARTUP: "false"
       TRUNCATE_LOG_ON_FRESH_CONTAINER_START: "true"
+      REPORT_SOURCE_HASH: "true"
     volumes:
       - ./dataexplorer-backend:/app
       # The shared library, hot-reloadable — see the curator-backend service for

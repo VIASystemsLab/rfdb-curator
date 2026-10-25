@@ -13,8 +13,16 @@ beyond that store.
 
 It lives under ``tests/curator/`` because writes drive every scenario. It skips
 when no stack answers ``/health``, and fails when one answers but does not settle
-(see ``api_client``). It writes into the stack's data graph and does not clean up:
-run it against a dev stack whose store may be wiped afterwards.
+(see ``api_client``), or when it runs code other than this checkout's: both
+backends must report ``source`` on ``/health`` (``REPORT_SOURCE_HASH``, on in the
+dev compose file) equal to the checkout's hash. It writes into the stack's data
+graph and does not clean up: run it against a dev stack whose store may be wiped
+afterwards.
+
+The payloads follow the rfdb shapes (the LRMoo chain, AgentRole, Contributor), so
+the suite runs only against a stack serving them, and skips otherwise. The
+namespaces are the stack's own: records are expected under its ``DATA_BASE_URI``
+and shapes looked up under its ``SCHEMA_BASE_URI``, both read from ``meta/schema``.
 """
 
 from __future__ import annotations
@@ -28,12 +36,15 @@ import time
 import uuid
 from collections.abc import Iterator
 from email.message import Message
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request as UrlRequest
 from urllib.request import urlopen
 
 import pytest
+
+from rfdb_core.source_hash import source_hash
 
 # Writes -> curator-backend; reads -> dataexplorer-backend. Override either to
 # point the suite at a deployed stack.
@@ -43,6 +54,8 @@ READ_API_BASE_URL = os.getenv("RFDB_READ_API_BASE_URL", "http://localhost:8001")
 # Route constants, so a path change is one edit and no line wraps.
 WRITE_ENTITIES = "/api/v1/curator/entities"
 READ_ENTITY = "/api/v1/dataexplorer/entities/get"
+META_SCHEMA = "/api/v1/dataexplorer/meta/schema"
+READ_SHAPES = "/api/v1/dataexplorer/shapes"
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"
 LRMOO_F1_WORK = "http://iflastandards.info/ns/lrm/lrmoo/F1_Work"
@@ -61,7 +74,22 @@ FOAF_AGENT = "http://xmlns.com/foaf/0.1/Agent"
 FOAF_PERSON = "http://xmlns.com/foaf/0.1/Person"
 FOAF_ORGANIZATION = "http://xmlns.com/foaf/0.1/Organization"
 FOAF_NAME = "http://xmlns.com/foaf/0.1/name"
-CONTRIBUTOR_SHAPE = "https://rosfeatr.eu/rdf/schema/ContributorShape"
+
+ROOT = Path(__file__).resolve().parents[2]
+
+# The stack's DATA_BASE_URI and SCHEMA_BASE_URI, read from meta/schema by
+# ``api_client`` before any test runs.
+_BASES: dict[str, str] = {}
+
+
+def _data_iri(local: str) -> str:
+    """An IRI in the stack's record namespace."""
+    return f"{_BASES['data']}{local}"
+
+
+def _shape_iri(name: str) -> str:
+    """A shape's IRI in the stack's schema namespace."""
+    return f"{_BASES['schema']}{name}"
 
 
 def _entity_url(iri: str) -> str:
@@ -162,6 +190,36 @@ def _probe_once() -> tuple[bool, bool, str]:
     return True, healthy, "; ".join(answers)
 
 
+def _check_served_code() -> None:
+    """Fail unless both backends run the Python code of this checkout.
+
+    Each backend hashes the code it loaded (``rfdb_core.source_hash``); the same
+    hash over this checkout must match, or the run would test other code: a
+    stack started from another worktree, a reload not finished, a stale image.
+    """
+    core = ROOT / "rfdb-core" / "rfdb_core"
+    problems = []
+    for service, base in (
+        ("curator-backend", API_BASE_URL),
+        ("dataexplorer-backend", READ_API_BASE_URL),
+    ):
+        _, health = _request_json("GET", "/health", base=base)
+        served = health.get("source")
+        expected = source_hash(ROOT / service, core)
+        if served is None:
+            problems.append(f"{service} does not report its source: set REPORT_SOURCE_HASH=true")
+        elif served != expected:
+            problems.append(
+                f"{service} runs other code: {served[:12]} served, {expected[:12]} here"
+            )
+    if problems:
+        pytest.fail(
+            "the stack does not run this checkout:\n"
+            + "\n".join(problems)
+            + "\nStart it from this checkout, or let its reload finish, and run again."
+        )
+
+
 @pytest.fixture(scope="session")
 def api_client() -> Iterator[None]:
     """Skip when no stack is running; fail when one runs but does not settle.
@@ -194,6 +252,26 @@ def api_client() -> Iterator[None]:
             f"in {_PROBE_TRIES} tries:\n" + "\n".join(log)
         )
 
+    _check_served_code()
+
+    status, info = _read_json(META_SCHEMA)
+    assert status == 200, info
+    _BASES.update(data=info["dataBaseUri"], schema=info["schemaBaseUri"])
+
+    status, shapes = _read_json(READ_SHAPES)
+    assert status == 200, shapes
+    served = {shape["id"]: shape.get("targetClassUri") for shape in shapes}
+    missing = [
+        name
+        for name, target_class in _rfdb_shapes().items()
+        if served.get(_shape_iri(name)) != target_class
+    ]
+    if missing:
+        pytest.skip(
+            "the stack does not serve the rfdb shapes these payloads follow "
+            f"(missing or retargeted under {_BASES['schema']}: {', '.join(missing)})"
+        )
+
     yield None
 
 
@@ -208,7 +286,6 @@ def api_client() -> Iterator[None]:
 # traces back to a single expected cause.
 # ---------------------------------------------------------------------------
 
-SCHEMA = "https://rosfeatr.eu/rdf/schema/"
 SOURCE_TYPES = [
     "https://w3id.org/polifonia/ontology/source/Source",
     "http://iflastandards.info/ns/lrm/lrmoo/F5_Item",
@@ -221,6 +298,25 @@ CORE_HAS_TYPE = "https://w3id.org/polifonia/ontology/core/hasType"
 PRISM_PUBLICATION_DATE = "http://prismstandard.org/namespaces/basic/2.0/publicationDate"
 LRMOO_R7_EXEMPLIFIES = "http://iflastandards.info/ns/lrm/lrmoo/R7_exemplifies"
 P51_OWNER = "http://www.cidoc-crm.org/cidoc-crm/P51_has_former_or_current_owner"
+SCHEMA_DIGITAL_DOCUMENT = "http://schema.org/DigitalDocument"
+
+
+def _rfdb_shapes() -> dict[str, str]:
+    """The shapes the suite writes, by local name, with the class each must target."""
+    return {
+        "PersonShape": CORE_PERSON,
+        "RoleShape": CORE_ROLE,
+        "AgentRoleShape": CORE_AGENT_ROLE,
+        "MusicalWorkShape": MM_MUSIC_ENTITY,
+        "ExpressionShape": LRMOO_F2_EXPRESSION,
+        "ManifestationShape": LRMOO_F3_MANIFESTATION,
+        "SourceShape": SOURCE_TYPES[0],
+        "SourceTypeShape": CORE_TYPE,
+        "PlaceShape": CORE_PLACE,
+        "HoldingOrganizationShape": CORE_ORGANIZATION,
+        "DigitalCopyShape": SCHEMA_DIGITAL_DOCUMENT,
+        "ContributorShape": FOAF_AGENT,
+    }
 
 
 def _label(text: str) -> dict:
@@ -228,7 +324,7 @@ def _label(text: str) -> dict:
 
 
 def _save(shape: str, data: dict, original: list[dict] | None = None) -> tuple[int, dict]:
-    payload = {"shapeId": f"{SCHEMA}{shape}", "data": data}
+    payload = {"shapeId": _shape_iri(shape), "data": data}
     if original is not None:
         payload["originalTriples"] = original
     return _request_json("POST", WRITE_ENTITIES, payload)
@@ -342,7 +438,7 @@ def _assert_not_stored(entity_id: str) -> None:
 
 
 def _assert_minted(iri: str, name: str) -> None:
-    assert re.fullmatch(rf"https://rosfeatr\.eu/rdf/data/{name}_[0-9a-f]{{12}}", iri), iri
+    assert re.fullmatch(rf"{re.escape(_BASES['data'])}{name}_[0-9a-f]{{12}}", iri), iri
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +537,7 @@ def test_payload_describing_a_cited_record_is_refused(api_client):
     without validating it as an Expression in its own right.
     """
     suffix = _make_suffix()
-    inline_expression = f"https://rosfeatr.eu/rdf/data/inline_expression_{suffix}"
+    inline_expression = _data_iri(f"inline_expression_{suffix}")
     data = _manifestation_data("Cascade Manifestation", inline_expression)
     data[LRMOO_R4_EMBODIES].update(
         {"@type": LRMOO_F2_EXPRESSION, RDFS_LABEL: _label("Inline Expression")}
@@ -453,7 +549,7 @@ def test_payload_describing_a_cited_record_is_refused(api_client):
 
 def test_create_with_an_id_is_refused(api_client):
     """``@id`` means update: a record that does not exist is a 404."""
-    iri = f"https://rosfeatr.eu/rdf/data/chosen_by_the_client_{_make_suffix()}"
+    iri = _data_iri(f"chosen_by_the_client_{_make_suffix()}")
     status, _ = _save("MusicalWorkShape", {"@id": iri, **_work_data("Chosen IRI")})
     assert status == 404
     _assert_not_stored(iri)
@@ -660,7 +756,7 @@ def test_contributor_appears_in_shape_scoped_list(api_client):
     entity_id = _create(
         "ContributorShape", _make_contributor_payload(f"Donor {suffix}", FOAF_PERSON)
     )
-    query = urlencode({"shapeId": CONTRIBUTOR_SHAPE, "q": suffix})
+    query = urlencode({"shapeId": _shape_iri("ContributorShape"), "q": suffix})
     status, listing = _read_json(f"/api/v1/dataexplorer/entities?{query}")
     assert status == 200
     assert any(item["id"] == entity_id for item in listing["items"])
@@ -672,7 +768,6 @@ def test_contributor_appears_in_shape_scoped_list(api_client):
 
 STAGE_FILE = "/api/v1/curator/files/staged"
 META_FILES = "/api/v1/dataexplorer/meta/files"
-SOURCE_SHAPE = "https://rosfeatr.eu/rdf/schema/SourceShape"
 P138I_HAS_REPRESENTATION = "http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation"
 SCHEMA_ORG = "http://schema.org/"
 XSD = "http://www.w3.org/2001/XMLSchema#"
@@ -777,7 +872,7 @@ def test_uploaded_copy_is_served_by_the_reader_once_submitted(api_client):
     )
     source = _source_data(prefix, manifestation)
     source[P138I_HAS_REPRESENTATION] = _digital_copy_node(staged)
-    status, body = _request_json("POST", WRITE_ENTITIES, {"shapeId": SOURCE_SHAPE, "data": source})
+    status, body = _save("SourceShape", source)
     assert status == 200, body
     assert body["success"] is True
 
