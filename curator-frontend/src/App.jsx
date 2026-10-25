@@ -171,8 +171,10 @@ export default function App() {
     return `Failed to load ${what}: unknown error.`
   }
 
-  // Shapes and schema info load together: the editor mints new connections
-  // under DATA_BASE_URI (utils/nodeIds.js), so it does not open without it.
+  // Shapes, schema info and prefixes load together, and the editor does not
+  // open without all three: new connections are minted under DATA_BASE_URI
+  // (utils/nodeIds.js), and the prefixes are the JSON-LD @context every save
+  // sends (utils/jsonld.js), without which the backend cannot expand a CURIE.
   function loadShapes() {
     setLoadingShapes(true)
     setShapesError(null)
@@ -190,8 +192,20 @@ export default function App() {
           getLoadErrorMessage('schema info from /api/v1/dataexplorer/meta/schema', error),
         )
       })
-    Promise.all([shapesRequest, infoRequest])
-      .then(([data, info]) => {
+    const prefixesRequest = apiClient
+      .getPrefixes()
+      .then((prefixes) => {
+        if (!prefixes || Object.keys(prefixes).length === 0) {
+          throw new Error('the response has no prefixes')
+        }
+        return prefixes
+      })
+      .catch((error) => {
+        throw new Error(getLoadErrorMessage('prefixes from /api/v1/dataexplorer/meta/prefixes', error))
+      })
+    Promise.all([shapesRequest, infoRequest, prefixesRequest])
+      .then(([data, info, prefixes]) => {
+        hydratePrefixes(prefixes)
         setDataBaseUri(info.dataBaseUri)
         hydrateDataBaseUri(info.dataBaseUri)
         if (info.projectName) {
@@ -221,15 +235,6 @@ export default function App() {
     loadShapes()
 
     refreshShapeCounts()
-
-    // Hydrate prefix map in parallel with shape loading.
-    // On failure degrade gracefully: IRI compaction and JSON-LD @context will be
-    // empty until the next reload, but the app remains fully functional.
-    apiClient.getPrefixes().then(hydratePrefixes).catch(() => {
-      console.warn(
-        'Failed to fetch prefix map from /api/v1/dataexplorer/meta/prefixes; IRI compaction disabled.',
-      )
-    })
   }, [])
 
   useEffect(() => {
