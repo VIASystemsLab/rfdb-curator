@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
@@ -10,11 +9,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BACKEND_DIR = REPO_ROOT / "dataexplorer-backend"
 SCHEMA_PATH = REPO_ROOT / "schema" / "rfdb_schema.ttl"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
 
 META = "/api/v1/dataexplorer/meta"
 SCHEMA_URL = f"{META}/schema"

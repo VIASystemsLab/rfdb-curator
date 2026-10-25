@@ -36,7 +36,7 @@ from rfdb_core.schema_extractor import SchemaExtractor
 from rfdb_core.vocab import SCHEMA_CONTENT_URL
 from scripts.cleanup_files import NoFileLinks, reconcile
 
-FILE_ID_RE = re.compile(r"^File_[0-9a-f]{8}$")
+FILE_ID_RE = re.compile(r"^File_[0-9a-f]{12}$")
 RFDB = "https://rosfeatr.eu/rdf/data/"
 P138I = "http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation"
 DIGITAL_DOCUMENT = "http://schema.org/DigitalDocument"
@@ -243,7 +243,7 @@ def test_download_staged_404s_once_promoted(env):
 
 def test_download_staged_unknown_or_malformed_404(env):
     """Unknown ids and malformed paths are refused before touching storage."""
-    for bad in ("File_deadbeef", "not-a-file-id", "../etc/passwd"):
+    for bad in ("File_deadbeefdead", "not-a-file-id", "../etc/passwd"):
         with pytest.raises(HTTPException) as exc:
             download_staged_file(bad, env.request)
         assert exc.value.status_code == 404
@@ -382,14 +382,14 @@ def test_reconcile_strips_registered_metadata(env):
 def test_reconcile_missing_staged_file_422(env):
     """A payload node whose staged object vanished is rejected."""
     payload = Graph()
-    payload.parse(data=_copy_node_turtle(f"{RFDB}File_deadbeef"), format="turtle")
+    payload.parse(data=_copy_node_turtle(f"{RFDB}File_deadbeefdead"), format="turtle")
     with pytest.raises(HTTPException) as exc:
         _reconcile_digital_copies(payload, env.request)
     assert exc.value.status_code == 422
 
 
 def test_reconcile_bad_node_iri_422(env):
-    """Digital-copy nodes outside the File_{8hex} namespace are rejected."""
+    """Digital-copy nodes outside the File_{12hex} namespace are rejected."""
     payload = Graph()
     payload.parse(
         data=f"<{RFDB}evil> a <{DIGITAL_DOCUMENT}> .",
@@ -404,7 +404,7 @@ def test_promote_moves_staged_to_registered(env):
     """Promotion moves the object; a failed move is logged, not raised."""
     pdf = _make_pdf()
     node = stage_file(env.request, _upload("a.pdf", pdf))
-    _promote_staged_files(env.request, [node.fileId, "File_00000000"])  # 2nd missing
+    _promote_staged_files(env.request, [node.fileId, "File_000000000000"])  # 2nd missing
     assert env.storage.objects == {registered_key(node.fileId): pdf}
 
 
@@ -427,23 +427,23 @@ def test_reconcile_script_rules(env):
     env.request.app.state.storage = storage
 
     # a) staged + referenced (crash before promotion) → promote
-    storage.put_pdf(staged_key("File_aaaaaaaa"), io.BytesIO(b"%PDF-a"))
-    _link(env, "File_aaaaaaaa")
+    storage.put_pdf(staged_key("File_aaaaaaaaaaaa"), io.BytesIO(b"%PDF-a"))
+    _link(env, "File_aaaaaaaaaaaa")
     # b) staged + unreferenced + old → delete
-    storage.put_pdf(staged_key("File_bbbbbbbb"), io.BytesIO(b"%PDF-b"))
+    storage.put_pdf(staged_key("File_bbbbbbbbbbbb"), io.BytesIO(b"%PDF-b"))
     # c) staged + unreferenced + fresh → keep
     # (created later, after the clock advances)
     # d) registered + unreferenced + old → delete
-    storage.put_pdf(registered_key("File_dddddddd"), io.BytesIO(b"%PDF-d"))
+    storage.put_pdf(registered_key("File_dddddddddddd"), io.BytesIO(b"%PDF-d"))
     # e) registered + linked → keep
-    storage.put_pdf(registered_key("File_eeeeeeee"), io.BytesIO(b"%PDF-e"))
-    _link(env, "File_eeeeeeee")
+    storage.put_pdf(registered_key("File_eeeeeeeeeeee"), io.BytesIO(b"%PDF-e"))
+    _link(env, "File_eeeeeeeeeeee")
     # f) orphaned node: typed but unlinked → triples purged + object deleted
-    env.store.load_turtle(f"<{RFDB}File_ffffffff> a <{DIGITAL_DOCUMENT}> .")
-    storage.put_pdf(registered_key("File_ffffffff"), io.BytesIO(b"%PDF-f"))
+    env.store.load_turtle(f"<{RFDB}File_ffffffffffff> a <{DIGITAL_DOCUMENT}> .")
+    storage.put_pdf(registered_key("File_ffffffffffff"), io.BytesIO(b"%PDF-f"))
 
     clock["now"] = 1000.0 + 100_000  # everything above is now "old"
-    storage.put_pdf(staged_key("File_cccccccc"), io.BytesIO(b"%PDF-c"))  # (c) fresh
+    storage.put_pdf(staged_key("File_cccccccccccc"), io.BytesIO(b"%PDF-c"))  # (c) fresh
 
     actions = reconcile(
         storage,
@@ -455,26 +455,26 @@ def test_reconcile_script_rules(env):
         now=clock["now"],
     )
 
-    assert actions["promoted"] == ["File_aaaaaaaa"]
-    assert actions["deleted_staged"] == ["File_bbbbbbbb"]
-    assert actions["deleted_registered"] == ["File_dddddddd"]
-    assert actions["purged_nodes"] == ["File_ffffffff"]
+    assert actions["promoted"] == ["File_aaaaaaaaaaaa"]
+    assert actions["deleted_staged"] == ["File_bbbbbbbbbbbb"]
+    assert actions["deleted_registered"] == ["File_dddddddddddd"]
+    assert actions["purged_nodes"] == ["File_ffffffffffff"]
     assert set(storage.objects) == {
-        registered_key("File_aaaaaaaa"),  # promoted
-        staged_key("File_cccccccc"),  # fresh, kept
-        registered_key("File_eeeeeeee"),  # linked, kept
+        registered_key("File_aaaaaaaaaaaa"),  # promoted
+        staged_key("File_cccccccccccc"),  # fresh, kept
+        registered_key("File_eeeeeeeeeeee"),  # linked, kept
     }
     # Orphaned node triples are gone from the store.
     assert (None, None, None) not in Graph().parse(
         data="", format="turtle"
-    ) or f"{RFDB}File_ffffffff" not in {str(s) for s in env.store.g.subjects()}
+    ) or f"{RFDB}File_ffffffffffff" not in {str(s) for s in env.store.g.subjects()}
 
 
 def test_reconcile_script_dry_run_changes_nothing(env):
     """--dry-run reports actions but leaves storage and triples untouched."""
     clock = {"now": 1000.0}
     storage = InMemoryStorage(clock=lambda: clock["now"])
-    storage.put_pdf(staged_key("File_bbbbbbbb"), io.BytesIO(b"%PDF-b"))
+    storage.put_pdf(staged_key("File_bbbbbbbbbbbb"), io.BytesIO(b"%PDF-b"))
     clock["now"] += 100_000
 
     actions = reconcile(
@@ -487,15 +487,15 @@ def test_reconcile_script_dry_run_changes_nothing(env):
         now=clock["now"],
         dry_run=True,
     )
-    assert actions["deleted_staged"] == ["File_bbbbbbbb"]
-    assert staged_key("File_bbbbbbbb") in storage.objects  # still there
+    assert actions["deleted_staged"] == ["File_bbbbbbbbbbbb"]
+    assert staged_key("File_bbbbbbbbbbbb") in storage.objects  # still there
 
 
 def test_reconcile_refuses_when_the_schema_declares_no_upload(env):
     """With no upload links, every file would look unreferenced: abort, touch nothing."""
     storage = InMemoryStorage()
-    storage.put_pdf(registered_key("File_aaaaaaaa"), io.BytesIO(b"%PDF-a"))
-    _link(env, "File_aaaaaaaa")
+    storage.put_pdf(registered_key("File_aaaaaaaaaaaa"), io.BytesIO(b"%PDF-a"))
+    _link(env, "File_aaaaaaaaaaaa")
     no_uploads = SimpleNamespace(file_links=lambda: [])
 
     with pytest.raises(NoFileLinks):
@@ -508,5 +508,5 @@ def test_reconcile_refuses_when_the_schema_declares_no_upload(env):
             registered_grace_s=0,
             now=10**9,
         )
-    assert registered_key("File_aaaaaaaa") in storage.objects
-    assert f"{RFDB}File_aaaaaaaa" in {str(s) for s in env.store.g.subjects()}
+    assert registered_key("File_aaaaaaaaaaaa") in storage.objects
+    assert f"{RFDB}File_aaaaaaaaaaaa" in {str(s) for s in env.store.g.subjects()}

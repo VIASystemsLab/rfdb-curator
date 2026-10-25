@@ -27,11 +27,11 @@ import re
 from rfdb_core.file_storage import REGISTERED_PREFIX, STAGED_PREFIX
 from rfdb_core.vocab import SCHEMA_DIGITAL_DOCUMENT
 
-# The minted file-id format: `File_` + 8 lowercase hex (see the curator's
+# The minted file-id format: `File_` + 12 lowercase hex (see the curator's
 # stage_file). Both services validate against it — the writer to reject a
 # malformed digital-copy node IRI in a payload, the reader to reject a download
 # path before touching storage — so the two must not be allowed to disagree.
-FILE_ID_RE = re.compile(r"^File_[0-9a-f]{8}$")
+FILE_ID_RE = re.compile(r"^File_[0-9a-f]{12}$")
 
 
 def file_content_url(file_id: str, data_base: str) -> str:
@@ -95,7 +95,7 @@ def is_file_referenced(file_id: str, store, extractor, data_base: str) -> bool:
     referenced.
 
     Args:
-        file_id: A ``File_xxxxxxxx`` id.
+        file_id: A ``File_xxxxxxxxxxxx`` id.
         store: A ``TripleStore``; the read is scoped via ``from_clause()``.
         extractor: A ``SchemaExtractor``, used to resolve which predicates link
             a parent entity to a digital copy.

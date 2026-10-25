@@ -3,7 +3,7 @@
 A digital copy is a bridge node whose fields are machine-filled. The flow:
 
 1. ``POST /api/v1/curator/files/staged`` — parent-agnostic. Sniffs the PDF, computes
-   sha256/size/pages, stores the bytes under ``staged/File_{8hex}.pdf`` and
+   sha256/size/pages, stores the bytes under ``staged/File_{12hex}.pdf`` and
    returns the prefilled ``schema:DigitalDocument`` node. The form shows it as a
    read-only bridge entry — on unsaved forms too.
 2. ``GET /api/v1/curator/files/staged/{file_id}`` — preview of a file staged but not yet
@@ -112,8 +112,8 @@ def stage_file(request: Request, file: UploadFile) -> DigitalCopy:
 
     size, sha256, pages = derive_metadata(spool)
 
-    # Random 8-hex id (assign_entity_id idiom): never reused, no mint race.
-    file_id = f"File_{uuid.uuid4().hex[:8]}"
+    # Random 12-hex id, like the record IRIs core.node_ids mints.
+    file_id = f"File_{uuid.uuid4().hex[:12]}"
     original_name = os.path.basename(file.filename or "") or f"{file_id}.pdf"
 
     spool.seek(0)

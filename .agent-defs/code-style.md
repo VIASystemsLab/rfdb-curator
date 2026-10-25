@@ -17,9 +17,16 @@ comment density, its idioms.
   pins. An older local tool can silently rewrite the lockfile format and turn a
   one-line change into a whole-file diff.
 - Avoid backwards-compatibility shims, unused `_var` renames, re-exported dead
-  types, or "removed" comments unless compatibility is an actual requirement.
+  types, or "removed" comments unless compatibility is an actual requirement,
+  which only the user decides (see "Asking" in `working-style.md`).
   Delete dead code outright when it is clearly unused.
 - Do not reformat unrelated code.
+- **Derived files are named by prefix.** A file cut, filtered or converted
+  from another starts with the source file's full name, then the modifiers:
+  `glottolog_language_dev_subset.ttl` from `glottolog_language.ttl`, not
+  `glottolog_dev_subset.ttl`. A sorted listing then puts each derived file
+  next to its source, and the name says where it came from. The script that
+  makes it takes the same name.
 
 ## Prefer the general rule to the special case
 

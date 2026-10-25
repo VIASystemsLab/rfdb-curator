@@ -172,8 +172,8 @@ consumer. Every response also carries plain RFC 8288 discovery: `rel="canonical"
 | `GET` | `/health` | Liveness/readiness check (Oxigraph status + seed report) |
 | `GET` | `/api/v1/curator/shapes` | NodeShapes with metadata, field descriptors and the `readOnly` flag — **identical to the reader's** |
 | `GET` | `/api/v1/curator/forms?shapeId=...` | Generated form schema for one shape. Writer-only: form fields exist to drive an editing form |
-| `POST` | `/api/v1/curator/entities` | Create or update an entity (JSON-LD → SHACL validate → Turtle load) |
-| `DELETE` | `/api/v1/curator/entities?id=<iri>` | Delete triples where the entity is subject |
+| `POST` | `/api/v1/curator/entities` | Create (no `@id`) or update (`@id`) one record and its helper nodes (JSON-LD → SHACL validate → Turtle load) |
+| `DELETE` | `/api/v1/curator/entities?id=<iri>` | Delete a record and its helper nodes; 404 if it does not exist, 409 while other records point to it |
 | `POST` | `/api/v1/curator/validate` | Dry-run SHACL validation without persisting |
 | `POST` | `/api/v1/curator/files/staged` | Stage an uploaded digital copy (e.g. a PDF) before it is attached to a record |
 | `GET` | `/api/v1/curator/files/staged/{fileId}` | Preview a staged, not-yet-submitted copy (mode-gated, curator-only) |
@@ -432,15 +432,29 @@ If a later payload references the Work but does not repeat the AgentRole, Person
 
 ---
 
-## Delete Behavior and Orphaned Helper Nodes
+## What a Save and a Delete May Touch
 
-`DELETE /api/v1/curator/entities?id=<iri>` removes the triples where the entity is the subject.
+A save (`POST /api/v1/curator/entities`) writes one record and its helper nodes:
 
-This leaves a known gap: bridge/helper nodes linked only from the deleted entity can be
-left orphaned — `AgentRole` nodes are the usual example. Several approaches could close
-it later: a cascade delete for helper nodes, an explicit cleanup endpoint, an
-orphan-detection job, a warning in the UI before delete, or a shape-role policy that
-distinguishes standalone entities from helper bridges.
+- Without `@id` it creates a record, named by the backend. With `@id` it updates
+  that record, which must exist (404 otherwise).
+- It describes the record, its helper nodes and its digital copies only. Other
+  records are cited by a bare `@id`; describing one is refused (422), so a save can
+  never write onto a record it did not validate as itself.
+- A helper node belongs to the one record linking it. For each helper-node
+  predicate the save carries, or lists in `originalTriples`, the payload is the
+  whole list: a node with an IRI must already be this record's (409 otherwise) and
+  its stored triples are replaced by the payload's; a new node comes as a blank
+  node and is named by the backend; a stored node the payload drops is deleted.
+- Every other field of the shape the save carries replaces the stored values. A field
+  the save leaves out is replaced only when `originalTriples` lists it, which is how the
+  editor says it emptied the field.
+
+A delete (`DELETE /api/v1/curator/entities?id=<iri>`) removes the record and its
+helper nodes. It is refused (409) while another record points to it, directly or
+through one of that record's helper nodes (a Person in a Work's `AgentRole`); the
+message names up to ten of them. Digital copies are left for
+`scripts/cleanup_files.py`.
 
 ---
 

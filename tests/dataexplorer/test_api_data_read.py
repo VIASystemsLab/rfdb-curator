@@ -11,26 +11,43 @@ suites.
 
 from __future__ import annotations
 
-import sys
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
-from rdflib import Graph
+from rdflib import RDF, RDFS, Graph, Literal, URIRef
+
+from api.data import count_data_by_shape, get_entity, list_data
+from rfdb_core.schema_extractor import SchemaExtractor
 
 ROOT = Path(__file__).resolve().parents[2]
-BACKEND_DIR = ROOT / "dataexplorer-backend"
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.data import count_data_by_shape, get_entity, list_data  # noqa: E402
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
 
 _EXTRACTOR = SchemaExtractor(str(SCHEMA_PATH))
 PLACE_SHAPE = "https://rosfeatr.eu/rdf/schema/PlaceShape"
+
+
+PLACE = "https://w3id.org/polifonia/ontology/core/Place"
+TRICKY_LABEL = 'Teatro (Nuovo) "x" a.b'
+
+
+class _GraphStore:
+    """A store answering from a real rdflib graph holding one Place with a tricky label."""
+
+    def __init__(self) -> None:
+        self.graph = Graph()
+        place = URIRef("https://rosfeatr.eu/rdf/data/P1")
+        self.graph.add((place, RDF.type, URIRef(PLACE)))
+        self.graph.add((place, RDFS.label, Literal(TRICKY_LABEL)))
+
+    def from_clause(self) -> str:
+        return ""
+
+    def query(self, sparql: str) -> list[dict]:
+        return [{k: str(v) for k, v in row.asdict().items()} for row in self.graph.query(sparql)]
 
 
 class _EmptyStore:
@@ -108,6 +125,16 @@ def test_counts_degrade_to_zeros_when_the_store_is_down():
     assert set(counts.values()) == {0}
 
 
+def test_degrading_to_empty_is_logged(caplog):
+    """Empty answers keep the sidebar usable, but an operator must see why."""
+    with caplog.at_level(logging.WARNING, logger="api.data"):
+        list_data(_request(_DownStore()), shapeId=PLACE_SHAPE, q="", limit=50, offset=0)
+        count_data_by_shape(_request(_DownStore()))
+    messages = [r.getMessage() for r in caplog.records]
+    assert any("Listing shape" in m and "store unreachable" in m for m in messages)
+    assert any("Counting shape" in m and "store unreachable" in m for m in messages)
+
+
 def test_get_entity_reports_503_when_the_store_is_down():
     """A single-entity fetch cannot fake an answer, so it surfaces the outage."""
     with pytest.raises(HTTPException) as exc:
@@ -144,3 +171,19 @@ def test_unsafe_iri_is_rejected_before_it_reaches_the_store(bad_iri):
     with pytest.raises(HTTPException) as exc:
         get_entity(_request(_Exploding()), entity_id=bad_iri)
     assert exc.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Search text
+# ---------------------------------------------------------------------------
+
+
+def test_search_text_with_regex_metacharacters_matches_literally():
+    """A ``(`` in the search box used to make the regex invalid, so the list came back empty."""
+    store = _GraphStore()
+    for q in ("(Nuovo", '"x"', "a.b"):
+        result = list_data(_request(store), shapeId=PLACE_SHAPE, q=q, limit=50, offset=0)
+        assert [item.label for item in result.items] == [TRICKY_LABEL], q
+        assert result.total == 1, q
+    result = list_data(_request(store), shapeId=PLACE_SHAPE, q="a?b", limit=50, offset=0)
+    assert result.items == []  # "?" is not a wildcard either

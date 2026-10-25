@@ -62,6 +62,15 @@ and names every container `rfdb-dev-<service>-1` and every volume `rfdb-dev_<vol
 it. Another checkout on the same machine (a fork, a second clone) needs its own name, or
 Compose treats both as one stack.
 
+`env-init.sh` also sets `VOCAB_PATH` in `.env` to seed
+`data/glottolog_language_dev_subset.ttl` instead of the full `data/glottolog_language.ttl`.
+The subset holds Italian, English, German and Russian with their families and dialects (168
+languages, 199 KB against 38 MB), so an empty store is seeded in seconds rather than about
+90 s. Language fields offer only those languages. To seed every language, as production
+does, delete the `VOCAB_PATH` line from `.env` and recreate the curator
+(`docker compose up -d curator-backend`). An `.env` written before this setting existed
+seeds the full file until the line is added.
+
 `env-init.sh` writes `COMPOSE_PROFILES=full` into `.env`, which is what makes that command
 bring up all six services. Without it (an `.env` written by hand, for instance) you get the
 read-only four and no editor on `:5173`. See

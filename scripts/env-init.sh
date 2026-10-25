@@ -41,6 +41,9 @@ GARAGE_RPC_SECRET="$(openssl rand -hex 32)"          # 64 hex
 S3_ACCESS_KEY_ID="GK$(openssl rand -hex 12)"         # GK + 24 hex
 S3_SECRET_ACCESS_KEY="$(openssl rand -hex 32)"       # 64 hex
 
+# Owner-only from creation: the file holds secrets, and a chmod after the write
+# would leave it readable for a moment under the default umask.
+umask 077
 cat > .env <<EOF
 # Dev-only secrets. Gitignored. Generated $(date +%F).
 # Regenerate freely — dev data is disposable.
@@ -63,6 +66,12 @@ GARAGE_RPC_SECRET=$GARAGE_RPC_SECRET
 S3_ACCESS_KEY_ID=$S3_ACCESS_KEY_ID
 S3_SECRET_ACCESS_KEY=$S3_SECRET_ACCESS_KEY
 S3_BUCKET=sources
+
+# Seed files. Dev seeds a Glottolog subset (Italian, English, German, Russian,
+# with their families and dialects) instead of the full 38 MB file, so a fresh
+# store is ready in seconds rather than about 90 s. Delete this line to seed
+# every language, as production does.
+VOCAB_PATH='["/app/data/rfdb_vocab.ttl", "/app/data/glottolog_language_dev_subset.ttl"]'
 EOF
 
 chmod 600 .env

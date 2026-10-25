@@ -7,11 +7,16 @@ The only shared helper these three routes use is the IRI guard in
 ``rfdb_core.iri``.
 """
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Query, Request
 from rdflib import Literal, URIRef
 
 from rfdb_core.iri import iri_error
 from rfdb_core.models_data import DataListResponse
+from rfdb_core.sparql_text import regex_literal
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -63,10 +68,10 @@ def list_data(
     if not target_class:
         return DataListResponse(shapeId=shapeId, total=0, items=[])
 
-    escaped_q = q.replace("\\", "\\\\").replace('"', '\\"')
+    pattern = regex_literal(q)
     filter_clause = (
-        f'FILTER(regex(COALESCE(str(?label_raw), ""), "{escaped_q}", "i") '
-        f'|| regex(str(?id), "{escaped_q}", "i"))'
+        f'FILTER(regex(COALESCE(str(?label_raw), ""), "{pattern}", "i") '
+        f'|| regex(str(?id), "{pattern}", "i"))'
         if q
         else ""
     )
@@ -95,9 +100,12 @@ def list_data(
         OFFSET {offset}
     """
 
+    # An unreachable store degrades to an empty page (see the module tests:
+    # the sidebar stays usable), but never silently.
     try:
         rows = store.query(sparql)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Listing shape %s failed: %s", shapeId, exc)
         rows = []
 
     items = [
@@ -124,7 +132,8 @@ def list_data(
     try:
         count_rows = store.query(count_sparql)
         total = int(count_rows[0]["total"]) if count_rows else 0
-    except Exception:
+    except Exception as exc:
+        logger.warning("Counting shape %s failed: %s", shapeId, exc)
         total = len(items)
 
     return DataListResponse(shapeId=shapeId, total=total, items=items)
@@ -137,7 +146,7 @@ def count_data_by_shape(request: Request):
     Iterates all shapes from the schema, runs a ``COUNT(DISTINCT ?id)`` query
     for each one's ``sh:targetClass``, and returns a single dict.  Shapes
     without a ``targetClass`` are included with count 0.  Query errors for
-    any individual shape are silently treated as 0 so a single broken shape
+    any individual shape are logged and treated as 0 so a single broken shape
     does not block the sidebar from rendering.
 
     Returns:
@@ -169,7 +178,8 @@ def count_data_by_shape(request: Request):
         try:
             rows = store.query(sparql)
             counts[shape_id] = int(rows[0]["total"]) if rows else 0
-        except Exception:
+        except Exception as exc:
+            logger.warning("Counting shape %s failed: %s", shape_id, exc)
             counts[shape_id] = 0
 
     return {"counts": counts}

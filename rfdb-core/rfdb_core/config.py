@@ -102,7 +102,7 @@ class BaseServiceSettings(BaseSettings):
 
     data_base_uri: str
     """Namespace every record this deployment mints is named under, digital-copy
-    nodes included: ``<data_base_uri>Place_ab12cd34``, and a copy's
+    nodes included: ``<data_base_uri>Place_ab12cd34ef56``, and a copy's
     ``schema:contentUrl`` is ``<data_base_uri>File_x/content``. Both services slice
     it off an IRI to recover a local id, and the reader serves the IRIs under it
     on ``/rdf/data/{local_name}``."""
@@ -193,6 +193,12 @@ class BaseServiceSettings(BaseSettings):
     """When ``true``, truncate ``log_file`` only on first startup of a
     freshly created container (for example after ``docker compose up --build``).
     Subsequent restarts of the same container keep appending to the file."""
+
+    report_source_hash: bool = False
+    """When ``true``, ``/health`` reports ``source``: a hash of the Python code the
+    service loaded (``rfdb_core.source_hash``), so the live HTTP suite can check
+    the stack runs the checkout under test. For dev stacks; off in production,
+    where it would only tell visitors which code runs."""
 
     # ------------------------------------------------------------------ #
     # Object storage (Garage / S3) — source digital copies                 #

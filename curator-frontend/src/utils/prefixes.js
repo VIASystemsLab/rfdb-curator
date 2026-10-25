@@ -45,7 +45,9 @@ export function compactIri(value) {
     return value
   }
 
-  for (const [prefix, ns] of Object.entries(prefixMap)) {
+  // Longest namespace first: of two nested namespaces the longer one wins.
+  const entries = Object.entries(prefixMap).sort(([, a], [, b]) => b.length - a.length)
+  for (const [prefix, ns] of entries) {
     if (value.startsWith(ns)) {
       return `${prefix}:${value.slice(ns.length)}`
     }

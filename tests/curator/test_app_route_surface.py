@@ -37,8 +37,6 @@ def _import_app(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CORS_ORIGINS", '["http://localhost:5173"]')
 
     monkeypatch.chdir(BACKEND_DIR)
-    if str(BACKEND_DIR) not in sys.path:
-        sys.path.insert(0, str(BACKEND_DIR))
     for name in [m for m in sys.modules if m == "app" or m.startswith(("api.", "core."))]:
         del sys.modules[name]
     return importlib.import_module("app")

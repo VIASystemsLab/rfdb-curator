@@ -56,8 +56,45 @@ imports no service module.
 
 `tests/curator/test_backend_api_data.py` is the exception worth knowing about: it
 POSTs to curator-backend and reads back from dataexplorer-backend, so it needs both
-services up and skips otherwise. Override `RFDB_API_BASE_URL` /
-`RFDB_READ_API_BASE_URL` to point it at a deployed stack.
+services up. Override `RFDB_API_BASE_URL` / `RFDB_READ_API_BASE_URL` to point it at
+another stack.
+
+### Running the live suite
+
+The dev backends run `uvicorn --reload` over the source tree, so any edit, checkout
+or branch switch restarts them, and a run during a restart tests half the old code
+and half the new.
+
+1. **Settle the tree first.** Finish every switch, checkout or edit, and never
+   start a run in the same command as one.
+2. **Let the fixture judge the stack.** `api_client` skips when nothing answers
+   `/health`, and fails, listing every answer, when the stack answers but is not
+   healthy three times in a row within 30 one-second tries. It then fails when a
+   backend's `source` hash differs from this checkout's (another worktree, an
+   unfinished reload, an old image) or is missing (`REPORT_SOURCE_HASH` off), and
+   skips when the stack does not serve the rfdb shapes the payloads follow. A skip
+   is not a pass: report it as a skip.
+3. **Check the checkout did not move.** Compare `git rev-parse HEAD` and
+   `git status --short` before and after; if either changed, the run is void.
+4. **Report every run.** A failed run followed by a passing one is reported as
+   both, with the cause.
+
+The suite writes records under fresh IRIs into the stack's data graph, and uploads
+PDFs into Garage, and deletes neither. Run it against a dev stack only, and wipe
+both stores afterwards. The writer reseeds the vocabulary on the next start, and
+`garage-init.sh` imports the same key from `.env` again:
+
+```bash
+PROJECT=$(grep '^COMPOSE_PROJECT_NAME=' .env | cut -d= -f2)
+docker compose stop curator-backend dataexplorer-backend
+docker compose rm -sf oxigraph garage
+docker volume rm "${PROJECT}_oxigraph_data" "${PROJECT}_garage_data" "${PROJECT}_garage_meta"
+docker compose up -d --no-build
+scripts/garage-init.sh
+```
+
+`scripts/garage-init.sh` prints the S3 secret: do not copy its output into a
+report.
 
 ## Test Docstrings
 

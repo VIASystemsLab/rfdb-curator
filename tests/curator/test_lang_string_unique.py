@@ -10,7 +10,6 @@ Covers what the editor promises for language-tagged fields:
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -18,17 +17,14 @@ from pyshacl import validate
 from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import RDFS, SH
 
+from api.data import create_or_update_entity
+from core.shacl_validator import ShaclValidator
+from models.data import EntityData
+from rfdb_core.schema_extractor import SchemaExtractor
+
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
-BACKEND_DIR = ROOT / "curator-backend"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.data import create_or_update_entity  # noqa: E402
-from core.shacl_validator import ShaclValidator  # noqa: E402
-from models.data import EntityData  # noqa: E402
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
 
 PLACE_SHAPE = "https://rosfeatr.eu/rdf/schema/PlaceShape"
 SOURCE_SHAPE_URI = URIRef("https://rosfeatr.eu/rdf/schema/SourceShape")
@@ -56,6 +52,10 @@ class _CapturingOxigraph:
         """No pre-existing triples for the payload under test."""
         return Graph()
 
+    def query(self, _sparql: str) -> list:
+        """No stored triples: every minted IRI is free."""
+        return []
+
     def load_turtle(self, turtle: str) -> None:
         """Capture the Turtle that would be loaded into Oxigraph."""
         self.loaded_turtle = turtle
@@ -74,7 +74,7 @@ def _request(oxigraph: _CapturingOxigraph) -> SimpleNamespace:
     )
 
 
-def _place_label_payload(entity_id: str, label: dict) -> EntityData:
+def _place_label_payload(label: dict) -> EntityData:
     """A Place carrying a single rdfs:label value (tagged or plain)."""
     return EntityData(
         shapeId=PLACE_SHAPE,
@@ -83,7 +83,6 @@ def _place_label_payload(entity_id: str, label: dict) -> EntityData:
                 "core": "https://w3id.org/polifonia/ontology/core/",
                 "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
             },
-            "@id": entity_id,
             "@type": "core:Place",
             "rdfs:label": label,
         },
@@ -104,13 +103,13 @@ def _conforms(body: str) -> bool:
 
 def test_language_tag_is_preserved_through_write() -> None:
     """A rdf:langString value keeps its language tag end to end."""
-    entity_id = "https://rosfeatr.eu/rdf/data/lang_place"
     oxigraph = _CapturingOxigraph()
     response = create_or_update_entity(
-        _place_label_payload(entity_id, {"@value": "Верона", "@language": "ru"}),
+        _place_label_payload({"@value": "Верона", "@language": "ru"}),
         _request(oxigraph),
     )
     assert response.success is True
+    entity_id = response.entityId
 
     written = Graph().parse(data=oxigraph.loaded_turtle, format="turtle")
     labels = list(written.objects(URIRef(entity_id), RDFS.label))
@@ -123,12 +122,12 @@ def test_language_tag_is_preserved_through_write() -> None:
 def test_untagged_value_is_accepted_when_string_allowed() -> None:
     """The label field allows xsd:string, so an untagged value is valid and stays
     untagged."""
-    entity_id = "https://rosfeatr.eu/rdf/data/plain_place"
     oxigraph = _CapturingOxigraph()
     response = create_or_update_entity(
-        _place_label_payload(entity_id, {"@value": "Verona"}), _request(oxigraph)
+        _place_label_payload({"@value": "Verona"}), _request(oxigraph)
     )
     assert response.success is True
+    entity_id = response.entityId
 
     written = Graph().parse(data=oxigraph.loaded_turtle, format="turtle")
     labels = list(written.objects(URIRef(entity_id), RDFS.label))

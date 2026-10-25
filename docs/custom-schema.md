@@ -65,7 +65,7 @@ the same values.
 
 | Setting | Names | Example value | Example IRI |
 |---|---|---|---|
-| `DATA_BASE_URI` | every record the curator mints, digital copies included | `https://example.org/rdf/data/` | `https://example.org/rdf/data/Place_4f3a9d12` |
+| `DATA_BASE_URI` | every record the curator mints, digital copies included | `https://example.org/rdf/data/` | `https://example.org/rdf/data/Place_4f3a9d12c07e` |
 | `SCHEMA_BASE_URI` | the SHACL shapes of the loaded schema | `https://example.org/rdf/schema/` | `https://example.org/rdf/schema/PlaceShape` |
 
 Rules:

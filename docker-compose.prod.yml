@@ -330,6 +330,14 @@ services:
     depends_on:
       dataexplorer-backend:
         condition: service_healthy
+    healthcheck:
+      # caddy:2-alpine ships busybox wget. A 200 for / means Caddy is up and
+      # serving the built bundle's index.html.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - edge
     # No `ports:`, no bind-mounts, no anonymous node_modules volume: this image
@@ -394,6 +402,15 @@ services:
       - caddy_config:/config
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      # Caddy's admin API on localhost:2019 answers once the Caddyfile is
+      # loaded. The sites themselves sit behind the domain and HTTPS, which a
+      # probe from inside the container cannot address.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     logging: *docker_logging
     deploy:
       resources:
@@ -460,10 +477,10 @@ services:
       # host uid/gid permission issues on first deploy.
       - curator_backend_logs:/app/logs
     # No `ports:` — only `proxy` reaches this, over `edge`.
-    # No --reload. --workers is a placeholder: size it to roughly
-    # (2 x CPU cores) + 1 for your actual VM, not this default. Fewer than the
-    # reader: this tier serves a handful of curators, not the public.
-    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+    # No --reload. One worker: every worker runs the startup seed, so two would
+    # load the vocabulary twice at once. One serves a handful of curators; to
+    # scale, see "scale the production deployment" in TODO.md.
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
     healthcheck:
       test:
         [
@@ -475,7 +492,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 12
-      start_period: 10s
+      # The first start seeds the vocabulary into an empty store, which takes
+      # over 90 s; failures before start_period ends do not count, and the
+      # first healthy answer ends it early.
+      start_period: 210s
     security_opt:
       - no-new-privileges:true
     logging: *docker_logging
@@ -513,6 +533,14 @@ services:
         condition: service_healthy
       dataexplorer-backend:
         condition: service_healthy
+    healthcheck:
+      # caddy:2-alpine ships busybox wget. A 200 for / means Caddy is up and
+      # serving the built bundle's index.html.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - edge
     # No `ports:` — only `proxy` reaches this.

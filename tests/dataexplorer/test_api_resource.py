@@ -20,7 +20,6 @@ resource. Three properties therefore matter more than the response bodies:
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
 import pytest
@@ -29,16 +28,13 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from rdflib import Graph
 
+from api.resource import router
+from core.config import settings
+from rfdb_core.schema_extractor import SchemaExtractor
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BACKEND_DIR = REPO_ROOT / "dataexplorer-backend"
 SCHEMA_PATH = REPO_ROOT / "schema" / "rfdb_schema.ttl"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.resource import router  # noqa: E402
-from core.config import settings  # noqa: E402
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
 
 RFDB_BASE = settings.data_base_uri
 LOCAL = "Src1"

@@ -20,13 +20,16 @@ docker compose version
 
 ## Waiting for Readiness (Mandatory)
 
-`oxigraph`, `garage` and both backends declare `healthcheck`s, and the services that depend on
-them use `condition: service_healthy`. So **let Compose do the waiting** — do not hand-roll a
-loop when this covers it:
+Every service declares a `healthcheck`, and the services that depend on another use
+`condition: service_healthy`. So **let Compose do the waiting** — do not hand-roll a loop when
+this covers it:
 
 ```bash
-docker compose up -d --wait --wait-timeout 180   # exits non-zero if a service never goes healthy
+docker compose up -d --wait --wait-timeout 300   # exits non-zero if a service never goes healthy
 ```
+
+The timeout covers the curator's first start on an empty store: seeding the full Glottolog file
+takes over 90 s, and its healthcheck allows up to 270 s (`start_period` 210 s plus 12 retries).
 
 One caveat: `oxigraph`'s healthcheck is **liveness only** — the image is distroless, so the
 check is `oxigraph --help`, which proves the process exists and says nothing about the HTTP
@@ -104,7 +107,8 @@ docker compose logs --tail=50
 
 ```bash
 # The two payloads differ by design: the writer reports {"status","oxigraph","seed"},
-# the reader {"status","store"} with no seed report.
+# the reader {"status","store"} with no seed report. On a dev stack both add
+# "source", the hash of the code loaded (REPORT_SOURCE_HASH).
 curl http://localhost:8000/health
 curl http://localhost:8001/health
 curl -s -o /dev/null -w "%{http_code}" http://localhost:5173

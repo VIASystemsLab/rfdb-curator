@@ -79,3 +79,38 @@ def test_schema_declares_every_prefix_the_ttl_files_use() -> None:
     used = scan_ttl_prefixes(ttl_files)
     declared = SchemaExtractor(str(SCHEMA_PATH)).prefixes
     assert {p: ns for p, ns in used.items() if declared.get(p) != ns} == {}
+
+
+_NESTED_SCHEMA = """
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ex: <https://example.org/> .
+@prefix exd: <https://example.org/data/> .
+@prefix brick: <https://brickschema.org/schema/Brick#> .
+
+ex:schema sh:declare
+    [ sh:prefix "ex" ; sh:namespace "https://example.org/"^^xsd:anyURI ] ,
+    [ sh:prefix "exd" ; sh:namespace "https://example.org/data/"^^xsd:anyURI ] .
+
+ex:ThingShape a sh:NodeShape ;
+    sh:targetClass exd:Thing ;
+    sh:property [ sh:path ex:name ; sh:datatype xsd:string ] ,
+                [ sh:path brick:hasPoint ; sh:datatype xsd:string ] .
+"""
+
+
+def test_curies_use_the_longest_declared_namespace_only(tmp_path: Path) -> None:
+    """Of two nested namespaces the longer wins; an undeclared one stays a full IRI.
+
+    ``ex:`` contains ``exd:``, so ``…/data/Thing`` is ``exd:Thing``, not
+    ``ex:data/Thing``. rdflib pre-binds ``brick:``, but the schema does not
+    declare it: the editor could not expand ``brick:hasPoint``, so the field
+    keeps the full IRI.
+    """
+    path = tmp_path / "schema.ttl"
+    path.write_text(_NESTED_SCHEMA)
+    shape = SchemaExtractor(str(path)).get_shape("https://example.org/ThingShape")
+
+    assert shape["targetClass"] == "exd:Thing"
+    paths = {prop["path"] for prop in shape["properties"]}
+    assert paths == {"ex:name", "https://brickschema.org/schema/Brick#hasPoint"}

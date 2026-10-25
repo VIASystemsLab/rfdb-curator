@@ -47,7 +47,9 @@ The role of each shape is derived from the schema, never from its name:
   identity, is listed, searched and created as a top-level record.
 - **Helper/bridge node**: a shape without one. It exists only inline in its
   parent (for example an agent-role node binding a person to a role), and the
-  editor blocks editing it on its own.
+  editor blocks editing it on its own. It belongs to that one record: a save may
+  not cite another record's helper node, and deleting the record deletes its
+  helper nodes.
 
 See [architecture.md](architecture.md#helperbridge-shape-classification) for how
 this drives the UI.
@@ -105,10 +107,12 @@ Other conventions:
 
 ## Identifiers
 
-- New records are named `<DATA_BASE_URI><ShapeName>_<8 hex>`, for example
-  `…/data/Place_4f3a9d12`.
-- Helper nodes are named nodes, not blank nodes, so they survive updates:
-  `<DATA_BASE_URI><parent>_<property>_<index>`.
+- The curator backend names every new node. A new record is sent without
+  `@id`, a new helper node as a blank node; both become
+  `<DATA_BASE_URI><ShapeName>_<12 hex>`, for example `…/data/Place_4f3a9d12c07e`
+  or `…/data/AgentRole_4f3a9d12c07e`, checked unused before they are written.
+  A save with `@id` updates that record, which must exist.
+- Helper nodes are named nodes, not blank nodes, so an edit to one keeps its IRI.
 - Shapes are looked up under `SCHEMA_BASE_URI`.
 - Existing IRIs are never changed. An IRI that is not `http(s)` or contains
   characters unsafe in SPARQL is rejected before it is stored.

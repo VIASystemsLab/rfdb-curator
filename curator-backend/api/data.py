@@ -13,11 +13,17 @@ import logging
 import tempfile
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from rdflib import XSD, Graph, Literal, URIRef
+from rdflib import XSD, BNode, Graph, Literal, URIRef
+from rdflib.term import Node
 
-from core.blank_node_handler import assign_entity_id, skolemize
 from core.config import settings
-from core.validation_merge import _build_validation_construct, bridge_link_predicates
+from core.node_ids import MintError, mint_iri
+from core.validation_merge import (
+    _build_validation_construct,
+    all_bridge_link_predicates,
+    bridge_links,
+    shape_field_predicates,
+)
 from models.data import (
     DataCreateResponse,
     EntityData,
@@ -48,6 +54,7 @@ _VOCAB_PREFIXES = (
     "http://www.w3.org/ns/shacl#",
 )
 _RDF_TYPE = URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")
+_RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 
 
 # ---------------------------------------------------------------------------
@@ -192,13 +199,199 @@ def _promote_staged_files(request: Request, file_ids: list[str]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Naming, ownership and dependents
+# ---------------------------------------------------------------------------
+
+# Records listed in a refused delete's message; one more is fetched to know
+# whether to add "and more".
+_MAX_DEPENDENTS_SHOWN = 10
+
+
+def _select(store, sparql: str) -> list[dict[str, str | None]]:
+    """Run a SELECT; a store failure is a 503, as everywhere in the write path."""
+    try:
+        return store.query(sparql)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Store unavailable") from exc
+
+
+def _has_triples(store, iri: str) -> bool:
+    """Whether the store describes ``iri`` (has it as a subject)."""
+    return bool(
+        _select(store, f"SELECT ?p {store.from_clause()} WHERE {{ <{iri}> ?p ?o }} LIMIT 1")
+    )
+
+
+def _iri_in_use(store, iri: str) -> bool:
+    """Whether the store mentions ``iri`` at all, as subject or object."""
+    return bool(
+        _select(
+            store,
+            f"SELECT ?x {store.from_clause()} "
+            f"WHERE {{ {{ <{iri}> ?p ?x }} UNION {{ ?x ?p <{iri}> }} }} LIMIT 1",
+        )
+    )
+
+
+def _mint(store, shape_id: str, minted: set[str]) -> str:
+    """A new IRI for a node of ``shape_id``, unused in the store and in this save."""
+    try:
+        iri = mint_iri(
+            settings.data_base_uri,
+            shape_id,
+            lambda candidate: candidate in minted or _iri_in_use(store, candidate),
+        )
+    except MintError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    minted.add(iri)
+    return iri
+
+
+def _rename(graph: Graph, old: Node, new: URIRef) -> None:
+    """Replace ``old`` by ``new`` in every triple of ``graph``."""
+    for s, p, o in list(graph.triples((old, None, None))):
+        graph.remove((s, p, o))
+        graph.add((new, p, o))
+    for s, p, o in list(graph.triples((None, None, old))):
+        graph.remove((s, p, o))
+        graph.add((s, p, new))
+
+
+def _name_bridge_cards(
+    data_graph: Graph,
+    entity_uri: URIRef,
+    store,
+    bridges: dict[str, str],
+    is_create: bool,
+    minted: set[str],
+) -> set[URIRef]:
+    """Name the new bridge cards; check the existing ones are this record's.
+
+    A new card is a blank node and gets ``<DATA_BASE_URI><BridgeShape>_<12hex>``.
+    A card with an IRI must already be linked from this record through the same
+    predicate: a bridge node belongs to one record, so anything else (another
+    record's card, a Person, reference data) is refused.
+
+    Returns:
+        The record's cards as sent, all named.
+    """
+    cards: set[URIRef] = set()
+    for pred, bridge_shape in bridges.items():
+        sent = list(data_graph.objects(entity_uri, URIRef(pred)))
+        if not sent:
+            continue
+        stored = set() if is_create else _linked_objects(store, str(entity_uri), pred)
+        for card in sent:
+            if isinstance(card, BNode):
+                named = URIRef(_mint(store, bridge_shape, minted))
+                _rename(data_graph, card, named)
+                cards.add(named)
+            elif isinstance(card, URIRef):
+                if str(card) not in stored:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"{card.n3()} is not one of this record's connections through "
+                            f"<{pred}>. A new connection is sent without @id."
+                        ),
+                    )
+                if (card, None, None) not in data_graph:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            f"Connection {card.n3()} is sent without its values; send it in full."
+                        ),
+                    )
+                cards.add(card)
+    return cards
+
+
+def _linked_objects(store, entity_id: str, pred: str) -> set[str]:
+    """The IRIs ``entity_id`` links through ``pred`` in the store."""
+    rows = _select(store, f"SELECT ?o {store.from_clause()} WHERE {{ <{entity_id}> <{pred}> ?o }}")
+    return {row["o"] for row in rows if row.get("o")}
+
+
+def _refuse_other_subjects(data_graph: Graph, entity_uri: URIRef, cards: set[URIRef]) -> None:
+    """Refuse a payload that describes anything but the record, its cards and its copies.
+
+    Other records are referenced by a bare ``@id``: describing one would write
+    onto it without validating it as itself. A blank node left over here is not
+    a card (cards were named above), so it would be stored as an anonymous node.
+    """
+    allowed = {entity_uri} | cards
+    for s, _p, o in data_graph:
+        if isinstance(o, BNode):
+            raise HTTPException(
+                status_code=422,
+                detail="Only a new connection may be a blank node; reference records by @id.",
+            )
+        if s in allowed:
+            continue
+        # Checked, and named, by _reconcile_digital_copies.
+        if (s, _RDF_TYPE, URIRef(SCHEMA_DIGITAL_DOCUMENT)) in data_graph:
+            continue
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"A save describes only its record and the record's connections, not "
+                f"{s.n3()}. Reference other records by @id alone."
+            ),
+        )
+
+
+def _dependents(store, entity_id: str, links: list[str]) -> list[tuple[str, str | None]]:
+    """Records pointing at ``entity_id``, directly or through one of their bridge nodes.
+
+    A link from a bridge node counts as a link from the record owning it.
+    Returns up to ``_MAX_DEPENDENTS_SHOWN + 1`` ``(iri, label)`` pairs.
+    """
+    owner = ""
+    if links:
+        values = " ".join(f"<{link}>" for link in links)
+        owner = f"OPTIONAL {{ VALUES ?link {{ {values} }} ?owner ?link ?s . }}"
+    rows = _select(
+        store,
+        f"""
+        SELECT ?record (SAMPLE(?l) AS ?label) {store.from_clause()}
+        WHERE {{
+            ?s ?p <{entity_id}> .
+            {owner}
+            BIND(COALESCE(?owner, ?s) AS ?record)
+            FILTER(?record != <{entity_id}>)
+            OPTIONAL {{ ?record <{_RDFS_LABEL}> ?l }}
+        }}
+        GROUP BY ?record
+        ORDER BY ?record
+        LIMIT {_MAX_DEPENDENTS_SHOWN + 1}
+        """,
+    )
+    return [(row["record"], row.get("label")) for row in rows if row.get("record")]
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 
 @router.post("/entities", response_model=DataCreateResponse)
 def create_or_update_entity(payload: EntityData, request: Request):
-    """Create or update an entity (RDF resource) from JSON-LD payload.
+    """Create or update a record from a JSON-LD payload.
+
+    ``@id`` decides which: a payload without it creates a record, named here
+    (:mod:`core.node_ids`); a payload with it updates that record, which must
+    exist.
+
+    A save describes the record, its bridge nodes and its digital copies, and
+    nothing else: other records are referenced by a bare ``@id``.
+
+    On an update, each field of the shape the payload carries replaces the stored
+    values; a field it leaves out is replaced only when ``originalTriples`` lists
+    it (how the editor says it emptied the field). For a bridge predicate the
+    payload is the whole list of cards: cards that exist keep their IRI and must
+    already be this record's; new cards come as blank nodes and are named here;
+    stored cards the payload drops are deleted. Each card's stored triples are
+    replaced by the payload's.
 
     SHACL targeting nuance:
     - Constraints attached to class-targeted shapes (sh:targetClass) are
@@ -216,20 +409,28 @@ def create_or_update_entity(payload: EntityData, request: Request):
     _assert_writable_mode()
     _assert_shape_writable(payload.shapeId)
 
+    store = request.app.state.store
     data = payload.data
     provided_id = data.get("@id")
-    if isinstance(provided_id, str):
+    is_create = provided_id is None
+    minted: set[str] = set()
+
+    if is_create:
+        entity_id = _mint(store, payload.shapeId, minted)
+        data = {**data, "@id": entity_id}
+    else:
+        if not isinstance(provided_id, str):
+            raise HTTPException(status_code=422, detail="@id must be an IRI string")
         _validate_iri(provided_id)
+        entity_id = provided_id
+        if not _has_triples(store, entity_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"No record {entity_id} to update. A new record is sent without @id.",
+            )
 
-    data = assign_entity_id(data, payload.shapeId, settings.data_base_uri)
-    entity_id = data.get("@id", "")
-    data = skolemize(data, entity_id, settings.data_base_uri)
-
-    store = request.app.state.store
     existing_entity_graph = None
-
-    if entity_id and payload.originalTriples:
-        _validate_iri(entity_id)
+    if not is_create:
         try:
             existing_entity_graph = store.construct(
                 f"""
@@ -248,13 +449,29 @@ def create_or_update_entity(payload: EntityData, request: Request):
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Invalid JSON-LD: {exc}") from exc
 
+    entity_uri = URIRef(entity_id)
+    dep_graph = request.app.state.shape_dep_graph
+    bridges = bridge_links(dep_graph, payload.shapeId)
+    original_predicates = {t.predicate for t in payload.originalTriples or []}
+    # Fields of the shape the payload carries: their values replace the stored ones.
+    fields_carried = {
+        pred
+        for pred in shape_field_predicates(dep_graph, payload.shapeId)
+        if (entity_uri, URIRef(pred), None) in data_graph
+    }
+    bridges_in_play = {
+        pred
+        for pred in bridges
+        if (entity_uri, URIRef(pred), None) in data_graph or pred in original_predicates
+    }
+    cards = _name_bridge_cards(data_graph, entity_uri, store, bridges, is_create, minted)
+    _refuse_other_subjects(data_graph, entity_uri, cards)
+
     # Digital copies (upload-first flow): the server is the metadata authority.
     # Re-derives staged-node metadata / strips registered-node metadata BEFORE
     # validation, so what is validated is exactly what will be stored. Returns
     # the staged file ids to promote after a successful persist.
     files_to_promote = _reconcile_digital_copies(data_graph, request)
-
-    entity_uri = URIRef(entity_id) if entity_id.startswith("http") else None
 
     # Collect seed IRIs for shape-driven merge planning.
     # Include the entity IRI itself only on create flows so root-shape chains
@@ -265,28 +482,19 @@ def create_or_update_entity(payload: EntityData, request: Request):
     # the entity from masking payload intent (e.g. keeping fields the curator
     # deleted in the editor, or causing false maxCount violations via stale
     # values).
-    include_root_entity = bool(entity_uri is not None and not payload.originalTriples)
-    seed_iris = {str(entity_uri)} if include_root_entity else set()
+    seed_iris = {entity_id} if is_create else set()
     seed_iris |= {
         str(obj)
         for obj in data_graph.objects()
         if isinstance(obj, URIRef) and _is_non_vocab_iri(str(obj))
     }
 
-    # Same reasoning as include_root_entity, one hop down: an inline bridge node
-    # (e.g. AgentRole) that the payload describes is payload-authoritative — the
-    # editor always sends the whole node and the write below replaces its stored
-    # triples — so merging the store's copy would only re-introduce the value the
-    # curator just changed and fail sh:maxCount on the node they edited. Nodes
-    # merely *referenced* by IRI stay seeded: their constraints still need the
-    # store's triples.
-    bridge_predicates = bridge_link_predicates(request.app.state.shape_dep_graph, payload.shapeId)
-    seed_iris -= {
-        str(obj)
-        for pred in bridge_predicates
-        for obj in data_graph.objects(predicate=URIRef(pred))
-        if isinstance(obj, URIRef) and (obj, None, None) in data_graph
-    }
+    # Same reasoning one hop down: the payload's cards replace the stored ones,
+    # so merging the store's copy would only re-introduce the value the curator
+    # just changed and fail sh:maxCount on the card they edited. Records merely
+    # *referenced* by IRI stay seeded: their constraints still need the store's
+    # triples.
+    seed_iris -= {str(card) for card in cards}
     logger.debug("Validation merge seed IRIs (%d): %s", len(seed_iris), sorted(seed_iris))
 
     # Build the validation graph by merging the payload with the referenced
@@ -300,7 +508,6 @@ def create_or_update_entity(payload: EntityData, request: Request):
     # clean 503 because it may silently pass constraints that should fail.
     referenced_graph = Graph()
     if seed_iris:
-        dep_graph = request.app.state.shape_dep_graph
         construct_query = _build_validation_construct(
             dep_graph=dep_graph,
             root_shape_id=payload.shapeId,
@@ -344,35 +551,29 @@ def create_or_update_entity(payload: EntityData, request: Request):
             validationReport=ValidationResult(**report),
         )
 
-    # Validation passed.  Delete the predicates that are being updated before
-    # writing the new triples.
-    if entity_id and payload.originalTriples:
-        predicates_to_delete = {t.predicate for t in payload.originalTriples}
+    # Validation passed. On an update, delete what is being replaced before
+    # writing: every field of the shape the payload carries, the predicates the
+    # client lists as changed (an emptied field is not carried), and every bridge
+    # predicate in play together with the cards it links. The payload re-adds
+    # what is kept.
+    if not is_create:
+        predicates_to_delete = original_predicates | bridges_in_play | fields_carried
         for pred_uri in predicates_to_delete:
             _validate_iri(pred_uri)
 
-        def bridge_where(pred_uri: str) -> str:
-            # The bridge nodes reached from this entity through pred_uri and by
-            # no other link: the ones the delete below removes.
-            return f"""
-                <{entity_id}> <{pred_uri}> ?bridge .
-                ?bridge ?bp ?bo .
-                FILTER NOT EXISTS {{
-                    ?other ?op ?bridge .
-                    FILTER(?other != <{entity_id}> || ?op != <{pred_uri}>)
-                }}
-            """
+        def cards_where(pred_uri: str) -> str:
+            return f"<{entity_id}> <{pred_uri}> ?card . ?card ?cp ?co ."
 
         # The rollback snapshot above holds only <entity_id> ?p ?o. Add the
-        # bridge triples the delete removes, before anything is deleted, so a
-        # failed load restores each node together with its link.
+        # cards the delete removes, before anything is deleted, so a failed load
+        # restores each card together with its link.
         try:
-            for pred_uri in predicates_to_delete & bridge_predicates:
+            for pred_uri in bridges_in_play:
                 existing_entity_graph += store.construct(
                     f"""
-                    CONSTRUCT {{ ?bridge ?bp ?bo }}
+                    CONSTRUCT {{ ?card ?cp ?co }}
                     {store.from_clause()}
-                    WHERE {{ {bridge_where(pred_uri)} }}
+                    WHERE {{ {cards_where(pred_uri)} }}
                     """
                 )
         except Exception as exc:
@@ -380,20 +581,12 @@ def create_or_update_entity(payload: EntityData, request: Request):
 
         wc = store.with_clause()
         for pred_uri in predicates_to_delete:
-            if pred_uri in bridge_predicates:
-                # A helper-bridge node (e.g. AgentRole) has no existence apart
-                # from the link being rewritten: deleting only the link would
-                # leave its triples in the store as an orphan the editor can no
-                # longer reach but validation merges can still pull in. Delete
-                # the node too — unless any link other than the one being
-                # rewritten points at it, in which case it is shared and stays.
-                # Payload-asserted bridge nodes are re-written by the load below,
-                # so this replaces (rather than accumulates) their values on edit.
+            if pred_uri in bridges_in_play:
                 store.update(
                     f"""
                     {wc}
-                    DELETE {{ ?bridge ?bp ?bo . }}
-                    WHERE  {{ {bridge_where(pred_uri)} }}
+                    DELETE {{ ?card ?cp ?co . }}
+                    WHERE  {{ {cards_where(pred_uri)} }}
                     """
                 )
             store.update(
@@ -440,7 +633,7 @@ def delete_entity(
         "", description="Shape URI of the entity being deleted (used to enforce READ_ONLY_SHAPES)"
     ),
 ):
-    """Delete all triples for a given entity IRI.
+    """Delete a record and its bridge nodes, unless other records point to it.
 
     The IRI travels as ``?id=``, the one convention for addressing an entity on the
     operational surface — same as ``/graph/node`` and the reader's ``/entities/get``.
@@ -449,6 +642,11 @@ def delete_entity(
     about how the *IRI* is passed, which is what actually trips callers up. A
     path-encoded IRI needs double-encoding to survive, and a bare local name fails
     the unsafe-IRI guard with a 400 that reads like a data problem.
+
+    A record that does not exist is a 404. A record another record points to,
+    directly or through one of that record's bridge nodes (a Person in a Work's
+    AgentRole), is refused with 409 naming them: deleting it would leave them
+    unsaveable until the link is fixed.
 
     An optional ``shapeId`` query parameter may be supplied by the frontend to
     enable per-shape write protection via ``READ_ONLY_SHAPES``.  When absent,
@@ -459,26 +657,44 @@ def delete_entity(
         _assert_shape_writable(shapeId)
     _validate_iri(entity_id)
     store = request.app.state.store
+    if not _has_triples(store, entity_id):
+        raise HTTPException(status_code=404, detail=f"No record <{entity_id}> to delete.")
+    links = sorted(all_bridge_link_predicates(request.app.state.shape_dep_graph))
+
+    dependents = _dependents(store, entity_id, links)
+    if dependents:
+        shown = dependents[:_MAX_DEPENDENTS_SHOWN]
+        names = "; ".join(f"{label} <{iri}>" if label else f"<{iri}>" for iri, label in shown)
+        more = " and more" if len(dependents) > _MAX_DEPENDENTS_SHOWN else ""
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot delete <{entity_id}>: other records point to it. "
+                f"Remove those links first: {names}{more}."
+            ),
+        )
 
     # Digital copies attached to this entity are NOT purged here: their node
     # triples become orphans (no inbound link) and scripts/cleanup_files.py
     # collects both the triples and the stored objects. One cleanup mechanism,
     # no cross-store transaction in the request path.
-
-    # TODO: Delete also triples where this entity is the object and related
-    #   blank/helper nodes (e.g. skolemized AgentRole nodes exclusively owned
-    #   by this entity).  Orphaned helper nodes left behind here will cause
-    #   SHACL validation failures on unrelated entities that trigger a merge
-    #   including those IRIs.  Deletion of helper nodes must happen before the
-    #   entity delete to avoid leaving orphans if a partial failure occurs.
-    #   Guard with FILTER NOT EXISTS to avoid deleting shared helper nodes —
-    #   the update path above already does exactly that for the predicates in
-    #   bridge_link_predicates(); reuse that query shape here.
-    delete_query = f"""
-        {store.with_clause()}
+    wc = store.with_clause()
+    if links:
+        # Cards first: if the record delete then fails, nothing is left pointing
+        # at a card that is gone.
+        values = " ".join(f"<{link}>" for link in links)
+        store.update(
+            f"""
+            {wc}
+            DELETE {{ ?card ?cp ?co . }}
+            WHERE  {{ VALUES ?link {{ {values} }} <{entity_id}> ?link ?card . ?card ?cp ?co . }}
+            """
+        )
+    store.update(
+        f"""
+        {wc}
         DELETE {{ <{entity_id}> ?p ?o . }}
         WHERE  {{ <{entity_id}> ?p ?o . }}
-    """
-
-    store.update(delete_query)
+        """
+    )
     return

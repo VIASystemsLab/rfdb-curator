@@ -48,7 +48,7 @@ from rfdb_core.external_ids import external_id_url
 router = APIRouter()
 
 # Local names are minted by this project — ``rfdb:PascalCase`` entities and
-# ``File_xxxxxxxx`` copies — so this is a whitelist, not the blocklist
+# ``File_xxxxxxxxxxxx`` copies — so this is a whitelist, not the blocklist
 # ``rfdb_core.iri.iri_error`` applies to client-supplied absolute IRIs. Here we
 # know exactly what a legal id looks like, and the id is interpolated into SPARQL.
 LOCAL_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")

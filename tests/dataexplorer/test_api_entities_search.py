@@ -7,26 +7,44 @@ first in rfdb_schema.ttl, so these tests run with the shapes in both orders.
 
 from __future__ import annotations
 
-import sys
+import logging
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from rdflib import RDF, RDFS, Graph, Literal, URIRef
+
+from api.entities import router
+from rfdb_core.schema_extractor import SchemaExtractor
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
-BACKEND_DIR = ROOT / "dataexplorer-backend"
 
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
-
-from api.entities import router  # noqa: E402
-from rfdb_core.schema_extractor import SchemaExtractor  # noqa: E402
 
 SEARCH_URL = "/api/v1/dataexplorer/entities/search"
 SCHEMA_NS = "https://rosfeatr.eu/rdf/schema/"
 CORE = "https://w3id.org/polifonia/ontology/core/"
+
+
+PLACE = "https://w3id.org/polifonia/ontology/core/Place"
+TRICKY_LABEL = 'Teatro (Nuovo) "x" a.b'
+
+
+class _GraphStore:
+    """A store answering from a real rdflib graph holding one Place with a tricky label."""
+
+    def __init__(self) -> None:
+        self.graph = Graph()
+        place = URIRef("https://rosfeatr.eu/rdf/data/P1")
+        self.graph.add((place, RDF.type, URIRef(PLACE)))
+        self.graph.add((place, RDFS.label, Literal(TRICKY_LABEL)))
+
+    def from_clause(self) -> str:
+        return ""
+
+    def query(self, sparql: str) -> list[dict]:
+        return [{k: str(v) for k, v in row.asdict().items()} for row in self.graph.query(sparql)]
 
 
 class _CapturingStore:
@@ -43,7 +61,7 @@ class _CapturingStore:
         return []
 
 
-def _client(store: _CapturingStore, *, reverse: bool = False) -> TestClient:
+def _client(store, *, reverse: bool = False) -> TestClient:
     extractor = SchemaExtractor(str(SCHEMA_PATH))
     if reverse:
         shapes = list(reversed(extractor.get_all_shapes()))
@@ -81,3 +99,29 @@ def test_partial_name_is_not_found(shape: str) -> None:
 
     assert response.status_code == 404
     assert store.queries == []
+
+
+def test_search_text_with_regex_metacharacters_matches_literally() -> None:
+    """A ``(`` typed into a relation field used to make the regex invalid: no suggestions."""
+    client = _client(_GraphStore())
+    for query in ("(Nuovo", '"x"', "a.b"):
+        response = client.get(SEARCH_URL, params={"shape": "PlaceShape", "query": query})
+        assert response.status_code == 200
+        assert [hit["label"] for hit in response.json()] == [TRICKY_LABEL], query
+    response = client.get(SEARCH_URL, params={"shape": "PlaceShape", "query": "a?b"})
+    assert response.json() == []  # "?" is not a wildcard either
+
+
+def test_store_failure_is_logged(caplog) -> None:
+    """No suggestions when the store is down, and a warning saying so."""
+
+    class _DownStore(_CapturingStore):
+        def query(self, sparql: str) -> list:
+            raise RuntimeError("store unreachable")
+
+    with caplog.at_level(logging.WARNING, logger="api.entities"):
+        response = _client(_DownStore()).get(SEARCH_URL, params={"shape": "PlaceShape"})
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert any("store unreachable" in r.getMessage() for r in caplog.records)

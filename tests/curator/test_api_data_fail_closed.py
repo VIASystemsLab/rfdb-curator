@@ -8,7 +8,6 @@ it tests backend branch semantics when related-entity merge fails.
 from __future__ import annotations
 
 import importlib
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,12 +16,12 @@ import pytest
 BACKEND_DIR = Path(__file__).resolve().parents[2] / "curator-backend"
 DATA_NS = "https://rosfeatr.eu/rdf/data"
 SHAPE_NS = "https://rosfeatr.eu/rdf/schema"
+# The IRI the seed-composition test makes the backend mint for its new record.
+MINTED = f"{DATA_NS}/minted_record"
 
 
 def _load_backend_symbols() -> SimpleNamespace:
     """Load service symbols directly from curator-backend/ for unit-level tests."""
-    if str(BACKEND_DIR) not in sys.path:
-        sys.path.insert(0, str(BACKEND_DIR))
 
     from fastapi import HTTPException
 
@@ -74,6 +73,10 @@ class _FailingConstructOxigraph:
         self.calls.append("construct")
         raise RuntimeError("simulated construct failure")
 
+    def query(self, _sparql: str) -> list:
+        # Reads only (naming checks): not a side effect, so not recorded.
+        return []
+
     def update(self, _sparql: str) -> None:
         self.calls.append("update")
 
@@ -90,6 +93,9 @@ class _NoopOxigraph:
     def construct(self, _sparql: str):
         self.calls.append("construct")
         return None
+
+    def query(self, _sparql: str) -> list:
+        return []
 
     def with_clause(self) -> str:
         return ""
@@ -139,7 +145,6 @@ def test_create_or_update_fails_closed_on_related_merge_error() -> None:
                 "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
                 "lrmoo": "http://iflastandards.info/ns/lrm/lrmoo/",
             },
-            "@id": f"{DATA_NS}/fail_closed_manifestation",
             "@type": "lrmoo:F3_Manifestation",
             "rdfs:label": {"@value": "Fail-Closed Test", "@language": "en"},
             "lrmoo:R4_embodies": {"@id": f"{DATA_NS}/fail_closed_expression"},
@@ -162,7 +167,6 @@ def test_create_or_update_fails_closed_on_related_merge_error() -> None:
     [
         (
             {
-                "@id": f"{DATA_NS}/literals_only",
                 "@type": f"{DATA_NS}/LocalType",
                 "http://www.w3.org/2000/01/rdf-schema#label": {
                     "@value": "Only literals",
@@ -170,37 +174,34 @@ def test_create_or_update_fails_closed_on_related_merge_error() -> None:
                 },
             },
             {
-                f"{DATA_NS}/literals_only",
+                MINTED,
                 f"{DATA_NS}/LocalType",
             },
         ),
         (
             {
-                "@id": f"{DATA_NS}/vocab_only",
                 "@type": f"{DATA_NS}/LocalType",
                 f"{DATA_NS}/pointsTo": {"@id": "http://www.w3.org/2000/01/rdf-schema#label"},
             },
             {
-                f"{DATA_NS}/vocab_only",
+                MINTED,
                 f"{DATA_NS}/LocalType",
             },
         ),
         (
             {
-                "@id": f"{DATA_NS}/mixed_iris",
                 "@type": f"{DATA_NS}/LocalType",
                 f"{DATA_NS}/pointsTo": {"@id": f"{DATA_NS}/RelatedNode"},
                 f"{DATA_NS}/vocabRef": {"@id": "http://www.w3.org/2001/XMLSchema#string"},
             },
             {
-                f"{DATA_NS}/mixed_iris",
+                MINTED,
                 f"{DATA_NS}/LocalType",
                 f"{DATA_NS}/RelatedNode",
             },
         ),
         (
             {
-                "@id": f"{DATA_NS}/repeated_non_vocab",
                 "@type": f"{DATA_NS}/LocalType",
                 f"{DATA_NS}/pointsTo": [
                     {"@id": f"{DATA_NS}/DedupNode"},
@@ -208,7 +209,7 @@ def test_create_or_update_fails_closed_on_related_merge_error() -> None:
                 ],
             },
             {
-                f"{DATA_NS}/repeated_non_vocab",
+                MINTED,
                 f"{DATA_NS}/LocalType",
                 f"{DATA_NS}/DedupNode",
             },
@@ -220,9 +221,10 @@ def test_create_or_update_seed_iri_composition(
     payload_data: dict,
     expected_seed_iris: set[str],
 ) -> None:
-    """Seed IRIs include non-vocab @type/object IRIs and deduplicate repeats."""
+    """Seed IRIs include the new record, non-vocab @type/object IRIs, deduplicated."""
     symbols = _load_backend_symbols()
     captured: dict[str, object] = {}
+    monkeypatch.setattr(symbols.data_module, "_mint", lambda _store, _shape, _minted: MINTED)
 
     def _capture_build_validation_construct(
         dep_graph, root_shape_id: str, seed_iris: set[str], from_clause: str
@@ -388,8 +390,6 @@ def test_shapes_endpoint_stamps_read_only_flag() -> None:
     wiring: that this service still applies the flag, and applies it from its own
     settings rather than from a hardcoded list.
     """
-    if str(BACKEND_DIR) not in sys.path:
-        sys.path.insert(0, str(BACKEND_DIR))
 
     import importlib
 

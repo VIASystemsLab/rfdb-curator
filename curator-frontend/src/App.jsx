@@ -24,8 +24,8 @@
  * --- IMPORTANT: CREATE vs UPDATE ---
  * - When editing, App fetches the full entity and passes it as the record prop to ShapeForm.
  * - ShapeForm must ensure @id is included in the form state and payload for updates.
- * - If the fetch fails, loadedRecord stays null and ShapeForm renders as a blank create
- *   form rather than an error (a known gap).
+ * - If the fetch fails, the form panel shows the error with Retry instead of the form:
+ *   a blank form there would look like the record and save as a new one.
  *
  * View details flow:
  *   1. User clicks eye (see details) button in records list.
@@ -86,6 +86,8 @@ export default function App() {
   const [recordsRefreshKey, setRecordsRefreshKey] = useState(0) // bump to re-fetch list
   const [activeView, setActiveView] = useState('form') // 'form' | 'records'
   const [recordLoading, setRecordLoading] = useState(false) // true while fetching entity data for editing
+  const [recordError, setRecordError] = useState(null) // {id, message} of a failed fetch, shown instead of the form
+  const [recordAttempt, setRecordAttempt] = useState(0) // bumped by Retry to fetch the same record again
   const [guideOpen, setGuideOpen] = useState(false) // first-time curator welcome guide (WEMI overlay)
   const [showContext, setShowContext] = useState(false) // read-only Data Context Panel in the main area
   const [toast, setToast] = useState('') // transient bottom-right confirmation (e.g. after save)
@@ -158,24 +160,56 @@ export default function App() {
     return Number.isFinite(n) ? Intl.NumberFormat('en-US').format(n) : '0'
   }
 
-  function getShapeLoadErrorMessage(error) {
+  function getLoadErrorMessage(what, error) {
     const status = error?.response?.status
     const detail = error?.response?.data?.detail
     if (typeof detail === 'string' && detail.trim()) {
-      return `Failed to load shapes (${status ?? 'error'}): ${detail}`
+      return `Failed to load ${what} (${status ?? 'error'}): ${detail}`
     }
-    if (error?.message) {
-      return `Failed to load shapes: ${error.message}`
-    }
-    return 'Failed to load shapes: unknown error.'
+    if (error?.message) return `Failed to load ${what}: ${error.message}`
+    return `Failed to load ${what}: unknown error.`
   }
 
+  // Shapes, schema info and prefixes load together, and the editor does not
+  // open without all three: DATA_BASE_URI tells the inspector which IRIs are
+  // records, and the prefixes are the JSON-LD @context every save sends
+  // (utils/jsonld.js), without which the backend cannot expand a CURIE.
   function loadShapes() {
     setLoadingShapes(true)
     setShapesError(null)
-    apiClient
-      .getShapes()
-      .then((data) => {
+    const shapesRequest = apiClient.getShapes().catch((error) => {
+      throw new Error(getLoadErrorMessage('shapes', error))
+    })
+    const infoRequest = apiClient
+      .getSchemaInfo()
+      .then((info) => {
+        if (!info?.dataBaseUri) throw new Error('the response has no dataBaseUri')
+        return info
+      })
+      .catch((error) => {
+        throw new Error(
+          getLoadErrorMessage('schema info from /api/v1/dataexplorer/meta/schema', error),
+        )
+      })
+    const prefixesRequest = apiClient
+      .getPrefixes()
+      .then((prefixes) => {
+        if (!prefixes || Object.keys(prefixes).length === 0) {
+          throw new Error('the response has no prefixes')
+        }
+        return prefixes
+      })
+      .catch((error) => {
+        throw new Error(getLoadErrorMessage('prefixes from /api/v1/dataexplorer/meta/prefixes', error))
+      })
+    Promise.all([shapesRequest, infoRequest, prefixesRequest])
+      .then(([data, info, prefixes]) => {
+        hydratePrefixes(prefixes)
+        setDataBaseUri(info.dataBaseUri)
+        if (info.projectName) {
+          setProjectName(info.projectName)
+          document.title = `${info.projectName} — Editor`
+        }
         const sorted = [...data].sort((a, b) => (a.label || a.id).localeCompare(b.label || b.id))
         setShapes(sorted)
         if (sorted.length > 0) {
@@ -190,7 +224,7 @@ export default function App() {
       .catch((error) => {
         setShapes([])
         setActiveShape(null)
-        setShapesError(getShapeLoadErrorMessage(error))
+        setShapesError(error.message)
       })
       .finally(() => setLoadingShapes(false))
   }
@@ -199,33 +233,6 @@ export default function App() {
     loadShapes()
 
     refreshShapeCounts()
-
-    // Hydrate prefix map in parallel with shape loading.
-    // On failure degrade gracefully: IRI compaction and JSON-LD @context will be
-    // empty until the next reload, but the app remains fully functional.
-    apiClient.getPrefixes().then(hydratePrefixes).catch(() => {
-      console.warn(
-        'Failed to fetch prefix map from /api/v1/dataexplorer/meta/prefixes; IRI compaction disabled.',
-      )
-    })
-
-    // The project's name, and the namespace that marks an IRI as one of our
-    // records. On failure the header stays blank and the inspector shows
-    // record IRIs as plain text instead of links.
-    apiClient
-      .getSchemaInfo()
-      .then((info) => {
-        setDataBaseUri(info.dataBaseUri || null)
-        if (info.projectName) {
-          setProjectName(info.projectName)
-          document.title = `${info.projectName} — Editor`
-        }
-      })
-      .catch(() => {
-        console.warn(
-          'Failed to fetch schema info from /api/v1/dataexplorer/meta/schema; record links disabled.',
-        )
-      })
   }, [])
 
   useEffect(() => {
@@ -283,23 +290,37 @@ export default function App() {
   // --- Effect: when a record is selected, for editing or for viewing, fetch its full data ---
   // The result feeds ShapeForm's record prop in both cases.
   useEffect(() => {
+    setRecordError(null)
     if (!selectedRecord) {
       setLoadedRecord(null)
       setRecordLoading(false)
       return
     }
+    // Ignore a response for a record that is no longer selected, so a slow or
+    // failed earlier fetch cannot overwrite the current one or its error.
+    let ignore = false
     setRecordLoading(true)
     apiClient
       .getEntity(selectedRecord.id)
       .then((res) => {
+        if (ignore) return
         setLoadedRecord(res)
         setRecordLoading(false)
       })
-      .catch(() => {
+      .catch((error) => {
+        if (ignore) return
         setLoadedRecord(null)
+        setRecordError({ id: selectedRecord.id, message: getLoadErrorMessage('the record', error) })
         setRecordLoading(false)
       })
-  }, [selectedRecord])
+    return () => {
+      ignore = true
+    }
+  }, [selectedRecord, recordAttempt])
+
+  // Keyed by record so a previous record's error never shows for the one just picked.
+  const recordErrorMessage =
+    selectedRecord && recordError?.id === selectedRecord.id ? recordError.message : null
 
   // Helper-bridge shapes (no rdfs:label — e.g. AgentRole, DigitalCopy) are set
   // aside at the bottom of the nav and are browse-only; everything else is a
@@ -418,11 +439,30 @@ export default function App() {
                   {selectedRecord && recordLoading && (
                     <div className="form-loading">Loading record…</div>
                   )}
+                  {selectedRecord && !recordLoading && recordErrorMessage && (
+                    <div className="form-error" role="alert">
+                      <p>{recordErrorMessage}</p>
+                      <button
+                        type="button"
+                        className="form-error-retry"
+                        onClick={() => setRecordAttempt((n) => n + 1)}
+                      >
+                        Retry
+                      </button>{' '}
+                      <button
+                        type="button"
+                        className="form-error-retry"
+                        onClick={() => setSelectedRecord(null)}
+                      >
+                        New record instead
+                      </button>
+                    </div>
+                  )}
                   {/*
                     This guard has a known gap: on the first render after onEdit,
                     recordLoading is still false, so ShapeForm briefly renders with the previous loadedRecord.
                   */}
-                  {(!selectedRecord || !recordLoading) && (
+                  {(!selectedRecord || (!recordLoading && !recordErrorMessage)) && (
                     <ShapeForm
                       shape={activeShape}
                       allShapes={shapes}

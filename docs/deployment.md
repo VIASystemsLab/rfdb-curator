@@ -56,7 +56,7 @@ an empty store or fail to find what the writer minted.
 | `TRIPLESTORE` | both | No | Which `TripleStore` implementation to build. Only `oxigraph` ships today; the seam exists so a second one is a config change. Default: `oxigraph`. |
 | `OXIGRAPH_URL` | both | Yes | Base URL of the Oxigraph HTTP endpoint, no trailing slash. `http://localhost:7878` locally, `http://oxigraph:7878` inside Docker. Must match across services. |
 | `DATA_GRAPH_URI` | both | Yes | Named graph URI where instance data is stored and queried. Every SPARQL read uses `FROM <uri>`; every Turtle load targets `?graph=<uri>`. Must match across services. |
-| `DATA_BASE_URI` | both | Yes | Namespace every minted record and digital copy is named under, ending in `/` or `#`. With `https://rosfeatr.eu/rdf/data/`, a new Place is `https://rosfeatr.eu/rdf/data/Place_4f3a9d12` and a PDF's `schema:contentUrl` is `…/data/File_0123abcd/content`. Served to the curator frontend on `GET /api/v1/dataexplorer/meta/schema`. Must match across services. |
+| `DATA_BASE_URI` | both | Yes | Namespace every minted record and digital copy is named under, ending in `/` or `#`. With `https://rosfeatr.eu/rdf/data/`, a new Place is `https://rosfeatr.eu/rdf/data/Place_4f3a9d12c07e` and a PDF's `schema:contentUrl` is `…/data/File_0123abcd0123/content`. Served to the curator frontend on `GET /api/v1/dataexplorer/meta/schema`. Must match across services. |
 | `SCHEMA_BASE_URI` | both | Yes | Namespace of the loaded schema's SHACL shapes, ending in `/` or `#`, e.g. `https://rosfeatr.eu/rdf/schema/` for `…/schema/PlaceShape`. Must match the schema file and across services. |
 | `LONG_TEXT_PREDICATES` | both | No | JSON array of predicate IRIs whose form fields are multi-line text areas. Default: the rfdb schema's description, note and transcription predicates (`rdfs:comment`, `dcterms:description`, `dcterms:abstract`, `skos:definition`, `skos:note`, `skos:scopeNote`, `core:text`). Must match across services. |
 | `PROJECT_NAME` | both | No | Name of the knowledge base, shown in the reader's HTML page titles, the editor's header and tab title, and the API docs. Default: `RossijskijFeatrDB`. |
@@ -67,6 +67,7 @@ an empty store or fail to find what the writer minted.
 | `S3_ENDPOINT` | both | No | Object-storage endpoint for digital copies. Empty disables it: `GET /api/v1/dataexplorer/meta/files` then reports `configured: false` instead of erroring. |
 | `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | both | No | Object-storage credentials. The writer stages and promotes objects; the reader streams them out. |
 | `LOG_FILE`, `LOG_LEVEL`, `TRUNCATE_LOG_ON_STARTUP`, `TRUNCATE_LOG_ON_FRESH_CONTAINER_START` | both | Yes / No | Structured JSON-lines logging. Each service writes to its own volume. `LOG_LEVEL` is one of `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`; default `INFO`. |
+| `REPORT_SOURCE_HASH` | both | No | `true` makes `/health` report `source`, a hash of the Python code the service loaded, which the live test suite compares with the checkout. Default `false`; the dev compose file turns it on. Leave it off in production. |
 | `VOCAB_PATH` | **curator** | Yes | JSON array of controlled-vocabulary Turtle files (`data/rfdb_vocab.ttl` and the Glottolog languages in this repository). Loaded at startup when `SEED_VOCAB_ON_STARTUP=true`. |
 | `DATA_PATH` | **curator** | Yes | Path to the sample-data Turtle file (`data/rfdb_data.ttl` in this repository). Loaded at startup only when `SEED_TEST_DATA_ON_STARTUP=true`. |
 | `RESET_DATA_ON_STARTUP` | **curator** | Yes | `true`/`false`. Destructive: wipes every graph in the store before seeding on every startup. Must be `false` in production. |
@@ -94,11 +95,17 @@ persisted volume. The application rotates that file itself (10 MB, five backups)
 
 Startup behavior is controlled by `RESET_DATA_ON_STARTUP`.
 
-**Clean slate (empty store)** — clears all triples from `DATA_GRAPH_URI` before seeding.
+**Clean slate (empty store)** — erases every graph in the store (`DROP ALL` plus
+`CLEAR DEFAULT`), not only `DATA_GRAPH_URI`, before seeding.
 
 ```bash
-RESET_DATA_ON_STARTUP=true docker compose up --build
+RESET_DATA_ON_STARTUP=true docker compose up -d --build
+docker compose up -d   # straight after: recreate the curator without the reset
 ```
+
+Run the second command as soon as the first is up. In dev the curator restarts on
+every code change (`uvicorn --reload`), and each restart runs the startup again: a
+container still carrying `RESET_DATA_ON_STARTUP=true` wipes the store on every save.
 
 **Preserve existing data (default)** — keeps existing triples and merges new seed data on top.
 
@@ -123,6 +130,10 @@ policy: seed vocabulary on, seed test data off, preserve existing data on.
   sed -i '' 's/geo1:/geo:/g' data/glottolog_language.ttl
   ```
 
+- `data/glottolog_language_dev_subset.ttl` is a cut of `data/glottolog_language.ttl` for dev
+  stacks: Italian, English, German and Russian with their families and dialects. The dev
+  `.env` written by `scripts/env-init.sh` seeds it through `VOCAB_PATH`; production seeds
+  the full file. See [development.md](development.md#running-the-full-application).
 - `data/rfdb_data.ttl` is test-only fixture data.
 
 ---

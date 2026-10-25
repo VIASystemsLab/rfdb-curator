@@ -45,6 +45,8 @@ class _ShapeNode:
     shape_id: str
     target_class_uri: str | None
     edges: list[_ShapeEdge] = field(default_factory=list)
+    # Every predicate the shape declares a property for: the record's fields.
+    field_predicates: set[str] = field(default_factory=set)
 
 
 def _build_shape_dep_graph(extractor) -> dict[str, _ShapeNode]:
@@ -62,6 +64,8 @@ def _build_shape_dep_graph(extractor) -> dict[str, _ShapeNode]:
 
         for prop in shape.get("properties", []):
             predicate = prop.get("pathUri")
+            if predicate:
+                node.field_predicates.add(predicate)
             nested = prop.get("nestedShape")
             if predicate and nested:
                 node.edges.append(
@@ -78,18 +82,35 @@ def _build_shape_dep_graph(extractor) -> dict[str, _ShapeNode]:
     return nodes
 
 
-def bridge_link_predicates(dep_graph: dict[str, _ShapeNode], shape_id: str) -> set[str]:
-    """Predicates of ``shape_id`` whose objects are inline helper-bridge nodes.
+def bridge_links(dep_graph: dict[str, _ShapeNode], shape_id: str) -> dict[str, str]:
+    """Predicates of ``shape_id`` whose objects are inline bridge nodes, with their shape.
 
-    Used by the write path to decide which stored objects it may delete outright
-    when a predicate is rewritten: a bridge node unlinked from its only parent
-    is garbage, while a standalone entity (or a store-owned digital copy) must
-    survive. See :class:`_ShapeEdge.inline_bridge` for the exact rule.
+    A bridge node belongs to the one record linking it through one of these
+    predicates: the write path names new ones after the bridge shape, refuses
+    one owned by another record, and deletes the ones a save drops. A standalone
+    entity (or a store-owned digital copy) is never in this map. See
+    :class:`_ShapeEdge.inline_bridge` for the exact rule.
     """
     node = dep_graph.get(shape_id)
     if not node:
-        return set()
-    return {edge.predicate_uri for edge in node.edges if edge.inline_bridge}
+        return {}
+    return {edge.predicate_uri: edge.target_shape_id for edge in node.edges if edge.inline_bridge}
+
+
+def shape_field_predicates(dep_graph: dict[str, _ShapeNode], shape_id: str) -> set[str]:
+    """The predicates ``shape_id`` declares properties for; empty for an unknown shape."""
+    node = dep_graph.get(shape_id)
+    return set(node.field_predicates) if node else set()
+
+
+def all_bridge_link_predicates(dep_graph: dict[str, _ShapeNode]) -> set[str]:
+    """Every predicate, of any shape, that links a record to its bridge nodes."""
+    return {
+        edge.predicate_uri
+        for node in dep_graph.values()
+        for edge in node.edges
+        if edge.inline_bridge
+    }
 
 
 def _bfs_shape_edges(

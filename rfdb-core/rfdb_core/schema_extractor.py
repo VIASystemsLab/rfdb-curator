@@ -123,18 +123,27 @@ def _declared_version(graph: Graph) -> str | None:
     return versions.pop() if versions else None
 
 
-def _curie(uri: URIRef | BNode | None, graph: Graph) -> str | None:
-    """Convert a full URI to a CURIE (prefix:local) using the graph's namespace manager.
+def _longest_first(prefixes: dict[str, str]) -> list[tuple[str, str]]:
+    """``(namespace, prefix)`` pairs, longest namespace first, for :func:`_curie`."""
+    return sorted(((ns, prefix) for prefix, ns in prefixes.items()), key=lambda pair: -len(pair[0]))
 
-    Returns the full URI string if no matching prefix is found, or None if uri is None.
+
+def _curie(uri: URIRef | BNode | None, namespaces: list[tuple[str, str]]) -> str | None:
+    """Convert a full URI to a CURIE (prefix:local) with the schema's declared prefixes.
+
+    ``namespaces`` comes from :func:`_longest_first`, so of two nested namespaces
+    the longer one wins. Only declared prefixes are used, never rdflib's
+    pre-bound ones: the editor expands a field's CURIE with the declared map
+    (``meta/prefixes``), so any other prefix would not expand.
+
+    Returns the full URI string if no prefix matches, or None if uri is None.
     """
     if uri is None:
         return None
     uri_str = str(uri)
-    for prefix, ns in graph.namespaces():
-        ns_str = str(ns)
-        if uri_str.startswith(ns_str) and prefix:
-            return f"{prefix}:{uri_str[len(ns_str) :]}"
+    for ns, prefix in namespaces:
+        if uri_str.startswith(ns):
+            return f"{prefix}:{uri_str[len(ns) :]}"
     return uri_str
 
 
@@ -174,6 +183,7 @@ class SchemaExtractor:
         # The CURIE prefix map the schema declares (sh:declare). Read here so a
         # conflicting declaration fails at load, like a Turtle syntax error does.
         self.prefixes: dict[str, str] = declared_prefixes(self.graph)
+        self._namespaces = _longest_first(self.prefixes)
         # The schema's own release (owl:versionInfo), or None if it states none.
         self.version: str | None = _declared_version(self.graph)
         self._cache: dict[str, dict[str, Any]] | None = None
@@ -227,7 +237,7 @@ class SchemaExtractor:
     def _extract_shape(self, shape_uri: URIRef) -> dict[str, Any]:
         """Extract all relevant metadata for a single NodeShape."""
         g = self.graph
-        label = self._preferred_label(shape_uri) or _curie(shape_uri, g)
+        label = self._preferred_label(shape_uri) or _curie(shape_uri, self._namespaces)
         description = g.value(shape_uri, SH.description) or g.value(shape_uri, RDFS.comment) or ""
         target_class = g.value(shape_uri, SH.targetClass)
         shape_role = self._infer_shape_role(shape_uri)
@@ -236,7 +246,7 @@ class SchemaExtractor:
         additional_types = [
             curie
             for klass in g.objects(shape_uri, SH["class"])
-            if (curie := _curie(klass, g)) is not None
+            if (curie := _curie(klass, self._namespaces)) is not None
         ]
 
         # Collect polymorphic type alternatives from a shape-level sh:or whose
@@ -258,7 +268,7 @@ class SchemaExtractor:
             "id": str(shape_uri),
             "label": str(label),
             "description": str(description),
-            "targetClass": _curie(target_class, g),
+            "targetClass": _curie(target_class, self._namespaces),
             "targetClassUri": str(target_class) if target_class else None,
             "shapeRole": shape_role,
             "additionalTypes": additional_types,
@@ -285,7 +295,7 @@ class SchemaExtractor:
             classes = [o for p, o in branch_triples if p == SH["class"]]
             if len(branch_triples) != 1 or len(classes) != 1:
                 return []
-            curie = _curie(classes[0], g)
+            curie = _curie(classes[0], self._namespaces)
             if curie is None:
                 return []
             options.append({"value": curie, "label": curie.split(":")[-1]})
@@ -333,9 +343,9 @@ class SchemaExtractor:
         if in_list_head:
             in_values = [str(v) for v in Collection(g, in_list_head)]
 
-        path_curie = _curie(path, g) or str(path)
+        path_curie = _curie(path, self._namespaces) or str(path)
         # Compute datatype CURIE for the return dict before field_type resolution
-        datatype_curie = _curie(datatype, g)
+        datatype_curie = _curie(datatype, self._namespaces)
         nested_shape_role = self._infer_nested_shape_role(node)
 
         # Step 1: derive the base field type from shape constraints
@@ -391,10 +401,10 @@ class SchemaExtractor:
             "longText": str(path) in self.long_text_predicates,
             "linkTemplate": self.external_id_links.get(str(path)),
             "datatype": datatype_curie,
-            "datatypeOptions": [_curie(dt, g) for dt in datatype_options],
+            "datatypeOptions": [_curie(dt, self._namespaces) for dt in datatype_options],
             "languageTagPolicy": language_tag_policy,
-            "nodeKind": _curie(node_kind, g),
-            "nodeClass": _curie(klass, g),
+            "nodeKind": _curie(node_kind, self._namespaces),
+            "nodeClass": _curie(klass, self._namespaces),
             "nestedShape": str(node) if node else None,
             "nestedShapeRole": nested_shape_role,
             "minCount": int(min_count) if min_count is not None else 0,

@@ -96,6 +96,16 @@ function tripleToFieldScalarValue(val, fieldType, languageTagPolicy) {
   return tripleToFieldValue(val, fieldType, languageTagPolicy, 1)
 }
 
+function schemaLoadErrorMessage(error) {
+  const status = error?.response?.status
+  const detail = error?.response?.data?.detail
+  if (typeof detail === 'string' && detail.trim()) {
+    return `Failed to load the form (${status ?? 'error'}): ${detail}`
+  }
+  if (error?.message) return `Failed to load the form: ${error.message}`
+  return 'Failed to load the form: unknown error.'
+}
+
 export default function ShapeForm({
   shape,
   allShapes,
@@ -108,6 +118,9 @@ export default function ShapeForm({
   onReset,
 }) {
   const [formSchema, setFormSchema] = useState(null)
+  const [schemaError, setSchemaError] = useState(null)
+  // Bumped by the Retry button to re-run the form-schema fetch for the same shape.
+  const [schemaAttempt, setSchemaAttempt] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
   // Bumped by the Reset button to force the hydration effect to re-seed a blank form
@@ -181,6 +194,7 @@ export default function ShapeForm({
   useEffect(() => {
     if (!shape) return
     setFormSchema(null)
+    setSchemaError(null)
 
     // Ignore stale in-flight responses when the selected shape changes quickly.
     let ignore = false
@@ -194,12 +208,13 @@ export default function ShapeForm({
       .catch((err) => {
         if (ignore) return
         console.error(err)
+        setSchemaError(schemaLoadErrorMessage(err))
       })
 
     return () => {
       ignore = true
     }
-  }, [shape])
+  }, [shape, schemaAttempt])
 
   // Flatten triples into a predicate-keyed map while preserving full triple metadata.
   function triplesToFlatObject(triples) {
@@ -491,7 +506,9 @@ export default function ShapeForm({
               numberOfPages: pages != null ? Number(pages) : null,
             }
           } catch {
-            // Skip a broken node rather than blocking the whole form load.
+            // As for nested cards: skip the copy so the rest of the form loads, but
+            // record the field, because saving now would drop the copy's link.
+            if (!failedNested.includes(field.name)) failedNested.push(field.name)
             return null
           }
         })
@@ -678,6 +695,20 @@ export default function ShapeForm({
   }
 
   if (!formSchema) {
+    if (schemaError) {
+      return (
+        <div className="form-error" role="alert">
+          <p>{schemaError}</p>
+          <button
+            type="button"
+            className="form-error-retry"
+            onClick={() => setSchemaAttempt((n) => n + 1)}
+          >
+            Retry
+          </button>
+        </div>
+      )
+    }
     return <div className="form-loading">Loading form schema…</div>
   }
 
