@@ -15,8 +15,8 @@
  *   - `number`           → `{"@value": "42", "@type": "xsd:decimal"}`
  *   - `uri`              → `{"@id": "https://..."}`
  *   - `entity-search`    → `{"@id": "rfdb:Place_abc"}` (from AsyncSelect option)
- *   - `nested`           → inline node whose `@id` is an rfdb: IRI minted by the
- *                          frontend (AnonymousEntityEditor, AgentRole pattern)
+ *   - `nested`           → inline node whose `@id` is an IRI under DATA_BASE_URI
+ *                          minted by the frontend (utils/nodeIds.js, AgentRole pattern)
  *   - `file-list`        → inline schema:DigitalDocument nodes (FileField entries)
  *   - `text` / other     → plain string
  *

@@ -38,11 +38,9 @@ on it; where an open task builds on something already shipped, that context is n
     state as "a record is selected and the loaded one is not it" closes it.
   Fix with an ignore flag per effect (as the record fetch in `App.jsx` now has) and a short
   debounce on the search.
-- [ ] **Editor: two small correctness fixes.** Bridge-node IRIs are minted with
-  `Math.random().toString(16)` (`AnonymousEntityEditor.jsx`), which can return fewer than 8 hex
-  digits and is not collision-safe: use `crypto.getRandomValues`, keeping the format the
-  backend's `assign_entity_id` expects. `compactIri` (`utils/prefixes.js`) returns the first
-  matching namespace instead of the longest; latent, since no namespaces nest today.
+- [ ] **Editor: prefix compaction picks the first match.** `compactIri` (`utils/prefixes.js`)
+  returns the first matching namespace instead of the longest; latent, since no namespaces nest
+  today.
 - [ ] Warn on duplicate `owl:sameAs`: when a same-as value is entered, check whether another record already has it and warn the user (needs a backend lookup).
 - [ ] Data Context Panel enhancements on top of the shipped read-only baseline (the panel plus its metadata API — `GET /api/v1/dataexplorer/meta/prefixes`, `GET /api/v1/dataexplorer/meta/graphs` with per-graph active/empty status, `GET /api/v1/dataexplorer/meta/files`):
   - [ ] Prefixes: per-entry `source` attribution (`schema` / `jsonld-context` / `runtime`); explicit prefix-drift warnings when mappings differ across schema, JSON-LD context, and runtime; copy Turtle prefix declaration / copy namespace IRI; search by prefix or namespace substring.

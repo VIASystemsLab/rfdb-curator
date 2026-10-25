@@ -14,7 +14,7 @@
  *   standalone-entity - the nested shape has its own label; a note is shown directing the user to create it separately then reference it via search.
  *
  * Node creation:
- *   - When adding a bridge/helper entry, generate a regular node IRI (rfdb:ShapeType_<8hex>), not a blank node.
+ *   - When adding a bridge/helper entry, generate a regular node IRI (<DATA_BASE_URI><ShapeName>_<8hex>), not a blank node.
  *
  * Props:
  *   field      {object}  - Property descriptor (path, nestedShape, parentShape if nested)
@@ -23,6 +23,7 @@
  */
 import { useFieldArray } from 'react-hook-form'
 import EntitySearch from './EntitySearch.jsx'
+import { mintNodeId } from '../utils/nodeIds.js'
 import './AnonymousEntityEditor.css'
 
 function getNestedShape(field, allShapes) {
@@ -42,22 +43,10 @@ export default function AnonymousEntityEditor({ field, allShapes, control }) {
   const isHelperBridge = nestedShape?.shapeRole === 'helper-bridge'
 
   function addHelperEntry() {
-    // Generate a regular named node IRI in the rfdb: namespace rather than a blank node.
-    // Format: rfdb:<ShapeType>_<8hexchars>  (e.g. rfdb:core_AgentRole_a3f2b1c9)
-    //
-    // NOTE: nestedShape.targetClass is a CURIE like "core:AgentRole".
-    // replace(':', '_') produces "core_AgentRole" so the generated IRI becomes
-    // rfdb:core_AgentRole_<hex>, which is intentional: the prefix part is kept to
-    // avoid collisions across shapes that may share local names.
-    // This must match the backend assign_entity_id logic; verify if that changes.
-    function randomHex(len = 8) {
-      return Math.random()
-        .toString(16)
-        .slice(2, 2 + len)
-    }
-    const shapeType = (nestedShape?.targetClass || 'Entity').replace(':', '_')
+    // A named node under DATA_BASE_URI, minted like the backend's records
+    // (e.g. https://rosfeatr.eu/rdf/data/AgentRole_a3f2b1c9). See utils/nodeIds.js.
     const entry = {
-      '@id': `rfdb:${shapeType}_${randomHex(8)}`,
+      '@id': mintNodeId(nestedShape?.id),
       '@type': nestedShape?.targetClass ?? '',
     }
     append(entry)

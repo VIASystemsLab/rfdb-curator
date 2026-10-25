@@ -43,6 +43,7 @@ import ShapeRecordList from './components/ShapeRecordList.jsx'
 import ValidationPanel from './components/ValidationPanel.jsx'
 import WelcomeGuide from './components/WelcomeGuide.jsx'
 import { hydratePrefixes } from './utils/prefixes.js'
+import { hydrateDataBaseUri } from './utils/nodeIds.js'
 
 // localStorage flag: once a curator dismisses the welcome guide it stays closed on reload.
 const GUIDE_SEEN_KEY = 'rfdb.guideSeen'
@@ -160,34 +161,43 @@ export default function App() {
     return Number.isFinite(n) ? Intl.NumberFormat('en-US').format(n) : '0'
   }
 
-  function getShapeLoadErrorMessage(error) {
+  function getLoadErrorMessage(what, error) {
     const status = error?.response?.status
     const detail = error?.response?.data?.detail
     if (typeof detail === 'string' && detail.trim()) {
-      return `Failed to load shapes (${status ?? 'error'}): ${detail}`
+      return `Failed to load ${what} (${status ?? 'error'}): ${detail}`
     }
-    if (error?.message) {
-      return `Failed to load shapes: ${error.message}`
-    }
-    return 'Failed to load shapes: unknown error.'
+    if (error?.message) return `Failed to load ${what}: ${error.message}`
+    return `Failed to load ${what}: unknown error.`
   }
 
-  function getRecordLoadErrorMessage(error) {
-    const status = error?.response?.status
-    const detail = error?.response?.data?.detail
-    if (typeof detail === 'string' && detail.trim()) {
-      return `Failed to load the record (${status ?? 'error'}): ${detail}`
-    }
-    if (error?.message) return `Failed to load the record: ${error.message}`
-    return 'Failed to load the record: unknown error.'
-  }
-
+  // Shapes and schema info load together: the editor mints new connections
+  // under DATA_BASE_URI (utils/nodeIds.js), so it does not open without it.
   function loadShapes() {
     setLoadingShapes(true)
     setShapesError(null)
-    apiClient
-      .getShapes()
-      .then((data) => {
+    const shapesRequest = apiClient.getShapes().catch((error) => {
+      throw new Error(getLoadErrorMessage('shapes', error))
+    })
+    const infoRequest = apiClient
+      .getSchemaInfo()
+      .then((info) => {
+        if (!info?.dataBaseUri) throw new Error('the response has no dataBaseUri')
+        return info
+      })
+      .catch((error) => {
+        throw new Error(
+          getLoadErrorMessage('schema info from /api/v1/dataexplorer/meta/schema', error),
+        )
+      })
+    Promise.all([shapesRequest, infoRequest])
+      .then(([data, info]) => {
+        setDataBaseUri(info.dataBaseUri)
+        hydrateDataBaseUri(info.dataBaseUri)
+        if (info.projectName) {
+          setProjectName(info.projectName)
+          document.title = `${info.projectName} — Editor`
+        }
         const sorted = [...data].sort((a, b) => (a.label || a.id).localeCompare(b.label || b.id))
         setShapes(sorted)
         if (sorted.length > 0) {
@@ -202,7 +212,7 @@ export default function App() {
       .catch((error) => {
         setShapes([])
         setActiveShape(null)
-        setShapesError(getShapeLoadErrorMessage(error))
+        setShapesError(error.message)
       })
       .finally(() => setLoadingShapes(false))
   }
@@ -220,24 +230,6 @@ export default function App() {
         'Failed to fetch prefix map from /api/v1/dataexplorer/meta/prefixes; IRI compaction disabled.',
       )
     })
-
-    // The project's name, and the namespace that marks an IRI as one of our
-    // records. On failure the header stays blank and the inspector shows
-    // record IRIs as plain text instead of links.
-    apiClient
-      .getSchemaInfo()
-      .then((info) => {
-        setDataBaseUri(info.dataBaseUri || null)
-        if (info.projectName) {
-          setProjectName(info.projectName)
-          document.title = `${info.projectName} — Editor`
-        }
-      })
-      .catch(() => {
-        console.warn(
-          'Failed to fetch schema info from /api/v1/dataexplorer/meta/schema; record links disabled.',
-        )
-      })
   }, [])
 
   useEffect(() => {
@@ -315,7 +307,7 @@ export default function App() {
       .catch((error) => {
         if (ignore) return
         setLoadedRecord(null)
-        setRecordError({ id: selectedRecord.id, message: getRecordLoadErrorMessage(error) })
+        setRecordError({ id: selectedRecord.id, message: getLoadErrorMessage('the record', error) })
         setRecordLoading(false)
       })
     return () => {
