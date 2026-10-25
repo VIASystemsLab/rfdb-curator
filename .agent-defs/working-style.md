@@ -27,6 +27,10 @@
   fix, and probing it burns time and can make the state worse.
 - For a question that comes up mid-task, do everything that does not depend
   on it first, then ask. A doubt about the prompt itself is the exception above.
+- **Ask before assuming backward compatibility is needed.** Existing data,
+  stored files, IRI formats, API callers, tests written against today's
+  behaviour: none of them is a reason to keep old behaviour, accept an old
+  format alongside a new one, or soften a design, until the user says it is.
 
 ## Verifying
 

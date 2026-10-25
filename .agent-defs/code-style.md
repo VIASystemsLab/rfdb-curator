@@ -17,7 +17,8 @@ comment density, its idioms.
   pins. An older local tool can silently rewrite the lockfile format and turn a
   one-line change into a whole-file diff.
 - Avoid backwards-compatibility shims, unused `_var` renames, re-exported dead
-  types, or "removed" comments unless compatibility is an actual requirement.
+  types, or "removed" comments unless compatibility is an actual requirement,
+  which only the user decides (see "Asking" in `working-style.md`).
   Delete dead code outright when it is clearly unused.
 - Do not reformat unrelated code.
 - **Derived files are named by prefix.** A file cut, filtered or converted
