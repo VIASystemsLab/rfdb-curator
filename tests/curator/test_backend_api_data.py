@@ -680,6 +680,12 @@ def test_delete_is_refused_while_a_card_cites_the_record(api_client):
     _assert_entity_has_label_and_type(person, CORE_PERSON, f"{prefix} Person")
 
 
+def test_delete_of_a_missing_record_is_a_404(api_client):
+    """Deleting a record that was never created is reported as not found."""
+    status, body = _delete(_data_iri(f"never_created_{_make_suffix()}"))
+    assert status == 404, body
+
+
 def test_delete_removes_the_record_and_its_cards(api_client):
     """An uncited Work goes, and its cards with it; the Person it cited stays."""
     prefix = f"Deleted {_make_suffix()}"

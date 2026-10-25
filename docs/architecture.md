@@ -173,7 +173,7 @@ consumer. Every response also carries plain RFC 8288 discovery: `rel="canonical"
 | `GET` | `/api/v1/curator/shapes` | NodeShapes with metadata, field descriptors and the `readOnly` flag — **identical to the reader's** |
 | `GET` | `/api/v1/curator/forms?shapeId=...` | Generated form schema for one shape. Writer-only: form fields exist to drive an editing form |
 | `POST` | `/api/v1/curator/entities` | Create (no `@id`) or update (`@id`) one record and its helper nodes (JSON-LD → SHACL validate → Turtle load) |
-| `DELETE` | `/api/v1/curator/entities?id=<iri>` | Delete a record and its helper nodes; 409 while other records point to it |
+| `DELETE` | `/api/v1/curator/entities?id=<iri>` | Delete a record and its helper nodes; 404 if it does not exist, 409 while other records point to it |
 | `POST` | `/api/v1/curator/validate` | Dry-run SHACL validation without persisting |
 | `POST` | `/api/v1/curator/files/staged` | Stage an uploaded digital copy (e.g. a PDF) before it is attached to a record |
 | `GET` | `/api/v1/curator/files/staged/{fileId}` | Preview a staged, not-yet-submitted copy (mode-gated, curator-only) |

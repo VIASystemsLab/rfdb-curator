@@ -643,9 +643,10 @@ def delete_entity(
     path-encoded IRI needs double-encoding to survive, and a bare local name fails
     the unsafe-IRI guard with a 400 that reads like a data problem.
 
-    A record another record points to, directly or through one of that record's
-    bridge nodes (a Person in a Work's AgentRole), is refused with 409 naming
-    them: deleting it would leave them unsaveable until the link is fixed.
+    A record that does not exist is a 404. A record another record points to,
+    directly or through one of that record's bridge nodes (a Person in a Work's
+    AgentRole), is refused with 409 naming them: deleting it would leave them
+    unsaveable until the link is fixed.
 
     An optional ``shapeId`` query parameter may be supplied by the frontend to
     enable per-shape write protection via ``READ_ONLY_SHAPES``.  When absent,
@@ -656,6 +657,8 @@ def delete_entity(
         _assert_shape_writable(shapeId)
     _validate_iri(entity_id)
     store = request.app.state.store
+    if not _has_triples(store, entity_id):
+        raise HTTPException(status_code=404, detail=f"No record <{entity_id}> to delete.")
     links = sorted(all_bridge_link_predicates(request.app.state.shape_dep_graph))
 
     dependents = _dependents(store, entity_id, links)

@@ -515,6 +515,16 @@ def _delete(store: _GraphOxigraph, iri: str) -> None:
     delete_entity(_dep_request(store), entity_id=DATA + iri, shapeId="")
 
 
+def test_delete_of_a_missing_record_is_a_404() -> None:
+    """Deleting an IRI the store does not describe is reported, not silently accepted."""
+    store = _GraphOxigraph(_STORED_WORK)
+    before = set(store.g)
+    with pytest.raises(HTTPException) as exc_info:
+        _delete(store, "never_created")
+    assert exc_info.value.status_code == 404
+    assert set(store.g) == before
+
+
 def test_delete_removes_the_records_cards() -> None:
     """The record's cards are deleted with it; the people and roles they cite stay."""
     store = _GraphOxigraph(_STORED_WORK)
