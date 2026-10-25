@@ -611,7 +611,7 @@ html = [
 
 [[package]]
 name = "rfdb-core"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "rfdb-core" }
 dependencies = [
     { name = "boto3" },
@@ -655,7 +655,7 @@ dev = [
 
 [[package]]
 name = "rfdb-curator-backend"
-version = "0.4.0"
+version = "0.5.0"
 source = { virtual = "curator-backend" }
 dependencies = [
     { name = "boto3" },
@@ -702,7 +702,7 @@ dev = [
 
 [[package]]
 name = "rfdb-dataexplorer-backend"
-version = "0.4.0"
+version = "0.5.0"
 source = { virtual = "dataexplorer-backend" }
 dependencies = [
     { name = "boto3" },

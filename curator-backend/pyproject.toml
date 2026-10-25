@@ -1,6 +1,6 @@
 [project]
 name = "rfdb-curator-backend"
-version = "0.4.0"
+version = "0.5.0"
 description = "FastAPI write backend for the RossijskijFeatrDB curator (the only service that mutates the store)"
 requires-python = ">=3.11"
 dependencies = [
