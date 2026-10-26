@@ -92,10 +92,6 @@ function tripleToFieldValue(val, fieldType, languageTagPolicy, maxCount = 1) {
   return triple ?? ''
 }
 
-function tripleToFieldScalarValue(val, fieldType, languageTagPolicy) {
-  return tripleToFieldValue(val, fieldType, languageTagPolicy, 1)
-}
-
 function schemaLoadErrorMessage(error) {
   const status = error?.response?.status
   const detail = error?.response?.data?.detail
@@ -236,6 +232,30 @@ export default function ShapeForm({
   }
 
   /**
+   * Fetch every node a link field points to (bridge cards, digital copies) and
+   * map each with `toEntry(iri, flatTriples)`. A node that fails to load is
+   * skipped so the rest of the form still loads, and the field is added to
+   * `failed`: saving now would drop that link (see `hydration`).
+   */
+  async function loadLinkedNodes(field, flat, failed, toEntry) {
+    const val = flat[field.path]
+    const rawVals = Array.isArray(val) ? val : val ? [val] : []
+    const iris = rawVals.map((t) => (t?.objectType === 'iri' ? t.object : null)).filter(Boolean)
+    const entries = await Promise.all(
+      iris.map(async (iri) => {
+        try {
+          const entity = await apiClient.getEntity(iri)
+          return await toEntry(iri, triplesToFlatObject(entity.triples))
+        } catch {
+          if (!failed.includes(field.name)) failed.push(field.name)
+          return null
+        }
+      })
+    )
+    return entries.filter(Boolean)
+  }
+
+  /**
    * Resolve a human-readable label for an entity IRI by querying the search API.
    * Falls back to the IRI itself if no label is found or the request fails.
    * Used to populate entity-search fields with proper labels on form load.
@@ -269,66 +289,21 @@ export default function ShapeForm({
     }
 
     for (const field of fields) {
-      const val = flat[field.path]
-
-      // --- Multi-value language-tagged list (e.g. skos:altLabel) ---
-      if (field.type === 'lang-string-list') {
-        formData[field.path] = tripleToFieldScalarValue(val, field.type, field.languageTagPolicy)
-        continue
-      }
-
-      // --- Single language-tagged string (e.g. rdfs:label) ---
-      if (field.type === 'lang-string') {
-        formData[field.path] = tripleToFieldScalarValue(val, field.type, field.languageTagPolicy)
-        continue
-      }
-
-      // --- Entity search ---
-      // Initialised to null here; resolved asynchronously in useEffect
-      // to obtain a proper {value, label} object the async-select can display.
       if (field.type === 'entity-search') {
+        // Resolved asynchronously in the hydration effect into the {value, label}
+        // object the async-select displays.
         formData[field.path] = null
-      }
-
-      // --- URI input ---
-      else if (field.type === 'uri') {
+      } else if (field.type === 'nested' || field.type === 'file-list') {
+        // Filled asynchronously in the hydration effect from each linked node's own
+        // triples; empty meanwhile so useFieldArray starts clean.
+        formData[field.path] = []
+      } else {
         formData[field.path] = tripleToFieldValue(
-          val,
+          flat[field.path],
           field.type,
           field.languageTagPolicy,
           field.maxCount
         )
-      }
-
-      // --- Nested bridge entity ---
-      // Not populated here — handled asynchronously in the useEffect below
-      // by fetching each bridge node's own triples from the backend.
-      // Initialised to empty array so useFieldArray starts in a clean state
-      // while the async fetch is in flight.
-      else if (field.type === 'nested') {
-        formData[field.path] = []
-      }
-
-      // --- Digital copies (file-list) ---
-      // Same pattern as nested: entries are hydrated asynchronously from the
-      // linked schema:DigitalDocument nodes' own triples.
-      else if (field.type === 'file-list') {
-        formData[field.path] = []
-      }
-
-      // --- Temporal (xsd:date / xsd:gYear / xsd:gYearMonth) ---
-      else if (field.type === 'temporal') {
-        formData[field.path] = tripleToFieldScalarValue(val, field.type, field.languageTagPolicy)
-      }
-
-      // --- Year and Number ---
-      else if (field.type === 'year' || field.type === 'number') {
-        formData[field.path] = tripleToFieldScalarValue(val, field.type, field.languageTagPolicy)
-      }
-
-      // --- Generic fallback for text-like fields ---
-      else {
-        formData[field.path] = tripleToFieldScalarValue(val, field.type, field.languageTagPolicy)
       }
     }
 
@@ -417,103 +392,62 @@ export default function ShapeForm({
 
     // Step 2 — resolve nested bridge entities and entity-search labels in parallel.
     const nestedPromises = nestedFields.map(async (field) => {
-      const val = flat[field.path]
-
-      // Collect all bridge IRIs linked via this predicate (may be multiple)
-      const rawVals = Array.isArray(val) ? val : val ? [val] : []
-      const iris = rawVals.map((t) => (t?.objectType === 'iri' ? t.object : null)).filter(Boolean)
-
-      if (iris.length === 0) {
-        mapped[field.path] = []
-        return
-      }
-
       // Resolve the nested shape descriptor so we know which properties to map
       const resolvedShape = allShapes?.find((s) => s.id === field.nestedShape)
 
-      const entries = await Promise.all(
-        iris.map(async (iri) => {
-          try {
-            const entity = await apiClient.getEntity(iri)
-            const bridgeFlat = triplesToFlatObject(entity.triples)
+      const toCard = async (iri, bridgeFlat) => {
+        // Start with the IRI so AnonymousEntityEditor can identify the node
+        const entry = {
+          '@id': iri,
+          // Keep rdf:type in form state so nested nodes satisfy sh:hasValue rdf:type constraints.
+          '@type': resolvedShape?.targetClass ?? '',
+        }
 
-            // Start with the IRI so AnonymousEntityEditor can identify the node
-            const entry = {
-              '@id': iri,
-              // Keep rdf:type in form state so nested nodes satisfy sh:hasValue rdf:type constraints.
-              '@type': resolvedShape?.targetClass ?? '',
-            }
+        for (const prop of resolvedShape?.properties ?? []) {
+          if (prop.path === 'rdf:type') continue
 
-            if (resolvedShape) {
-              for (const prop of resolvedShape.properties) {
-                if (prop.path === 'rdf:type') continue
+          const propVal = bridgeFlat[prop.path]
+          if (!propVal) continue
 
-                const propVal = bridgeFlat[prop.path]
-                if (!propVal) continue
-
-                if (prop.type === 'entity-search') {
-                  // Resolve label for entity-search props inside bridge entities too
-                  const t = Array.isArray(propVal) ? propVal[0] : propVal
-                  const iriVal = t?.objectType === 'iri' ? t.object : String(t)
-                  entry[prop.path] = await resolveEntityLabel(iriVal, prop)
-                } else {
-                  // Reuse the same triple-to-widget mapping as top-level fields.
-                  entry[prop.path] = tripleToFieldValue(propVal, prop.type, prop.languageTagPolicy)
-                }
-              }
-            }
-
-            return entry
-          } catch {
-            // Skip the card so the rest of the form still loads, but record the
-            // field: saving now would delete this connection (see `hydration`).
-            if (!failedNested.includes(field.name)) failedNested.push(field.name)
-            return null
+          if (prop.type === 'entity-search') {
+            // Resolve label for entity-search props inside bridge entities too
+            const t = Array.isArray(propVal) ? propVal[0] : propVal
+            const iriVal = t?.objectType === 'iri' ? t.object : String(t)
+            entry[prop.path] = await resolveEntityLabel(iriVal, prop)
+          } else {
+            // Reuse the same triple-to-widget mapping as top-level fields.
+            entry[prop.path] = tripleToFieldValue(propVal, prop.type, prop.languageTagPolicy)
           }
-        })
-      )
+        }
 
-      mapped[field.path] = entries.filter(Boolean)
+        return entry
+      }
+
+      mapped[field.path] = await loadLinkedNodes(field, flat, failedNested, toCard)
     })
 
     // Step 2b — hydrate file-list entries from the linked digital-copy nodes.
-    // Same fetch pattern as nested bridge entities; each entry becomes the
-    // plain object shape FileField renders and jsonld.js re-emits on submit.
+    // Each entry becomes the plain object shape FileField renders and jsonld.js
+    // re-emits on submit.
     const filePromises = fileFields.map(async (field) => {
-      const val = flat[field.path]
-      const rawVals = Array.isArray(val) ? val : val ? [val] : []
-      const iris = rawVals.map((t) => (t?.objectType === 'iri' ? t.object : null)).filter(Boolean)
-
-      const entries = await Promise.all(
-        iris.map(async (iri) => {
-          try {
-            const entity = await apiClient.getEntity(iri)
-            const fileFlat = triplesToFlatObject(entity.triples)
-            const scalar = (key) => {
-              const t = fileFlat[key]
-              const first = Array.isArray(t) ? t[0] : t
-              return first?.object
-            }
-            const fileId = iri.split('/').pop()
-            const pages = scalar('schema:numberOfPages')
-            return {
-              '@id': iri,
-              fileId,
-              name: scalar('schema:name') ?? fileId,
-              contentUrl: scalar('schema:contentUrl') ?? '',
-              contentSize: Number(scalar('schema:contentSize') ?? 0),
-              sha256: scalar('schema:sha256') ?? '',
-              numberOfPages: pages != null ? Number(pages) : null,
-            }
-          } catch {
-            // As for nested cards: skip the copy so the rest of the form loads, but
-            // record the field, because saving now would drop the copy's link.
-            if (!failedNested.includes(field.name)) failedNested.push(field.name)
-            return null
-          }
-        })
-      )
-      mapped[field.path] = entries.filter(Boolean)
+      mapped[field.path] = await loadLinkedNodes(field, flat, failedNested, (iri, fileFlat) => {
+        const scalar = (key) => {
+          const t = fileFlat[key]
+          const first = Array.isArray(t) ? t[0] : t
+          return first?.object
+        }
+        const fileId = iri.split('/').pop()
+        const pages = scalar('schema:numberOfPages')
+        return {
+          '@id': iri,
+          fileId,
+          name: scalar('schema:name') ?? fileId,
+          contentUrl: scalar('schema:contentUrl') ?? '',
+          contentSize: Number(scalar('schema:contentSize') ?? 0),
+          sha256: scalar('schema:sha256') ?? '',
+          numberOfPages: pages != null ? Number(pages) : null,
+        }
+      })
     })
 
     // Step 3 — resolve labels for top-level entity-search fields
