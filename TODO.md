@@ -239,6 +239,18 @@ in this repository too.
   suite's fixture now does. App-import helpers are repeated in four files; a per-suite
   fixture would do. The docstring of `tests/curator/test_seeder.py` lists only the
   `VOCAB_PATH` cases, though the file also tests `bootstrap_store`.
+- [ ] **Review the documentation: content, coherence, structure and style.** `README.md` and
+  `docs/` (seven files). Check every statement against the code, remove what is said twice
+  (one home, links elsewhere), make the files agree with each other and with
+  `.agent-defs/`, and give each a clear scope. Apply `.agent-defs/language.md` throughout:
+  it holds for every published text, and the docs still carry 124 em dashes.
+- [ ] **DECIDE — how code and tests get their settings.** Each service builds one settings
+  object when `core/config.py` is imported, and 15 modules import it directly. Tests override
+  it by patching that object or by dropping `core.config` from `sys.modules` and re-importing,
+  so results can depend on import order. Reconsider passing settings in (for example
+  FastAPI's cached `get_settings()` with `Depends`, swapped in tests through
+  `app.dependency_overrides`), refactor the tests to match, and record the practice in the
+  rules (`python-package.md`, configuration).
 - [ ] Investigate what dominates build/deploy time (backend especially) and whether it can be sped up.
 - [ ] Set up automated release to GitHub Releases and the GitHub package registry.
 - [ ] Verify versioning and commit tagging work with GitHub Actions (automatic release from tagged commits).
