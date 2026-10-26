@@ -205,7 +205,7 @@ When the RFDB namespaces change, update these locations together:
 - `schema/rfdb_schema.ttl` — authoritative Turtle prefixes and SHACL shape IRIs. Shape IRIs use `rfdbs:` (`https://rosfeatr.eu/rdf/schema/`); data resources use `rfdb:` (`https://rosfeatr.eu/rdf/data/`).
 - `data/rfdb_vocab.ttl` and `data/rfdb_data.ttl` — authoritative Turtle data prefixes for seeded and fixture data.
 - `DATA_BASE_URI` and `SCHEMA_BASE_URI` — the settings both backends name records and shapes under. Set them in the compose files (or a root `.env` in dev, `.env.prod` in production); the `.env.example` files show where each one ends up.
-- `curator-backend/models/data.py`, `rfdb-core/rfdb_core/models_data.py` and the two `core/config.py` files — doc examples reference shape/data IRIs.
+- `curator-backend/models/data.py`, `dataexplorer-backend/models/data.py` and the two `core/config.py` files — doc examples reference shape/data IRIs.
 - `tests/` Python files (all three subdirectories) — many tests assert full shape or entity IRIs directly; search for `rosfeatr.eu/rdf/` before and after any namespace migration.
 
 Quick check from repo root:
