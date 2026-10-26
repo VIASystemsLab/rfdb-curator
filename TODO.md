@@ -218,12 +218,6 @@ in this repository too.
   Oxigraph together. The reader seeds nothing, so its workers can grow on their own. Past one
   host, the single Oxigraph and Garage instances are the limit; multi-user editing (above)
   also has to land before several curators write at once.
-- [ ] **CHECK — `no-cache` on the frontends' HTML.** In `proxy/spa.Caddyfile`, `header
-  /index.html Cache-Control "no-cache"` probably never matches `/` or a deep link: `header`
-  runs before the `try_files` rewrite, so it sees the original path. If so, browsers may keep
-  an old `index.html`, and with it old asset names, after a deploy. Check against a running
-  production build (`curl -I` on `/` and on a deep link), then fix by setting `no-cache` on
-  every path outside the immutable assets.
 - [ ] **DECIDE — the script that makes `data/glottolog_language_dev_subset.ttl`.** The file is
   committed, but the script that cut it from `data/glottolog_language.ttl` is not, so nobody
   can rebuild it or change the language list. Decide whether to commit it (and where:
