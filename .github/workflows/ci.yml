@@ -148,7 +148,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '26.12'
           cache: 'npm'
           cache-dependency-path: curator-frontend/package-lock.json
 
@@ -173,7 +173,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '26.12'
           cache: 'npm'
           cache-dependency-path: graphexplorer-frontend/package-lock.json
 

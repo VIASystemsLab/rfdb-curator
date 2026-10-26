@@ -15,7 +15,7 @@
 # ---------------------------------------------------------------------------
 # Pin the full patch version so `docker build` is fully reproducible.
 # Update deliberately when you want to take a new Node release.
-FROM node:20.20-bookworm-slim AS development
+FROM node:26.12-bookworm-slim AS development
 
 # NODE_ENV=development is not cosmetic: npm ci skips devDependencies when
 # NODE_ENV=production, and vite is a devDependency. Pinning it here means
