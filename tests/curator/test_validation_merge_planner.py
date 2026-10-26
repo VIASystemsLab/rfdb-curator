@@ -21,12 +21,12 @@ def _load_backend_symbols() -> SimpleNamespace:
 
     from core.validation_merge import (
         _bfs_shape_edges,
-        _build_shape_dep_graph,
-        _build_validation_construct,
         _ShapeEdge,
         _ShapeNode,
         all_bridge_link_predicates,
         bridge_links,
+        build_shape_dep_graph,
+        build_validation_construct,
     )
     from rfdb_core.triplestore import OxigraphStore
 
@@ -37,8 +37,8 @@ def _load_backend_symbols() -> SimpleNamespace:
         bfs_shape_edges=_bfs_shape_edges,
         all_bridge_link_predicates=all_bridge_link_predicates,
         bridge_links=bridge_links,
-        build_shape_dep_graph=_build_shape_dep_graph,
-        build_validation_construct=_build_validation_construct,
+        build_shape_dep_graph=build_shape_dep_graph,
+        build_validation_construct=build_validation_construct,
     )
 
 

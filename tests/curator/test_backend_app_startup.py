@@ -127,7 +127,7 @@ def test_startup_initialization_order_populates_services_before_seeding(
         )
 
     monkeypatch.setattr(app_module, "build_triplestore", build_triplestore_stub)
-    monkeypatch.setattr(app_module, "_build_shape_dep_graph", build_shape_dep_graph_stub)
+    monkeypatch.setattr(app_module, "build_shape_dep_graph", build_shape_dep_graph_stub)
     monkeypatch.setattr(_seeder_module(), "seed_store", seed_store_stub)
 
     fake_app = _make_fake_app()
@@ -214,7 +214,7 @@ def test_reset_data_on_startup_clears_store_before_seeding(
         )
 
     monkeypatch.setattr(app_module, "build_triplestore", build_triplestore_stub)
-    monkeypatch.setattr(app_module, "_build_shape_dep_graph", build_shape_dep_graph_stub)
+    monkeypatch.setattr(app_module, "build_shape_dep_graph", build_shape_dep_graph_stub)
     monkeypatch.setattr(_seeder_module(), "seed_store", seed_store_stub)
 
     fake_app = _make_fake_app()
@@ -294,7 +294,7 @@ def test_first_write_can_read_shape_dep_graph_after_startup(
         )
 
     monkeypatch.setattr(app_module, "build_triplestore", build_triplestore_stub)
-    monkeypatch.setattr(app_module, "_build_shape_dep_graph", build_shape_dep_graph_stub)
+    monkeypatch.setattr(app_module, "build_shape_dep_graph", build_shape_dep_graph_stub)
     monkeypatch.setattr(_seeder_module(), "seed_store", seed_store_stub)
 
     fake_app = _make_fake_app()
@@ -314,7 +314,7 @@ def test_first_write_can_read_shape_dep_graph_after_startup(
 
     monkeypatch.setattr(
         data_module,
-        "_build_validation_construct",
+        "build_validation_construct",
         capture_build_validation_construct,
     )
 

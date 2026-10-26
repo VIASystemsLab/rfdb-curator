@@ -237,7 +237,7 @@ def test_create_or_update_seed_iri_composition(
 
     monkeypatch.setattr(
         symbols.data_module,
-        "_build_validation_construct",
+        "build_validation_construct",
         _capture_build_validation_construct,
     )
 

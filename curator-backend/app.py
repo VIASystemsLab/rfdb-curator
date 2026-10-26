@@ -48,7 +48,7 @@ from api.validate import router as validate_router
 from core.config import settings
 from core.seeder import bootstrap_store
 from core.shacl_validator import ShaclValidator
-from core.validation_merge import _build_shape_dep_graph
+from core.validation_merge import build_shape_dep_graph
 from rfdb_core.app_factory import configure_app
 from rfdb_core.file_storage import build_storage
 from rfdb_core.logging_config import configure_logging
@@ -104,7 +104,7 @@ async def lifespan(app: FastAPI):
         app.state.schema_extractor = SchemaExtractor(
             settings.schema_path, settings.long_text_predicates, settings.external_id_links
         )
-        app.state.shape_dep_graph = _build_shape_dep_graph(app.state.schema_extractor)
+        app.state.shape_dep_graph = build_shape_dep_graph(app.state.schema_extractor)
         app.state.shacl_validator = ShaclValidator(settings.schema_path)
     except BadSyntax as exc:
         logger.error(

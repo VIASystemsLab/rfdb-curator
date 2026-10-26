@@ -19,9 +19,9 @@ from rdflib.term import Node
 from core.config import settings
 from core.node_ids import MintError, mint_iri
 from core.validation_merge import (
-    _build_validation_construct,
     all_bridge_link_predicates,
     bridge_links,
+    build_validation_construct,
     shape_field_predicates,
 )
 from models.data import (
@@ -508,7 +508,7 @@ def create_or_update_entity(payload: EntityData, request: Request):
     # clean 503 because it may silently pass constraints that should fail.
     referenced_graph = Graph()
     if seed_iris:
-        construct_query = _build_validation_construct(
+        construct_query = build_validation_construct(
             dep_graph=dep_graph,
             root_shape_id=payload.shapeId,
             seed_iris=seed_iris,

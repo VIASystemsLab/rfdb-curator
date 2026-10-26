@@ -29,7 +29,7 @@ from rdflib.namespace import RDF, RDFS
 
 from api.data import create_or_update_entity, delete_entity
 from core.shacl_validator import ShaclValidator
-from core.validation_merge import _build_shape_dep_graph
+from core.validation_merge import build_shape_dep_graph
 from models.data import EntityData, TripleObject
 from rfdb_core.schema_extractor import SchemaExtractor
 
@@ -186,7 +186,7 @@ def _dep_request(oxigraph: _GraphOxigraph) -> SimpleNamespace:
         app=SimpleNamespace(
             state=SimpleNamespace(
                 store=oxigraph,
-                shape_dep_graph=_build_shape_dep_graph(extractor),
+                shape_dep_graph=build_shape_dep_graph(extractor),
                 shacl_validator=ShaclValidator(str(SCHEMA_PATH)),
             )
         )
