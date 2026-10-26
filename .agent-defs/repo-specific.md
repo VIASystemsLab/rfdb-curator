@@ -200,7 +200,10 @@ checked before it is pushed, and confirmed after.
   that exact tag or commit exists in the action's repository. Do not assume a
   moving major tag (`@v10`) exists because a release (`v10.3.2`) does: some
   actions, `astral-sh/setup-uv` among them, publish only full version tags.
-  Prefer a full version tag. Checking needs the network, so ask first.
+  Checking needs the network, so ask first.
+- **Use the major tag where the action publishes one** (`actions/checkout@v7`),
+  as GitHub recommends, so its fixes arrive without an edit. Use the full
+  version only where no major tag exists (`astral-sh/setup-uv@v10.3.2`).
 - **Check the inputs at that ref.** Read the action's `action.yml` at the new
   tag, not at `main`. Every `with:` key the workflow passes must still exist,
   and any changed default that matters (caching, for example) goes in the commit
