@@ -13,7 +13,8 @@
 # ---------------------------------------------------------------------------
 # development
 # ---------------------------------------------------------------------------
-# Pin the full patch version so `docker build` is reproducible.
+# Pinned to major.minor (.agent-defs/platform.md, "Images"): patch releases
+# arrive on rebuild; a new minor is a deliberate change.
 FROM node:26.12-bookworm-slim AS development
 
 # npm ci skips devDependencies when NODE_ENV=production, and vite is a

@@ -33,8 +33,11 @@ apply, they say how.
 
 ## Images
 
-Pin image tags exactly. Never `latest`, never an open-ended range. Secrets and
-`.env` follow `security.md`.
+Pin image tags, and runtime versions in CI, to major.minor: `node:26.12-bookworm-slim`,
+`python:3.12-slim`, `node-version: '26.12'`. Patch releases, mostly security fixes,
+then arrive on the next rebuild; a minor release is a deliberate change. Never
+`latest`, never a major alone, never a full patch version. Secrets and `.env`
+follow `security.md`.
 
 ## Compose files
 
