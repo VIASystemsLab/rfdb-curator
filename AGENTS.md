@@ -29,6 +29,7 @@ cannot both be followed, stop and ask which one applies.
 | [working-style.md](.agent-defs/working-style.md) | Scope, when to ask, verifying, reporting |
 | [code-style.md](.agent-defs/code-style.md) | Conventions, dependencies, version bumps |
 | [language.md](.agent-defs/language.md) | How to write prose in this repository |
+| [upgrades.md](.agent-defs/upgrades.md) | Checking, running and verifying version upgrades |
 | [platform.md](.agent-defs/platform.md) | Docker Compose services with application code and persistent state. |
 | [python-package.md](.agent-defs/python-package.md) | A Python package or a set of scripts, installed and tested locally. |
 | [repo-specific.md](.agent-defs/repo-specific.md) | Rules specific to this repository, kept through migration |
