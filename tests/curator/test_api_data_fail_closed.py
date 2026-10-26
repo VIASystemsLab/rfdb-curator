@@ -8,12 +8,10 @@ it tests backend branch semantics when related-entity merge fails.
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "curator-backend"
 DATA_NS = "https://rosfeatr.eu/rdf/data"
 SHAPE_NS = "https://rosfeatr.eu/rdf/schema"
 # The IRI the seed-composition test makes the backend mint for its new record.
@@ -379,35 +377,3 @@ def test_delete_rejects_read_only_shape(monkeypatch: pytest.MonkeyPatch) -> None
     assert exc.value.status_code == 403
     assert "read-only" in str(exc.value.detail).lower()
     assert oxigraph.calls == []
-
-
-def test_shapes_endpoint_stamps_read_only_flag() -> None:
-    """The curator's shapes route flags shapes listed in READ_ONLY_SHAPES.
-
-    The stamp itself is in ``rfdb_core.shapes``, shared with the reader so both
-    services serve identical flags, and its pure-function behaviour is covered in
-    ``tests/core/test_shapes_stamp.py``. What matters *here* is the curator-side
-    wiring: that this service still applies the flag, and applies it from its own
-    settings rather than from a hardcoded list.
-    """
-
-    import importlib
-
-    shapes_module = importlib.import_module("api.shapes")
-
-    language_shape_uri = f"{SHAPE_NS}/LanguageShape"
-    other_shape_uri = f"{SHAPE_NS}/SourceShape"
-
-    locked = shapes_module.stamp_read_only(
-        {"id": language_shape_uri, "label": "Language"}, [language_shape_uri]
-    )
-    unlocked = shapes_module.stamp_read_only(
-        {"id": other_shape_uri, "label": "Source"}, [language_shape_uri]
-    )
-
-    assert locked["readOnly"] is True
-    assert unlocked["readOnly"] is False
-
-    # The route must read the deployment's own policy, not a literal.
-    source = (BACKEND_DIR / "api" / "shapes.py").read_text()
-    assert "settings.read_only_shapes" in source

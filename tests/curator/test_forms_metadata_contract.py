@@ -74,10 +74,10 @@ FIELD_TYPES = {
 }
 
 
-def _client() -> TestClient:
+def _client(shapes_router=router) -> TestClient:
     """Mount the shapes router over a real SchemaExtractor for the active schema."""
     app = FastAPI()
-    app.include_router(router, prefix="/api/v1/curator")
+    app.include_router(shapes_router, prefix="/api/v1/curator")
     app.state.schema_extractor = SchemaExtractor(str(SCHEMA_PATH))
     return TestClient(app)
 
@@ -120,3 +120,25 @@ def test_core_shapes_are_present() -> None:
         "LanguageShape",
     ):
         assert BASE + name in ids
+
+
+def test_read_only_flag_follows_the_read_only_shapes_setting(monkeypatch) -> None:
+    """Both routes stamp ``readOnly`` from this service's ``READ_ONLY_SHAPES``, not a literal.
+
+    The stamp itself is covered in ``tests/core/test_shapes_stamp.py``; this checks
+    the curator's wiring.
+    """
+    import api.shapes as shapes_module
+
+    # Other tests re-import service modules, so patch and mount the same module.
+    monkeypatch.setattr(shapes_module.settings, "read_only_shapes", [PLACE_SHAPE])
+    client = _client(shapes_module.router)
+
+    flags = {s["id"]: s["readOnly"] for s in client.get("/api/v1/curator/shapes").json()}
+    assert flags[PLACE_SHAPE] is True
+    assert not any(flag for shape_id, flag in flags.items() if shape_id != PLACE_SHAPE)
+
+    place = client.get("/api/v1/curator/forms", params={"shapeId": PLACE_SHAPE}).json()
+    other = client.get("/api/v1/curator/forms", params={"shapeId": BASE + "SourceShape"}).json()
+    assert place["shape"]["readOnly"] is True
+    assert other["shape"]["readOnly"] is False
