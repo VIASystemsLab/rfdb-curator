@@ -16,16 +16,9 @@
 import { useState } from 'react'
 import { Controller } from 'react-hook-form'
 import { apiClient } from '../api/client.js'
+import { formatBytes } from '../utils/format.js'
 import Icon from './Icon.jsx'
 import './FileField.css'
-
-function humanSize(bytes) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
-  const value = bytes / 1024 ** i
-  return `${i === 0 ? value : value.toFixed(1)} ${units[i]}`
-}
 
 function entryId(entry) {
   return entry['@id'] ?? entry.id
@@ -102,7 +95,7 @@ export default function FileField({ field, control }) {
                       {entry.name || entryFileId(entry)}
                     </a>
                     <span className="file-field-meta">
-                      {humanSize(entry.contentSize)}
+                      {formatBytes(entry.contentSize)}
                       {entry.numberOfPages ? ` · ${entry.numberOfPages} pp` : ''}
                     </span>
                     <button

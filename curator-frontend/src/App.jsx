@@ -42,6 +42,7 @@ import DataContextPanel from './components/DataContextPanel.jsx'
 import ShapeRecordList from './components/ShapeRecordList.jsx'
 import ValidationPanel from './components/ValidationPanel.jsx'
 import WelcomeGuide from './components/WelcomeGuide.jsx'
+import { formatCount } from './utils/format.js'
 import { hydratePrefixes } from './utils/prefixes.js'
 
 // localStorage flag: once a curator dismisses the welcome guide it stays closed on reload.
@@ -152,12 +153,6 @@ export default function App() {
       .getDataCounts()
       .then((data) => setShapeCounts(data?.counts ?? {}))
       .catch(() => setShapeCounts({}))
-  }
-
-  /** Format a raw count number with locale-aware thousands separators. */
-  function formatCount(value) {
-    const n = Number(value ?? 0)
-    return Number.isFinite(n) ? Intl.NumberFormat('en-US').format(n) : '0'
   }
 
   function getLoadErrorMessage(what, error) {

@@ -17,25 +17,10 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { apiClient } from '../api/client.js'
+import { formatBytes, formatCount } from '../utils/format.js'
 import { compactIri, prefixMap } from '../utils/prefixes.js'
 import Icon from './Icon.jsx'
 import './DataContextPanel.css'
-
-/** Locale-aware thousands separators for a triple count. */
-function fmt(n) {
-  const value = Number(n ?? 0)
-  return Number.isFinite(value) ? value.toLocaleString('en-US') : '0'
-}
-
-/** Human-readable byte size for the file-storage stats. */
-function fmtBytes(bytes) {
-  const n = Number(bytes ?? 0)
-  if (!n) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)))
-  const value = n / 1024 ** i
-  return `${i === 0 ? value : value.toFixed(1)} ${units[i]}`
-}
 
 export default function DataContextPanel() {
   const [context, setContext] = useState(null)
@@ -126,10 +111,10 @@ export default function DataContextPanel() {
                         {g.active && <span className="dc-badge">active</span>}
                         {g.count === 0 && <span className="dc-badge dc-badge-muted">empty</span>}
                       </td>
-                      <td className="dc-num">{fmt(g.count)}</td>
-                      <td className="dc-num">{fmt(g.subjects)}</td>
-                      <td className="dc-num">{fmt(g.objects)}</td>
-                      <td className="dc-num">{fmt(g.literals)}</td>
+                      <td className="dc-num">{formatCount(g.count)}</td>
+                      <td className="dc-num">{formatCount(g.subjects)}</td>
+                      <td className="dc-num">{formatCount(g.objects)}</td>
+                      <td className="dc-num">{formatCount(g.literals)}</td>
                     </tr>
                   ))
                 )}
@@ -137,10 +122,10 @@ export default function DataContextPanel() {
               <tfoot>
                 <tr>
                   <td>Total</td>
-                  <td className="dc-num">{fmt(context.totalTriples)}</td>
-                  <td className="dc-num">{fmt(context.totalSubjects)}</td>
-                  <td className="dc-num">{fmt(context.totalObjects)}</td>
-                  <td className="dc-num">{fmt(context.totalLiterals)}</td>
+                  <td className="dc-num">{formatCount(context.totalTriples)}</td>
+                  <td className="dc-num">{formatCount(context.totalSubjects)}</td>
+                  <td className="dc-num">{formatCount(context.totalObjects)}</td>
+                  <td className="dc-num">{formatCount(context.totalLiterals)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -182,10 +167,10 @@ export default function DataContextPanel() {
         ) : (
           <>
             <p className="dc-active">
-              <strong>{fmt(fileStats.linkedNodes)}</strong> digital{' '}
+              <strong>{formatCount(fileStats.linkedNodes)}</strong> digital{' '}
               {fileStats.linkedNodes === 1 ? 'copy' : 'copies'} attached to records
               {fileStats.registered.bytes > 0 && (
-                <> · {fmtBytes(fileStats.registered.bytes)} stored</>
+                <> · {formatBytes(fileStats.registered.bytes)} stored</>
               )}
             </p>
             {(() => {
@@ -197,7 +182,7 @@ export default function DataContextPanel() {
               }
               return (
                 <p className="dc-muted dc-table-note">
-                  {fmt(unused)} uploaded file{unused === 1 ? '' : 's'} not attached to any
+                  {formatCount(unused)} uploaded file{unused === 1 ? '' : 's'} not attached to any
                   record — an upload that was never saved, or a file whose record was
                   deleted. Clear them with the cleanup routine{' '}
                   <span className="mono">scripts/cleanup_files.py</span>.
