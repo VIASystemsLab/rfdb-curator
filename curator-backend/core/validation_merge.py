@@ -49,7 +49,7 @@ class _ShapeNode:
     field_predicates: set[str] = field(default_factory=set)
 
 
-def _build_shape_dep_graph(extractor) -> dict[str, _ShapeNode]:
+def build_shape_dep_graph(extractor) -> dict[str, _ShapeNode]:
     """Build the shape dependency graph keyed by shape IRI."""
     nodes: dict[str, _ShapeNode] = {}
     for shape in extractor.get_all_shapes():
@@ -139,7 +139,7 @@ def _bfs_shape_edges(
     return results
 
 
-def _build_validation_construct(
+def build_validation_construct(
     dep_graph: dict[str, _ShapeNode],
     root_shape_id: str,
     seed_iris: set[str],

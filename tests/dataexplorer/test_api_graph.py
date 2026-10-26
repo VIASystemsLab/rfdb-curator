@@ -35,8 +35,8 @@ OWL_SAME_AS = "http://www.w3.org/2002/07/owl#sameAs"
 RDFS_LABEL = "http://www.w3.org/2000/01/rdf-schema#label"
 
 
-class _StubOxigraph:
-    """Oxigraph double: canned CONSTRUCT graph + branchable SELECT rows."""
+class _StubStore:
+    """Store double: canned CONSTRUCT graph + branchable SELECT rows."""
 
     def __init__(self, self_turtle="", out_rows=None, in_rows=None, raise_exc=None):
         self._self_turtle = self_turtle
@@ -62,11 +62,11 @@ class _StubOxigraph:
         return self._in_rows if "?s ?p" in sparql else self._out_rows
 
 
-def _client(oxigraph) -> TestClient:
+def _client(store) -> TestClient:
     app = FastAPI()
     app.include_router(router, prefix="/api/v1/dataexplorer")
     app.state.schema_extractor = SchemaExtractor(str(SCHEMA_PATH))
-    app.state.store = oxigraph
+    app.state.store = store
     return TestClient(app)
 
 
@@ -112,7 +112,7 @@ rfdb:Src1
 
 def test_get_node_assembles_self_and_edges() -> None:
     """The response carries the node's own data plus inbound/outbound edges."""
-    ox = _StubOxigraph(
+    ox = _StubStore(
         self_turtle=_SOURCE_TURTLE,
         out_rows=[
             {
@@ -149,7 +149,7 @@ def test_get_node_assembles_self_and_edges() -> None:
 
 def test_get_node_includes_inbound_edges() -> None:
     """Inbound edges (who links to this node) are returned with direction 'in'."""
-    ox = _StubOxigraph(
+    ox = _StubStore(
         self_turtle=_SOURCE_TURTLE,
         out_rows=[],
         in_rows=[{"p": IS_COMPONENT_OF, "s": DATA + "Expr1", "label": "Libretto", "types": ""}],
@@ -172,7 +172,7 @@ def test_get_node_caps_neighbors_and_flags_truncation() -> None:
         }
         for i in range(5)
     ]
-    ox = _StubOxigraph(self_turtle=_SOURCE_TURTLE, out_rows=out_rows, in_rows=[])
+    ox = _StubStore(self_turtle=_SOURCE_TURTLE, out_rows=out_rows, in_rows=[])
     body = _client(ox).get(NODE_URL, params={"id": DATA + "Src1", "limit": 2}).json()
     out_edges = [e for e in body["edges"] if e["direction"] == "out"]
     assert len(out_edges) == 2
@@ -181,19 +181,19 @@ def test_get_node_caps_neighbors_and_flags_truncation() -> None:
 
 def test_get_node_rejects_bad_iri() -> None:
     """A non-http(s) id is a 400."""
-    res = _client(_StubOxigraph()).get(NODE_URL, params={"id": "not-an-iri"})
+    res = _client(_StubStore()).get(NODE_URL, params={"id": "not-an-iri"})
     assert res.status_code == 400
 
 
 def test_get_node_404_when_absent() -> None:
     """No triples and no edges → 404."""
-    res = _client(_StubOxigraph()).get(NODE_URL, params={"id": DATA + "Nope"})
+    res = _client(_StubStore()).get(NODE_URL, params={"id": DATA + "Nope"})
     assert res.status_code == 404
 
 
 def test_get_node_503_when_store_down() -> None:
     """A store transport error becomes a 503."""
-    ox = _StubOxigraph(raise_exc=RuntimeError("store down"))
+    ox = _StubStore(raise_exc=RuntimeError("store down"))
     res = _client(ox).get(NODE_URL, params={"id": DATA + "Src1"})
     assert res.status_code == 503
 
@@ -212,7 +212,7 @@ def test_identifier_literal_carries_its_link() -> None:
     app.state.schema_extractor = SchemaExtractor(
         str(SCHEMA_PATH), external_id_links={viaf: "https://viaf.org/en/viaf/$1"}
     )
-    app.state.store = _StubOxigraph(self_turtle=turtle)
+    app.state.store = _StubStore(self_turtle=turtle)
     body = TestClient(app).get(NODE_URL, params={"id": DATA + "Work1"}).json()
 
     urls = {lit["predicate"]: lit["url"] for lit in body["literals"]}

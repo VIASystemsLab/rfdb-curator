@@ -18,6 +18,7 @@ For the conventions your schema must follow, see the data-model contract in
 | Read-only reference shapes | `READ_ONLY_SHAPES` | every shape is editable |
 | Long-text fields | `LONG_TEXT_PREDICATES` | the rfdb list applies; your other text fields get one line |
 | External identifiers shown as links | `EXTERNAL_ID_LINKS` | only VIAF and RISM IDs are linked |
+| Other names the record search matches | `SEARCH_LABEL_PREDICATES` | only `skos:altLabel` is searched besides `rdfs:label` |
 | File uploads | one shape targeting `schema:DigitalDocument` in your schema (see [data-model.md](data-model.md#digital-documents)) | no upload field; the cleanup script refuses to run while file nodes or stored files exist |
 | Project name | `PROJECT_NAME` (backends, editor); `VITE_APP_TITLE` (graph explorer, at build time) | pages and the editor say RossijskijFeatrDB; the explorer says RFDB Explorer |
 | Welcome guide text | `curator-frontend/src/project/WelcomeGuideContent.jsx` | curators see the rfdb guide |
@@ -125,6 +126,19 @@ EXTERNAL_ID_LINKS={"http://www.wikidata.org/prop/direct/P214": "https://viaf.org
 Wikidata lists the template for most authorities as the property's formatter
 URL (P1630). The form, the graph explorer and the reader's HTML page then show
 the value as a link.
+
+## Other names in search
+
+The search behind the editor's link fields matches a record's `rdfs:label`, its
+IRI, and the predicates `SEARCH_LABEL_PREDICATES` lists, as a JSON array of full
+IRIs. A record found by another name is still listed under its label:
+
+```
+SEARCH_LABEL_PREDICATES=["http://www.w3.org/2004/02/skos/core#altLabel", "http://schema.org/alternateName"]
+```
+
+Only the reader searches, so the compose files set it on `dataexplorer-backend`
+alone. An empty value searches the label and IRI only.
 
 ## The Welcome guide
 

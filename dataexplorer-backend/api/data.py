@@ -12,8 +12,8 @@ import logging
 from fastapi import APIRouter, HTTPException, Query, Request
 from rdflib import Literal, URIRef
 
+from models.data import DataListResponse
 from rfdb_core.iri import iri_error
-from rfdb_core.models_data import DataListResponse
 from rfdb_core.sparql_text import regex_literal
 
 logger = logging.getLogger(__name__)

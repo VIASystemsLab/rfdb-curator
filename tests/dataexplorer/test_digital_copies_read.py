@@ -32,13 +32,13 @@ from rfdb_core.file_storage import (
     staged_key,
 )
 from rfdb_core.schema_extractor import SchemaExtractor
+from rfdb_core.vocab import SCHEMA_DIGITAL_DOCUMENT, SCHEMA_NAME
 
 ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
 RFDB = "https://rosfeatr.eu/rdf/data/"
 P138I = "http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation"
-DIGITAL_DOCUMENT = "http://schema.org/DigitalDocument"
 
 _EXTRACTOR = SchemaExtractor(str(_SCHEMA_PATH))
 
@@ -105,7 +105,8 @@ def _stage(env, file_id: str, data: bytes) -> None:
 def _link(env, file_id: str, parent: str = f"{RFDB}S1") -> None:
     """Write the parent→file link + node type triples into the fake store."""
     env.store.load_turtle(
-        f"<{parent}> <{P138I}> <{RFDB}{file_id}> . <{RFDB}{file_id}> a <{DIGITAL_DOCUMENT}> ."
+        f"<{parent}> <{P138I}> <{RFDB}{file_id}> . "
+        f"<{RFDB}{file_id}> a <{SCHEMA_DIGITAL_DOCUMENT}> ."
     )
 
 
@@ -215,7 +216,7 @@ def test_download_filename_from_rdf(env):
     _stage(env, file_id, _make_pdf())
     env.storage.move(staged_key(file_id), registered_key(file_id))
     _link(env, file_id)
-    env.store.load_turtle(f'<{RFDB}{file_id}> <http://schema.org/name> "scan.pdf" .')
+    env.store.load_turtle(f'<{RFDB}{file_id}> <{SCHEMA_NAME}> "scan.pdf" .')
 
     resp = download_file(file_id, env.request)
     assert 'filename="scan.pdf"' in resp.headers["content-disposition"]

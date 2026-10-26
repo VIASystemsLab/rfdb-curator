@@ -19,9 +19,9 @@ from rdflib.term import Node
 from core.config import settings
 from core.node_ids import MintError, mint_iri
 from core.validation_merge import (
-    _build_validation_construct,
     all_bridge_link_predicates,
     bridge_links,
+    build_validation_construct,
     shape_field_predicates,
 )
 from models.data import (
@@ -76,7 +76,7 @@ def _is_non_vocab_iri(value: str) -> bool:
     return not any(value.startswith(prefix) for prefix in _VOCAB_PREFIXES)
 
 
-def _assert_writable_mode() -> None:
+def assert_writable_mode() -> None:
     """Refuse mutating operations when READ_ONLY mode is enabled."""
     if settings.read_only:
         raise HTTPException(
@@ -406,7 +406,7 @@ def create_or_update_entity(payload: EntityData, request: Request):
         referenced entities merged from store), so nested linked-node
         constraint violations are rejected within the same write request.
     """
-    _assert_writable_mode()
+    assert_writable_mode()
     _assert_shape_writable(payload.shapeId)
 
     store = request.app.state.store
@@ -508,7 +508,7 @@ def create_or_update_entity(payload: EntityData, request: Request):
     # clean 503 because it may silently pass constraints that should fail.
     referenced_graph = Graph()
     if seed_iris:
-        construct_query = _build_validation_construct(
+        construct_query = build_validation_construct(
             dep_graph=dep_graph,
             root_shape_id=payload.shapeId,
             seed_iris=seed_iris,
@@ -652,7 +652,7 @@ def delete_entity(
     enable per-shape write protection via ``READ_ONLY_SHAPES``.  When absent,
     only the global ``READ_ONLY`` flag is checked.
     """
-    _assert_writable_mode()
+    assert_writable_mode()
     if shapeId:
         _assert_shape_writable(shapeId)
     _validate_iri(entity_id)
@@ -680,8 +680,10 @@ def delete_entity(
     # no cross-store transaction in the request path.
     wc = store.with_clause()
     if links:
-        # Cards first: if the record delete then fails, nothing is left pointing
-        # at a card that is gone.
+        # Cards first: they are found through the record's links, so once the
+        # record is gone they could not be found. The two updates are not atomic:
+        # if the record delete then fails, the record survives still linking to
+        # cards that are gone.
         values = " ".join(f"<{link}>" for link in links)
         store.update(
             f"""

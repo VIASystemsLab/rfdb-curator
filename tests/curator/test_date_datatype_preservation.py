@@ -28,8 +28,8 @@ WORK_SHAPE = "https://rosfeatr.eu/rdf/schema/MusicalWorkShape"
 DCTERMS_DATE = URIRef("http://purl.org/dc/terms/date")
 
 
-class _CapturingOxigraph:
-    """Oxigraph double: validates via the real SHACL validator and captures the
+class _CapturingStore:
+    """Store double: validates via the real SHACL validator and captures the
     Turtle that would be written."""
 
     def __init__(self) -> None:
@@ -48,16 +48,16 @@ class _CapturingOxigraph:
         return []
 
     def load_turtle(self, turtle: str) -> None:
-        """Capture the Turtle that would be loaded into Oxigraph."""
+        """Capture the Turtle that would be loaded into the store."""
         self.loaded_turtle = turtle
 
 
-def _request(oxigraph: _CapturingOxigraph) -> SimpleNamespace:
+def _request(store: _CapturingStore) -> SimpleNamespace:
     """Minimal request object expected by create_or_update_entity."""
     return SimpleNamespace(
         app=SimpleNamespace(
             state=SimpleNamespace(
-                store=oxigraph,
+                store=store,
                 shape_dep_graph={},
                 shacl_validator=ShaclValidator(str(SCHEMA_PATH)),
             )
@@ -97,12 +97,12 @@ def test_extractor_exposes_temporal_field_with_all_options() -> None:
 
 def test_year_only_value_keeps_gyear_datatype() -> None:
     """A '1736'^^xsd:gYear value survives the write path without promotion to date."""
-    oxigraph = _CapturingOxigraph()
-    response = create_or_update_entity(_work_payload("1736", "xsd:gYear"), _request(oxigraph))
+    store = _CapturingStore()
+    response = create_or_update_entity(_work_payload("1736", "xsd:gYear"), _request(store))
     assert response.success is True
     entity_id = response.entityId
 
-    written = Graph().parse(data=oxigraph.loaded_turtle, format="turtle")
+    written = Graph().parse(data=store.loaded_turtle, format="turtle")
     dates = list(written.objects(URIRef(entity_id), DCTERMS_DATE))
     assert len(dates) == 1
     assert isinstance(dates[0], Literal)
@@ -112,12 +112,12 @@ def test_year_only_value_keeps_gyear_datatype() -> None:
 
 def test_full_date_value_is_accepted_and_preserved() -> None:
     """A full xsd:date value is accepted and kept as xsd:date."""
-    oxigraph = _CapturingOxigraph()
-    response = create_or_update_entity(_work_payload("1736-05-01", "xsd:date"), _request(oxigraph))
+    store = _CapturingStore()
+    response = create_or_update_entity(_work_payload("1736-05-01", "xsd:date"), _request(store))
     assert response.success is True
     entity_id = response.entityId
 
-    written = Graph().parse(data=oxigraph.loaded_turtle, format="turtle")
+    written = Graph().parse(data=store.loaded_turtle, format="turtle")
     dates = list(written.objects(URIRef(entity_id), DCTERMS_DATE))
     assert len(dates) == 1
     assert dates[0].datatype == XSD.date

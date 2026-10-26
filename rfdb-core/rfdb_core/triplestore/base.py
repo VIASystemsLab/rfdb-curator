@@ -15,7 +15,7 @@ exists to test the names against.
 
 **The graph-scoping members are part of the contract, not an implementation
 detail.** Route handlers build SPARQL strings *around* :meth:`from_clause` and
-:meth:`with_clause`, and ``validation_merge._build_validation_construct`` takes a
+:meth:`with_clause`, and ``validation_merge.build_validation_construct`` takes a
 ``from_clause`` string as a parameter. A store whose scoping model differs must
 still return usable clause strings (or empty ones, which callers already handle —
 ``/api/v1/dataexplorer/meta/graphs`` deliberately queries unscoped).

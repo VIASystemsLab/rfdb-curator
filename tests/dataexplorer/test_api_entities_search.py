@@ -29,6 +29,8 @@ CORE = "https://w3id.org/polifonia/ontology/core/"
 
 PLACE = "https://w3id.org/polifonia/ontology/core/Place"
 TRICKY_LABEL = 'Teatro (Nuovo) "x" a.b'
+SKOS_ALT_LABEL = URIRef("http://www.w3.org/2004/02/skos/core#altLabel")
+SCHEMA_ALTERNATE_NAME = URIRef("http://schema.org/alternateName")
 
 
 class _GraphStore:
@@ -47,6 +49,19 @@ class _GraphStore:
         return [{k: str(v) for k, v in row.asdict().items()} for row in self.graph.query(sparql)]
 
 
+class _RenamedPlaceStore(_GraphStore):
+    """Adds a Place known by other names: two SKOS alternative labels and a schema.org one."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        place = URIRef("https://rosfeatr.eu/rdf/data/P2")
+        self.graph.add((place, RDF.type, URIRef(PLACE)))
+        self.graph.add((place, RDFS.label, Literal("Sankt-Peterburg")))
+        self.graph.add((place, SKOS_ALT_LABEL, Literal("Petrograd")))
+        self.graph.add((place, SKOS_ALT_LABEL, Literal("Leningrad")))
+        self.graph.add((place, SCHEMA_ALTERNATE_NAME, Literal("Piter")))
+
+
 class _CapturingStore:
     """Store double that records the SPARQL it is asked and returns no rows."""
 
@@ -61,13 +76,13 @@ class _CapturingStore:
         return []
 
 
-def _client(store, *, reverse: bool = False) -> TestClient:
+def _client(store, *, reverse: bool = False, search_router=router) -> TestClient:
     extractor = SchemaExtractor(str(SCHEMA_PATH))
     if reverse:
         shapes = list(reversed(extractor.get_all_shapes()))
         extractor.get_all_shapes = lambda: shapes
     app = FastAPI()
-    app.include_router(router, prefix="/api/v1/dataexplorer")
+    app.include_router(search_router, prefix="/api/v1/dataexplorer")
     app.state.schema_extractor = extractor
     app.state.store = store
     return TestClient(app)
@@ -125,3 +140,38 @@ def test_store_failure_is_logged(caplog) -> None:
     assert response.status_code == 200
     assert response.json() == []
     assert any("store unreachable" in r.getMessage() for r in caplog.records)
+
+
+def _search(client: TestClient, query: str) -> list[str]:
+    response = client.get(SEARCH_URL, params={"shape": "PlaceShape", "query": query})
+    assert response.status_code == 200
+    return [hit["label"] for hit in response.json()]
+
+
+def _client_with_label_predicates(monkeypatch, predicates: list[str]) -> TestClient:
+    """A client whose search reads ``predicates`` as SEARCH_LABEL_PREDICATES."""
+    import api.entities as entities_module
+
+    # Other tests re-import service modules, so patch and mount the same module.
+    monkeypatch.setattr(entities_module.settings, "search_label_predicates", predicates)
+    return _client(_RenamedPlaceStore(), search_router=entities_module.router)
+
+
+def test_an_alternative_label_matches_and_the_primary_label_is_shown(monkeypatch) -> None:
+    """Typing a former name finds the record, listed once under its rdfs:label."""
+    client = _client_with_label_predicates(monkeypatch, [str(SKOS_ALT_LABEL)])
+
+    assert _search(client, "petrograd") == ["Sankt-Peterburg"]
+    assert _search(client, "grad") == ["Sankt-Peterburg"]  # two alt labels match, one row
+    assert _search(client, "Sankt") == ["Sankt-Peterburg"]  # the label still matches
+
+
+def test_the_setting_decides_which_predicates_are_searched(monkeypatch) -> None:
+    """Only the listed predicates count; an empty list searches the label and IRI only."""
+    client = _client_with_label_predicates(monkeypatch, [str(SCHEMA_ALTERNATE_NAME)])
+    assert _search(client, "Piter") == ["Sankt-Peterburg"]
+    assert _search(client, "Petrograd") == []
+
+    client = _client_with_label_predicates(monkeypatch, [])
+    assert _search(client, "Piter") == []
+    assert _search(client, "Sankt") == ["Sankt-Peterburg"]

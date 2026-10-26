@@ -239,7 +239,6 @@ rfdb-curator/
 │       ├── prefixes.py           # CURIE map read from the schema's sh:declare
 │       ├── external_ids.py       # URL for an external identifier stored as text
 │       ├── iri.py                # IRI guard for SPARQL interpolation
-│       ├── models_data.py        # Record-list response models
 │       └── vocab.py              # Digital-copy vocabulary terms
 │
 ├── curator-backend/              # WRITES ONLY — :8000
@@ -255,6 +254,7 @@ rfdb-curator/
 ├── dataexplorer-backend/         # READS ONLY — :8001
 │   ├── api/                      # data (GET), entities, graph, meta, files, shapes
 │   ├── core/config.py            # Plain BaseServiceSettings — no writer fields
+│   ├── models/                   # Pydantic record-list response models
 │   ├── app.py                    # FastAPI app; no validator, no seeder, no reset
 │   ├── Dockerfile
 │   └── pyproject.toml

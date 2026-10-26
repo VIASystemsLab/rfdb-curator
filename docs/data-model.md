@@ -129,6 +129,8 @@ Both base IRIs are settings; [custom-schema.md](custom-schema.md) explains them.
 - **Long text:** whatever the `LONG_TEXT_PREDICATES` setting lists (see above).
 - **External identifiers:** whatever the `EXTERNAL_ID_LINKS` setting maps (see
   above).
+- **Other names in search:** whatever the `SEARCH_LABEL_PREDICATES` setting lists
+  (default `skos:altLabel`).
 
 No other ontology term is read by name. Everything else comes from the schema.
 

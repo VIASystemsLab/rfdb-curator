@@ -122,8 +122,8 @@ GRAPH_A = "https://rosfeatr.eu/rdf/graph/"
 GRAPH_B = "https://rosfeatr.eu/rdf/vocab/"
 
 
-class _StubOxigraph:
-    """Minimal Oxigraph double that routes the three meta/graphs queries by content.
+class _StubStore:
+    """Minimal store double that routes the three meta/graphs queries by content.
 
     ``named_rows`` is a list of per-graph dicts with string cells:
     ``{"g", "count", "subjects", "objects", "literals"}``. The stub reshapes them
@@ -162,13 +162,13 @@ class _StubOxigraph:
         return [{"count": self._default_count}]  # default-graph triple count
 
 
-def _make_graphs_app(oxigraph) -> FastAPI:
+def _make_graphs_app(store) -> FastAPI:
     """Build a minimal FastAPI app with the meta router and a stub store."""
     from api.meta import router
 
     app = FastAPI()
     app.include_router(router, prefix="/api/v1/dataexplorer")
-    app.state.store = oxigraph
+    app.state.store = store
     return app
 
 
@@ -182,7 +182,7 @@ def _set_active_graph(monkeypatch: pytest.MonkeyPatch, value) -> None:
 def test_get_graphs_returns_expected_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     """Response is 200 with exactly the documented top-level keys."""
     _set_active_graph(monkeypatch, GRAPH_A)
-    ox = _StubOxigraph([{"g": GRAPH_A, "count": "1234"}, {"g": GRAPH_B, "count": "87"}])
+    ox = _StubStore([{"g": GRAPH_A, "count": "1234"}, {"g": GRAPH_B, "count": "87"}])
     res = TestClient(_make_graphs_app(ox)).get(GRAPHS_URL)
     assert res.status_code == 200
     assert set(res.json()) == {
@@ -199,7 +199,7 @@ def test_get_graphs_returns_expected_keys(monkeypatch: pytest.MonkeyPatch) -> No
 def test_get_graphs_marks_active_sorts_and_casts(monkeypatch: pytest.MonkeyPatch) -> None:
     """graphs[] is sorted by URI, counts are ints, and the active graph is flagged once."""
     _set_active_graph(monkeypatch, GRAPH_A)
-    ox = _StubOxigraph([{"g": GRAPH_B, "count": "87"}, {"g": GRAPH_A, "count": "1234"}])
+    ox = _StubStore([{"g": GRAPH_B, "count": "87"}, {"g": GRAPH_A, "count": "1234"}])
     body = TestClient(_make_graphs_app(ox)).get(GRAPHS_URL).json()
 
     assert body["activeGraph"] == GRAPH_A
@@ -216,7 +216,7 @@ def test_get_graphs_reports_per_graph_distinct_terms(
 ) -> None:
     """Each graph row carries its own distinct subject/object/literal counts as ints."""
     _set_active_graph(monkeypatch, GRAPH_A)
-    ox = _StubOxigraph(
+    ox = _StubStore(
         [{"g": GRAPH_A, "count": "10", "subjects": "7", "objects": "12", "literals": "5"}]
     )
     body = TestClient(_make_graphs_app(ox)).get(GRAPHS_URL).json()
@@ -232,7 +232,7 @@ def test_get_graphs_totals_are_store_wide_distinct(
 ) -> None:
     """Footer totals use store-wide distinct counts, not the sum of per-graph columns."""
     _set_active_graph(monkeypatch, GRAPH_A)
-    ox = _StubOxigraph(
+    ox = _StubStore(
         [
             {"g": GRAPH_A, "count": "10", "subjects": "7", "objects": "12", "literals": "5"},
             {"g": GRAPH_B, "count": "4", "subjects": "3", "objects": "5", "literals": "2"},
@@ -249,7 +249,7 @@ def test_get_graphs_totals_are_store_wide_distinct(
 def test_total_triples_sums_named_and_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """totalTriples is the sum of every named-graph count plus the default graph."""
     _set_active_graph(monkeypatch, GRAPH_A)
-    ox = _StubOxigraph(
+    ox = _StubStore(
         [{"g": GRAPH_A, "count": "1234"}, {"g": GRAPH_B, "count": "87"}],
         default_count="5",
     )
@@ -260,7 +260,7 @@ def test_total_triples_sums_named_and_default(monkeypatch: pytest.MonkeyPatch) -
 def test_warning_when_active_graph_absent(monkeypatch: pytest.MonkeyPatch) -> None:
     """A configured active graph missing from the store surfaces a warning."""
     _set_active_graph(monkeypatch, "https://rosfeatr.eu/rdf/unused/")
-    ox = _StubOxigraph([{"g": GRAPH_A, "count": "1234"}])
+    ox = _StubStore([{"g": GRAPH_A, "count": "1234"}])
     body = TestClient(_make_graphs_app(ox)).get(GRAPHS_URL).json()
     assert any("empty or absent" in w for w in body["warnings"])
 
@@ -268,7 +268,7 @@ def test_warning_when_active_graph_absent(monkeypatch: pytest.MonkeyPatch) -> No
 def test_warning_when_default_graph_populated(monkeypatch: pytest.MonkeyPatch) -> None:
     """Triples in the default graph (invisible to the scoped editor) warn."""
     _set_active_graph(monkeypatch, GRAPH_A)
-    ox = _StubOxigraph([{"g": GRAPH_A, "count": "10"}], default_count="3")
+    ox = _StubStore([{"g": GRAPH_A, "count": "10"}], default_count="3")
     body = TestClient(_make_graphs_app(ox)).get(GRAPHS_URL).json()
     assert any("default graph" in w for w in body["warnings"])
 
@@ -278,6 +278,6 @@ def test_get_graphs_returns_503_when_store_unavailable(
 ) -> None:
     """A store transport error becomes a 503 (matching api/data.py), not a 500."""
     _set_active_graph(monkeypatch, GRAPH_A)
-    ox = _StubOxigraph([], raise_exc=RuntimeError("store down"))
+    ox = _StubStore([], raise_exc=RuntimeError("store down"))
     res = TestClient(_make_graphs_app(ox)).get(GRAPHS_URL)
     assert res.status_code == 503

@@ -1,19 +1,17 @@
 """Unit-level fail-closed coverage for backend write logic.
 
 This module executes ``api.data.create_or_update_entity`` directly with a fake
-request/app.state and a controlled Oxigraph stub. It does not test HTTP routing;
+request/app.state and a controlled store stub. It does not test HTTP routing;
 it tests backend branch semantics when related-entity merge fails.
 """
 
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-BACKEND_DIR = Path(__file__).resolve().parents[2] / "curator-backend"
 DATA_NS = "https://rosfeatr.eu/rdf/data"
 SHAPE_NS = "https://rosfeatr.eu/rdf/schema"
 # The IRI the seed-composition test makes the backend mint for its new record.
@@ -60,8 +58,8 @@ class _RejectingValidator:
         }
 
 
-class _FailingConstructOxigraph:
-    """Oxigraph stub that fails on CONSTRUCT and records side-effect calls."""
+class _FailingConstructStore:
+    """Store stub that fails on CONSTRUCT and records side-effect calls."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
@@ -84,8 +82,8 @@ class _FailingConstructOxigraph:
         self.calls.append("load_turtle")
 
 
-class _NoopOxigraph:
-    """Oxigraph stub for seed-composition tests without write operations."""
+class _NoopStore:
+    """Store stub for seed-composition tests without write operations."""
 
     def from_clause(self) -> str:
         return ""
@@ -110,11 +108,11 @@ class _NoopOxigraph:
         self.calls: list[str] = []
 
 
-def _fake_request(oxigraph: _FailingConstructOxigraph) -> SimpleNamespace:
+def _fake_request(store: _FailingConstructStore) -> SimpleNamespace:
     """Build the minimal request.app.state object expected by the route logic."""
 
     state = SimpleNamespace(
-        store=oxigraph,
+        store=store,
         shape_dep_graph={},
         shacl_validator=_NoopValidator(),
     )
@@ -135,8 +133,8 @@ def _fake_request_with_validator(*, store: object, validator: object) -> SimpleN
 def test_create_or_update_fails_closed_on_related_merge_error() -> None:
     """Related merge failures return 503 and do not execute write operations."""
     symbols = _load_backend_symbols()
-    oxigraph = _FailingConstructOxigraph()
-    request = _fake_request(oxigraph)
+    store = _FailingConstructStore()
+    request = _fake_request(store)
 
     payload = symbols.EntityData(
         shapeId=f"{SHAPE_NS}/ManifestationShape",
@@ -159,7 +157,7 @@ def test_create_or_update_fails_closed_on_related_merge_error() -> None:
 
     assert exc.value.status_code == 503
     assert "Related-entity merge failed" in str(exc.value.detail)
-    assert oxigraph.calls == ["construct"]
+    assert store.calls == ["construct"]
 
 
 @pytest.mark.parametrize(
@@ -237,7 +235,7 @@ def test_create_or_update_seed_iri_composition(
 
     monkeypatch.setattr(
         symbols.data_module,
-        "_build_validation_construct",
+        "build_validation_construct",
         _capture_build_validation_construct,
     )
 
@@ -247,9 +245,9 @@ def test_create_or_update_seed_iri_composition(
         originalTriples=None,
     )
 
-    oxigraph = _NoopOxigraph()
+    store = _NoopStore()
     request = _fake_request_with_validator(
-        store=oxigraph,
+        store=store,
         validator=_RejectingValidator(),
     )
 
@@ -265,8 +263,8 @@ def test_create_or_update_rejects_in_read_only_mode(
 ) -> None:
     """POST /api/v1/curator/entities returns 403 when READ_ONLY mode is enabled."""
     symbols = _load_backend_symbols()
-    oxigraph = _NoopOxigraph()
-    request = _fake_request_with_validator(store=oxigraph, validator=_NoopValidator())
+    store = _NoopStore()
+    request = _fake_request_with_validator(store=store, validator=_NoopValidator())
 
     monkeypatch.setattr(symbols.data_module.settings, "read_only", True)
 
@@ -281,14 +279,14 @@ def test_create_or_update_rejects_in_read_only_mode(
 
     assert exc.value.status_code == 403
     assert "READ_ONLY=true" in str(exc.value.detail)
-    assert oxigraph.calls == []
+    assert store.calls == []
 
 
 def test_delete_rejects_in_read_only_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     """DELETE /api/v1/curator/entities?id=... returns 403 when READ_ONLY is enabled."""
     symbols = _load_backend_symbols()
-    oxigraph = _NoopOxigraph()
-    request = _fake_request_with_validator(store=oxigraph, validator=_NoopValidator())
+    store = _NoopStore()
+    request = _fake_request_with_validator(store=store, validator=_NoopValidator())
 
     monkeypatch.setattr(symbols.data_module.settings, "read_only", True)
 
@@ -297,7 +295,7 @@ def test_delete_rejects_in_read_only_mode(monkeypatch: pytest.MonkeyPatch) -> No
 
     assert exc.value.status_code == 403
     assert "READ_ONLY=true" in str(exc.value.detail)
-    assert oxigraph.calls == []
+    assert store.calls == []
 
 
 def test_create_or_update_rejects_read_only_shape(
@@ -305,8 +303,8 @@ def test_create_or_update_rejects_read_only_shape(
 ) -> None:
     """POST /api/v1/curator/entities returns 403 when the target shape is in READ_ONLY_SHAPES."""
     symbols = _load_backend_symbols()
-    oxigraph = _NoopOxigraph()
-    request = _fake_request_with_validator(store=oxigraph, validator=_NoopValidator())
+    store = _NoopStore()
+    request = _fake_request_with_validator(store=store, validator=_NoopValidator())
 
     monkeypatch.setattr(
         symbols.data_module.settings,
@@ -325,7 +323,7 @@ def test_create_or_update_rejects_read_only_shape(
 
     assert exc.value.status_code == 403
     assert "read-only" in str(exc.value.detail).lower()
-    assert oxigraph.calls == []
+    assert store.calls == []
 
 
 def test_create_or_update_allows_non_read_only_shape(
@@ -333,8 +331,8 @@ def test_create_or_update_allows_non_read_only_shape(
 ) -> None:
     """POST /api/v1/curator/entities is not blocked by the shape guard for non-read-only shapes."""
     symbols = _load_backend_symbols()
-    oxigraph = _NoopOxigraph()
-    request = _fake_request_with_validator(store=oxigraph, validator=_RejectingValidator())
+    store = _NoopStore()
+    request = _fake_request_with_validator(store=store, validator=_RejectingValidator())
 
     monkeypatch.setattr(
         symbols.data_module.settings,
@@ -360,8 +358,8 @@ def test_create_or_update_allows_non_read_only_shape(
 def test_delete_rejects_read_only_shape(monkeypatch: pytest.MonkeyPatch) -> None:
     """DELETE /api/v1/curator/entities?id=…&shapeId=… returns 403 for a read-only shape."""
     symbols = _load_backend_symbols()
-    oxigraph = _NoopOxigraph()
-    request = _fake_request_with_validator(store=oxigraph, validator=_NoopValidator())
+    store = _NoopStore()
+    request = _fake_request_with_validator(store=store, validator=_NoopValidator())
 
     monkeypatch.setattr(
         symbols.data_module.settings,
@@ -378,36 +376,4 @@ def test_delete_rejects_read_only_shape(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert exc.value.status_code == 403
     assert "read-only" in str(exc.value.detail).lower()
-    assert oxigraph.calls == []
-
-
-def test_shapes_endpoint_stamps_read_only_flag() -> None:
-    """The curator's shapes route flags shapes listed in READ_ONLY_SHAPES.
-
-    The stamp itself is in ``rfdb_core.shapes``, shared with the reader so both
-    services serve identical flags, and its pure-function behaviour is covered in
-    ``tests/core/test_shapes_stamp.py``. What matters *here* is the curator-side
-    wiring: that this service still applies the flag, and applies it from its own
-    settings rather than from a hardcoded list.
-    """
-
-    import importlib
-
-    shapes_module = importlib.import_module("api.shapes")
-
-    language_shape_uri = f"{SHAPE_NS}/LanguageShape"
-    other_shape_uri = f"{SHAPE_NS}/SourceShape"
-
-    locked = shapes_module.stamp_read_only(
-        {"id": language_shape_uri, "label": "Language"}, [language_shape_uri]
-    )
-    unlocked = shapes_module.stamp_read_only(
-        {"id": other_shape_uri, "label": "Source"}, [language_shape_uri]
-    )
-
-    assert locked["readOnly"] is True
-    assert unlocked["readOnly"] is False
-
-    # The route must read the deployment's own policy, not a literal.
-    source = (BACKEND_DIR / "api" / "shapes.py").read_text()
-    assert "settings.read_only_shapes" in source
+    assert store.calls == []

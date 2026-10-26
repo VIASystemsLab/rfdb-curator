@@ -24,14 +24,16 @@ import { entityKind, hydrateSchema, isBridgeType, predicateLabel } from './utils
 // Deployment-branding only; the code itself is domain-agnostic.
 const APP_TITLE = import.meta.env.VITE_APP_TITLE || 'RFDB Explorer'
 
-function stubNode(id) {
+/** A collapsed node, from its IRI and whatever label and types are known so far. */
+function stubNode(id, label = '', types = []) {
+  const kind = entityKind(types)
   return {
     id,
-    label: compactIri(id),
-    types: [],
-    kind: null,
-    typeLabel: 'Entity',
-    isBridge: false,
+    label: label || compactIri(id),
+    types,
+    kind: kind.kind,
+    typeLabel: kind.label,
+    isBridge: isBridgeType(types),
     expanded: false,
     loading: false,
     edgeCount: null, // null = link count not known yet; a number (incl. 0) once fetched
@@ -100,20 +102,7 @@ export default function App() {
       if (expand) {
         for (const e of data.edges) {
           const nb = e.neighbor
-          if (!next[nb.id]) {
-            const nk = entityKind(nb.types)
-            next[nb.id] = {
-              id: nb.id,
-              label: nb.label || compactIri(nb.id),
-              types: nb.types,
-              kind: nk.kind,
-              typeLabel: nk.label,
-              isBridge: isBridgeType(nb.types),
-              expanded: false,
-              loading: false,
-              edgeCount: null,
-            }
-          }
+          if (!next[nb.id]) next[nb.id] = stubNode(nb.id, nb.label, nb.types)
         }
       }
       return next
@@ -189,21 +178,7 @@ export default function App() {
       setSelectedId(id)
       setNodesMap((prev) => {
         if (prev[id]) return prev
-        const kind = entityKind(meta.types || [])
-        return {
-          ...prev,
-          [id]: {
-            id,
-            label: meta.label || compactIri(id),
-            types: meta.types || [],
-            kind: kind.kind,
-            typeLabel: kind.label,
-            isBridge: isBridgeType(meta.types || []),
-            expanded: false,
-            loading: false,
-            edgeCount: null,
-          },
-        }
+        return { ...prev, [id]: stubNode(id, meta.label, meta.types || []) }
       })
       prefetchNode(id)
     },

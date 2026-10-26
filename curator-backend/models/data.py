@@ -2,7 +2,7 @@
 
 Kept in one file so the shape of every payload is easy to audit.
 
-Write-path only; the record-list read models live in ``rfdb_core.models_data``.
+Write-path only; the record-list read models live in ``dataexplorer-backend/models/data.py``.
 """
 
 from __future__ import annotations

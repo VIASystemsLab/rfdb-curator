@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"
 
 
-class _ValidationOxigraph:
-    """Oxigraph stub that validates through the real SHACL validator.
+class _ValidationStore:
+    """Store stub that validates through the real SHACL validator.
 
     ``referenced`` is Turtle for the records a payload cites: what the validation
     merge would fetch from a real store.
@@ -39,7 +39,7 @@ class _ValidationOxigraph:
         return []
 
     def load_turtle(self, turtle: str) -> None:
-        """Capture the Turtle payload that would be written to Oxigraph."""
+        """Capture the Turtle payload that would be written to the store."""
         self.loaded_turtle = turtle
 
 
@@ -61,12 +61,12 @@ rfdb:api_unit_work a mm:MusicEntity, lrmoo:F1_Work ;
 """
 
 
-def _request(oxigraph: _ValidationOxigraph):
+def _request(store: _ValidationStore):
     """Build the minimal request object expected by create_or_update_entity."""
     return SimpleNamespace(
         app=SimpleNamespace(
             state=SimpleNamespace(
-                store=oxigraph,
+                store=store,
                 shape_dep_graph={},
                 shacl_validator=ShaclValidator(str(SCHEMA_PATH)),
             )
@@ -76,7 +76,7 @@ def _request(oxigraph: _ValidationOxigraph):
 
 def test_api_write_accepts_place_plain_label_and_multiple_same_as() -> None:
     """POST /api/v1/curator/entities accepts an untranslated place label and two sameAs IRIs."""
-    oxigraph = _ValidationOxigraph()
+    store = _ValidationStore()
     payload = EntityData(
         shapeId="https://rosfeatr.eu/rdf/schema/PlaceShape",
         data={
@@ -95,17 +95,17 @@ def test_api_write_accepts_place_plain_label_and_multiple_same_as() -> None:
         originalTriples=None,
     )
 
-    response = create_or_update_entity(payload, _request(oxigraph))
+    response = create_or_update_entity(payload, _request(store))
 
     assert response.success is True
     assert response.validationReport.conforms is True
-    assert "owl:sameAs" in oxigraph.loaded_turtle
-    assert '"API Place"' in oxigraph.loaded_turtle
+    assert "owl:sameAs" in store.loaded_turtle
+    assert '"API Place"' in store.loaded_turtle
 
 
 def test_api_write_accepts_manifestation_plain_comment() -> None:
     """POST /api/v1/curator/entities accepts an untranslated manifestation comment."""
-    oxigraph = _ValidationOxigraph(_STORED_EXPRESSION)
+    store = _ValidationStore(_STORED_EXPRESSION)
     payload = EntityData(
         shapeId="https://rosfeatr.eu/rdf/schema/ManifestationShape",
         data={
@@ -123,8 +123,8 @@ def test_api_write_accepts_manifestation_plain_comment() -> None:
         originalTriples=None,
     )
 
-    response = create_or_update_entity(payload, _request(oxigraph))
+    response = create_or_update_entity(payload, _request(store))
 
     assert response.success is True
     assert response.validationReport.conforms is True
-    assert '"Generic API comment"' in oxigraph.loaded_turtle
+    assert '"Generic API comment"' in store.loaded_turtle

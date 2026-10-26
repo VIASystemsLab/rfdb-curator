@@ -38,7 +38,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from api.data import _assert_writable_mode
+from api.data import assert_writable_mode
 from core.config import settings
 from models.files import DigitalCopy
 from rfdb_core.file_storage import staged_key
@@ -103,7 +103,7 @@ def stage_file(request: Request, file: UploadFile) -> DigitalCopy:
         415: Body is not a PDF.
         503: Storage not configured.
     """
-    _assert_writable_mode()
+    assert_writable_mode()
 
     spool = file.file  # SpooledTemporaryFile — sync route, so direct access is fine
     spool.seek(0)
@@ -150,7 +150,7 @@ def download_staged_file(file_id: str, request: Request):
         404: Malformed id, or no staged object (submitted already, or expired).
         503: Storage not configured.
     """
-    _assert_writable_mode()
+    assert_writable_mode()
 
     if not FILE_ID_RE.match(file_id):
         raise HTTPException(status_code=404, detail="File not found")

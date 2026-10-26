@@ -1,10 +1,8 @@
 """Response models for the record-list read contract.
 
-These two live here rather than in a service's ``models/`` package because both
-tiers need them and neither owns them: the reader returns them from
-``GET /api/v1/dataexplorer/entities`` (as ``response_model``, so the shape is enforced by
-FastAPI), and the curator's record list is generated from the same schema. A
-copy per service would let the two drift silently — the frontend talks to both.
+The reader returns them from ``GET /api/v1/dataexplorer/entities`` as
+``response_model``, so FastAPI enforces the shape. The curator frontend reads its
+record list from that route too, so these are the only copy.
 
 The write-path models (``EntityData``, ``DataCreateResponse``,
 ``ValidationResult``, ``TripleObject``) live in the curator: they describe

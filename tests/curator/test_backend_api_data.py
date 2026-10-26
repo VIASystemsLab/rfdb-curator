@@ -45,6 +45,14 @@ from urllib.request import urlopen
 import pytest
 
 from rfdb_core.source_hash import source_hash
+from rfdb_core.vocab import (
+    SCHEMA_CONTENT_SIZE,
+    SCHEMA_CONTENT_URL,
+    SCHEMA_DIGITAL_DOCUMENT,
+    SCHEMA_ENCODING_FORMAT,
+    SCHEMA_NAME,
+    SCHEMA_SHA256,
+)
 
 # Writes -> curator-backend; reads -> dataexplorer-backend. Override either to
 # point the suite at a deployed stack.
@@ -298,7 +306,6 @@ CORE_HAS_TYPE = "https://w3id.org/polifonia/ontology/core/hasType"
 PRISM_PUBLICATION_DATE = "http://prismstandard.org/namespaces/basic/2.0/publicationDate"
 LRMOO_R7_EXEMPLIFIES = "http://iflastandards.info/ns/lrm/lrmoo/R7_exemplifies"
 P51_OWNER = "http://www.cidoc-crm.org/cidoc-crm/P51_has_former_or_current_owner"
-SCHEMA_DIGITAL_DOCUMENT = "http://schema.org/DigitalDocument"
 
 
 def _rfdb_shapes() -> dict[str, str]:
@@ -775,7 +782,6 @@ def test_contributor_appears_in_shape_scoped_list(api_client):
 STAGE_FILE = "/api/v1/curator/files/staged"
 META_FILES = "/api/v1/dataexplorer/meta/files"
 P138I_HAS_REPRESENTATION = "http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation"
-SCHEMA_ORG = "http://schema.org/"
 XSD = "http://www.w3.org/2001/XMLSchema#"
 
 
@@ -832,15 +838,15 @@ def _digital_copy_node(staged: dict) -> dict:
     """The inline schema:DigitalDocument node the editor sends for a staged file."""
     return {
         "@id": staged["id"],
-        "@type": f"{SCHEMA_ORG}DigitalDocument",
-        f"{SCHEMA_ORG}name": staged["name"],
-        f"{SCHEMA_ORG}encodingFormat": "application/pdf",
-        f"{SCHEMA_ORG}contentUrl": {"@value": staged["contentUrl"], "@type": f"{XSD}anyURI"},
-        f"{SCHEMA_ORG}contentSize": {
+        "@type": SCHEMA_DIGITAL_DOCUMENT,
+        SCHEMA_NAME: staged["name"],
+        SCHEMA_ENCODING_FORMAT: "application/pdf",
+        SCHEMA_CONTENT_URL: {"@value": staged["contentUrl"], "@type": f"{XSD}anyURI"},
+        SCHEMA_CONTENT_SIZE: {
             "@value": str(staged["contentSize"]),
             "@type": f"{XSD}integer",
         },
-        f"{SCHEMA_ORG}sha256": staged["sha256"],
+        SCHEMA_SHA256: staged["sha256"],
     }
 
 
