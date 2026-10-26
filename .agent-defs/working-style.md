@@ -4,15 +4,16 @@
 
 - Do exactly what is asked. No unrequested features, refactors, or
   "while I am here" cleanups. A bug fix does not require surrounding tidy-up.
-- No speculative abstraction. Do not build for hypothetical future needs.
-  Duplicated logic in two or three places is fine; a premature helper is not.
+- No speculative abstraction. Do not build for hypothetical future needs. When
+  to share code and when to leave a copy is in `code-style.md`, "Prefer the
+  general rule to the special case".
 - No half-finished work. Either finish it in the same pass or flag it clearly
   as incomplete. Never leave it silently half-done.
 - Do not add error handling, retries, fallbacks, or input validation for cases
   that cannot occur given how the code is actually called. Validate at real
   boundaries: user input, external APIs, network, file I/O.
 - Prefer editing existing files over creating new ones. Do not create
-  documentation or planning files unless asked.
+  documentation or planning files without prior approval.
 
 ## Asking
 

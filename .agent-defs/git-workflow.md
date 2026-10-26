@@ -139,6 +139,18 @@ Never use `--no-verify`.
 generated-with footer. The `[BOT]` marker is the convention and it is
 sufficient.
 
+## Branch names
+
+`<type>/<short-description>`: the type is one of the commit types above, the
+description lowercase and hyphenated. A branch that spans several types takes
+its main one. For example:
+
+```
+fix/live-suite
+chore/react-19
+refactor/schema-decoupling
+```
+
 ## Commit identity comes from the clone's git config
 
 The commit identity for this repository is set in the clone's own git config,

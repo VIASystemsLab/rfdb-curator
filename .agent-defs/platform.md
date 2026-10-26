@@ -33,18 +33,13 @@ apply, they say how.
 
 ## Images
 
-Pin image tags, and runtime versions in CI, to major.minor: `node:26.12-bookworm-slim`,
-`python:3.12-slim`, `node-version: '26.12'`. Patch releases, mostly security fixes,
-then arrive on the next rebuild; a minor release is a deliberate change. Never
-`latest`, never a major alone, never a full patch version. Secrets and `.env`
-follow `security.md`.
-
-Two exceptions keep a full version: Garage, which publishes no major.minor tags,
-and Oxigraph, by choice. Dependabot opens a PR when either publishes a new
-version (`.github/dependabot.yml`); review it, do not merge it blindly.
+Pin every image tag. Never `latest`, never an open-ended range. Which form each
+pin takes is in `repo-specific.md`, "Version pins". Secrets and `.env` follow
+`security.md`.
 
 ## Compose files
 
-Keep the default in the code and the value in `compose.yml` in agreement. When
-they drift, the service works locally and fails in deployment, which is the
+The compose files carry the deployment values; keep each equal to the code's
+default for that setting (the general rule is in `code-style.md`, configuration).
+When they drift, the service works locally and fails in deployment, which is the
 worst way to find out.

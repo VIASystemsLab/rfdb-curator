@@ -1,8 +1,8 @@
 # Upgrading runtimes, dependencies and tools
 
 How to check, run and verify a version change: a language runtime, a library, a
-base image, a CI action, a build tool. The pin formats themselves are in
-`platform.md` ("Images") and `repo-specific.md` ("GitHub Actions and CI").
+base image, a CI action, a build tool. Which form each pin takes is in
+`repo-specific.md`, "Version pins".
 
 ## Before changing anything
 

@@ -4,8 +4,8 @@
 # and these entries then only tell security updates where each lockfile is.
 #
 # The exception is the two images pinned to a full version (Oxigraph, Garage;
-# see .agent-defs/platform.md, "Images"): a version-update PR opens when either
-# publishes a new release, so the pin is reviewed rather than forgotten.
+# see .agent-defs/repo-specific.md, "Version pins"): a version-update PR opens
+# when either publishes a new release, so the pin is reviewed, not forgotten.
 #
 # Security updates and alerts must also be enabled in the repository settings
 # (Settings → Code security). The weekly audit workflow (.github/workflows/

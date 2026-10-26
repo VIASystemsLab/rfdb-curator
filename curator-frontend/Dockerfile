@@ -13,8 +13,8 @@
 # ---------------------------------------------------------------------------
 # development
 # ---------------------------------------------------------------------------
-# Pinned to major.minor (.agent-defs/platform.md, "Images"): patch releases
-# arrive on rebuild; a new minor is a deliberate change.
+# Pinned to major.minor (.agent-defs/repo-specific.md, "Version pins"):
+# patch releases arrive on rebuild; a new minor is a deliberate change.
 FROM node:26.12-bookworm-slim AS development
 
 # NODE_ENV=development is not cosmetic: npm ci skips devDependencies when

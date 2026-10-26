@@ -8,11 +8,11 @@ and one virtualenv at the repo root** for all of them. One sync installs everyth
 an edit to `rfdb-core` is picked up by both services with no reinstall.
 
 ```bash
-uv sync --all-extras --dev      # from the repo root — installs every member
+uv sync --all-extras --dev      # from the repo root: installs every member
 source .venv/bin/activate       # the venv is at the ROOT, not curator-backend/.venv
 ```
 
-`cd curator-backend && uv sync …` works identically — uv walks up to the workspace root — so
+`cd curator-backend && uv sync …` works identically (uv walks up to the workspace root), so
 either is fine. Use this one environment for all Python checks.
 
 ## Frontend Environment Setup
@@ -33,49 +33,62 @@ new dependency and it reaches the network).
 
 ## Docker Compose Lifecycle (Preferred Runtime)
 
-Run from repository root. Lifecycle only — `ps`, `logs`, `restart` and health checks live in
+Run from repository root. Lifecycle only: `ps`, `logs`, `restart` and health checks live in
 [editor-runtime.md](editor-runtime.md).
 
 ```bash
 docker compose up --build
 docker compose up
 docker compose down
-docker compose down -v   # DROPS the Oxigraph and Garage volumes — destroys all stored data
+docker compose down -v   # DROPS the Oxigraph and Garage volumes: destroys all stored data
 ```
 
 `down -v` is a deletion: never run it to "clean up" without explicit approval ([repo-specific.md](repo-specific.md) → "Deletion is scoped").
-It also un-bootstraps Garage — a fresh volume has no layout, bucket or key, so
+It also un-bootstraps Garage: a fresh volume has no layout, bucket or key, so
 `scripts/garage-init.sh` must be re-run once afterwards (it is idempotent).
 
-**Two modes.** Base services (`oxigraph`, `garage`, `dataexplorer-backend`,
-`graphexplorer-frontend`) carry no `profiles:` key and start in every mode; `curator-backend`
-and `curator-frontend` are `full`-only. So a bare `docker compose up` is the **read-only**
-stack — no editor, no writer — and the whole stack needs `COMPOSE_PROFILES=full` in `.env`
-(what `scripts/env-init.sh` writes) or `--profile full` per invocation. When a write route
-refuses connections, check this first — [editor-runtime.md](editor-runtime.md) → "Compose
-Commands" has the diagnosis, [../docs/deployment.md](../docs/deployment.md) the full detail.
-
-Never start or restart the Docker daemon / Docker Desktop yourself ([platform.md](platform.md)) — if it
-is unreachable, stop and ask the user. Managing `docker compose` services is fine.
+**Two modes.** A bare `docker compose up` is the read-only stack; the editor and the
+writer need the `full` profile. How to get it, and the diagnosis when a write route
+refuses connections: [editor-runtime.md](editor-runtime.md) → "Compose Commands".
 
 ## Seeding and Data Reset
 
-How triples get into the store — the thing to check first when reads come back empty.
+How triples get into the store: the thing to check first when reads come back empty.
 
 - **On startup:** `curator-backend` seeds `data/rfdb_vocab.ttl` because compose sets
   `SEED_VOCAB_ON_STARTUP=true`. Test fixtures (`data/rfdb_data.ttl`) are `SEED_TEST_DATA_ON_STARTUP`
   and default to off.
 - **One-shot, no web server:** `docker compose run --rm curator-backend python scripts/seed.py`
-  — the same `core.seeder.bootstrap_store()` the lifespan runs. It loads the controlled
+  runs the same `core.seeder.bootstrap_store()` the lifespan runs. It loads the controlled
   vocabulary (and the sample data when enabled), never curated records or uploaded files:
   enough for a vocabulary-only read-only demo, where no writer process seeds on startup.
   Real data reaches a read-only instance through carried-over volumes (`docs/deployment.md`).
 - **Idempotent.** Vocabulary seeding merges rather than replaces, so re-running is safe.
 
-**`RESET_DATA_ON_STARTUP=true` is destructive** — it wipes the whole store (every named graph and the default graph) before every seed,
+**`RESET_DATA_ON_STARTUP=true` is destructive**: it wipes the whole store (every named graph and the default graph) before every seed,
 and it must stay `false` in production. Treat setting it, like `docker compose down -v`, as a
 deletion requiring explicit approval ([repo-specific.md](repo-specific.md) → "Deletion is scoped"). Back up volumes first; the tarball
 procedure is in [../docs/deployment.md](../docs/deployment.md) → "Ongoing operations".
+
+### Wiping the dev stores
+
+Removes every triple and every stored file from the dev stack, then reseeds the
+vocabulary and re-bootstraps Garage. It is a deletion: run it only on a yes to
+that question. Count the triples first, so the result can be checked. The writer
+reseeds the vocabulary on its next start, and `garage-init.sh` imports the same key
+from `.env` again:
+
+```bash
+PROJECT=$(grep '^COMPOSE_PROJECT_NAME=' .env | cut -d= -f2)
+docker compose stop curator-backend dataexplorer-backend
+docker compose rm -sf oxigraph garage
+docker volume rm "${PROJECT}_oxigraph_data" "${PROJECT}_garage_data" "${PROJECT}_garage_meta"
+docker compose up -d --no-build
+scripts/garage-init.sh
+```
+
+`scripts/garage-init.sh` prints the S3 secret: do not copy its output into a
+report.
 
 Full configuration matrix, reset modes, and the read-only population path:
 [../docs/deployment.md](../docs/deployment.md).
@@ -122,28 +135,28 @@ docker run --rm \
 			riot --validate "$f" || { echo "ERROR in $f" >&2; status=1; }
 		done < <(find /data/data -type f \( -name "*.ttl" -o -name "*.nt" \) -print0)
 		exit $status
-	' 2>&1 | tee .temp/ttl-validation.log
+	'
 ```
 
-### Reviewing an edited `data/*.ttl` file — fast path
+### Reviewing an edited `data/*.ttl` file: fast path
 
 Do this in order and stop as soon as it's clean; don't reach for full pySHACL unless step 2
 raises a real question.
 
-1. `git diff -- data/<file>.ttl` — read the actual diff, not the whole file.
-2. `python3 -c "from rdflib import Graph; Graph().parse('data/<file>.ttl', format='turtle')"`
-   — syntax check, ~1s. Never merge in `glottolog_language.ttl` (38MB) for this.
+1. `git diff -- data/<file>.ttl`: read the actual diff, not the whole file.
+2. `uv run --offline python -c "from rdflib import Graph; Graph().parse('data/<file>.ttl', format='turtle')"`
+   is the syntax check, ~1s. Never merge in `glottolog_language.ttl` (38MB) for this.
 3. For each *new predicate* in the diff: `grep -n '<local-name>' schema/rfdb_schema.ttl`. Predicates
    absent from every shape are legal RDF (shapes aren't `sh:closed` by default) but are
-   **invisible** to the graph explorer and curator UI — both are schema-driven
+   **invisible** to the graph explorer and curator UI, since both are schema-driven
    (`dataexplorer-backend/api/graph.py`: "every shape property ... is a relation"). This is the
-   most common real issue and a plain grep catches it in a second — no validator needed.
+   most common real issue and a plain grep catches it in a second, with no validator.
 4. For each *new individual whose IRI looks like it belongs to a large reference file*
    (Glottolog languages, controlled vocab) : `grep -c '<iri>' data/glottolog_language.ttl` /
-   `data/rfdb_vocab.ttl` before assuming it needs declaring locally — it's often already seeded there,
+   `data/rfdb_vocab.ttl` before assuming it needs declaring locally: it's often already seeded there,
    and redeclaring it in a test-fixture file is redundant clutter, not a bug, but worth flagging.
 5. Only if something looks structurally wrong (cardinality, datatype, class mismatch), run real
-   pySHACL — scoped to just the one file plus `schema/rfdb_schema.ttl`, no `inference="rdfs"` unless
+   pySHACL, scoped to just the one file plus `schema/rfdb_schema.ttl`, no `inference="rdfs"` unless
    the check specifically needs subclass entailment, and never with `glottolog_language.ttl`
    merged in (rdfs inference over 38MB takes minutes).
 
@@ -152,14 +165,14 @@ raises a real question.
 There are three Python projects, all uv workspace members: `rfdb-core/` (the shared
 library), `curator-backend/` (writes) and `dataexplorer-backend/` (reads). Ruff is
 pinned in **each member's `[dependency-groups] dev`** (the workspace resolves one
-version for all three), but **its config lives in the root `pyproject.toml`** — one
+version for all three), but **its config lives in the root `pyproject.toml`**: one
 `[tool.ruff]` for every member, plus `tests/`. The version is deliberately not repeated
 here, so the pin stays its only copy.
 
 Run ruff **from the repo root**, which is what CI does:
 
 ```bash
-# Python — run FROM THE REPO ROOT, mirrors CI exactly.
+# Python: run FROM THE REPO ROOT, mirrors CI exactly.
 # Covers every member and tests/ in one pass.
 uv run --offline ruff check .          # CI: "Ruff lint"
 uv run --offline ruff format --check . # CI: "Ruff format check"
@@ -173,7 +186,22 @@ The root config sets `src = ["curator-backend", "dataexplorer-backend", "rfdb-co
 That is load-bearing: ruff's isort infers first-party packages from `src`, so without it
 `core`, `api`, `models` and `scripts` would be classified as third-party and ruff would
 demand they merge into the `fastapi`/`rdflib` import block. **Add any new member to that
-list** — the symptom of forgetting is a batch of I001 errors in the new service only.
+list**: the symptom of forgetting is a batch of I001 errors in the new service only.
+
+### Pre-commit hooks
+
+The repo tracks `.pre-commit-config.yaml`: commit message format, no machine-local
+paths, ruff lint and format (scoped to every Python workspace member plus `tests/`),
+and the prefix-map coverage check. They are opt-in: they run on every commit once
+`pre-commit install` has run in the clone. Run them by hand with:
+
+```bash
+pre-commit run --all-files
+```
+
+They do not run the test suites. They run `uv run --offline ruff …` from the repo
+root, as CI does, and drop any stale `VIRTUAL_ENV` (`env -u`) so uv resolves the
+root `.venv` without a warning.
 
 ### Gotcha: `ruff: command not found` / `pyenv: ruff`
 
@@ -185,7 +213,7 @@ the workspace environment:
   walks up to the workspace root.
 - A stale `VIRTUAL_ENV` pointing at a deleted venv triggers a harmless
   `VIRTUAL_ENV does not match` warning; uv ignores it. Run `deactivate` to clear it.
-- `uv run ruff check .` needs no manual `source .venv/bin/activate` — uv resolves
+- `uv run ruff check .` needs no manual `source .venv/bin/activate`; uv resolves
   the environment itself. If it still fails, run `uv sync --all-extras --dev`.
 
 ## Notes

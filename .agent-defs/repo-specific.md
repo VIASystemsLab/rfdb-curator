@@ -5,11 +5,14 @@ module, this one applies.
 
 ## Repository modules
 
+This repository's own modules; the general ones are listed in `AGENTS.md`. When you
+add, rename or remove one, update this table in the same change.
+
 | File | Covers |
 | - | - |
 | [build-commands.md](build-commands.md) | Environment setup, Compose lifecycle, seeding/data reset, linting, RDF validation |
-| [editor-runtime.md](editor-runtime.md) | Runtime diagnostics for the curator-backend/curator-frontend/Oxigraph stack, waiting for readiness |
-| [testing.md](testing.md) | Test structure and the one-run-per-member rule |
+| [editor-runtime.md](editor-runtime.md) | Runtime diagnostics for the Compose stack (both backends, both frontends, Oxigraph, Garage), waiting for readiness |
+| [testing.md](testing.md) | Running tests (once per member), the live suite, checking frontend changes without a browser |
 | [planning-docs.md](planning-docs.md) | Format for design/implementation plan documents in `.temp/` |
 
 Load them when the task touches their area, not otherwise.
@@ -40,7 +43,8 @@ Before writing code, stop at the first rung that holds:
 8. Then add clear, concise docstrings and comments where they reduce future
    maintenance cost. Never leave complex or non-obvious code uncommented.
 
-- No abstractions not explicitly requested. No boilerplate nobody asked for.
+- Abstractions only as `code-style.md` → "Prefer the general rule to the special
+  case" allows. No boilerplate nobody asked for.
 - Deletion over addition. Boring over clever. Fewest files possible.
 - Search existing code, schema, shapes, and tests before introducing new
   patterns.
@@ -58,19 +62,10 @@ Non-trivial logic should leave one runnable check behind.
 The repo is a **uv workspace** with three Python members: `rfdb-core/` (shared
 library), `curator-backend/` (the only service that writes) and
 `dataexplorer-backend/` (reads). There is one lockfile and one `.venv`, both at
-the repo root. Ruff's config lives in the **root** `pyproject.toml`, so
-lint/format run from the root: that is the only invocation that checks every
-member plus `tests/`. Tests run **once per member**, as CI does, because both
-services own a top-level `api` package and a single pytest process would
-resolve `from api.data import …` to whichever was imported first.
-
-```bash
-uv run --offline ruff check .          # lint, from the ROOT, covers all members + tests
-uv run --offline ruff format --check . # format check, from the ROOT
-```
-
-The three pytest commands are in [testing.md](testing.md) → "Running Tests",
-which is their canonical copy. A change to `rfdb-core/` affects **both**
+the repo root. Lint and format run from the root, and tests once per member:
+the commands and the reasons are in [build-commands.md](build-commands.md) →
+"Linting and Formatting" and [testing.md](testing.md) → "Running Tests". A change
+to `rfdb-core/` affects **both**
 services, so run all three suites. `uv sync` reaches the network and needs a yes
 (see `security.md`).
 
@@ -124,11 +119,11 @@ from pathlib import Path
 
 from rdflib import Graph
 
-from core.schema_extractor import SchemaExtractor
+from rfdb_core.schema_extractor import SchemaExtractor
 ```
 
 Docstrings: brief purpose, concise variables, optional Example block. Test
-functions carry a concise docstring describing intent and expected behaviour.
+docstrings: [testing.md](testing.md).
 
 | Artifact | Convention | Example |
 |----------|-----------|---------|
@@ -137,7 +132,7 @@ functions carry a concise docstring describing intent and expected behaviour.
 | Python functions / variables | `snake_case` | `merge_related_entities` |
 | RDF data resources | `rfdb:PascalCase` | `rfdb:SanPietroburgo` |
 | SHACL shapes | `rfdbs:` + suffix `Shape` | `rfdbs:SourceShape` |
-| Git branches | `feature/<short-description>` or `fix/<short-description>` | `feature/add-shape-filter` |
+| Git branches | `<type>/<short-description>`, the type a commit type (`git-workflow.md`, "Branch names") | `chore/react-19` |
 
 Sanitize error messages before they reach users or logs.
 
@@ -191,26 +186,47 @@ The whole repository carries one version.
   the tag. A tag on a commit with red CI has to be moved and force-pushed, which
   changes a published reference.
 
+## Version pins
+
+Prefer major.minor. Patch releases, mostly security fixes, then arrive on the next
+rebuild or run, and a new minor stays a deliberate change.
+
+| What | Pin | Example |
+| - | - | - |
+| Base images and language runtimes: Dockerfiles, compose files, CI's `node-version` and `python-version` | major.minor | `node:26.12-bookworm-slim`, `python:3.12-slim`, `node-version: '26.12'` |
+| GitHub Actions | the major tag, as GitHub recommends; the full version where the action publishes no major tag | `actions/checkout@v7`, `astral-sh/setup-uv@v10.3.2` |
+| Tools CI installs | full version, so a run is reproducible; uv also matches the local uv that writes `uv.lock` (see "GitHub Actions and CI") | uv `version: '0.13.5'`, `pip-audit==2.10.1` |
+| Python dependencies | exact, always, in each member's `pyproject.toml`, locked in `uv.lock` | `fastapi==0.141.1` |
+| npm dependencies | ranges in `package.json`, exact versions in `package-lock.json` as npm writes them | `"react": "^19.3.1"` |
+
+Where major.minor is preferred, a full version is allowed only when no alternative
+exists (the publisher tags only full versions) or the user has chosen it for that
+software. Each such exception is listed here, and Dependabot opens a PR when it
+publishes a release (`.github/dependabot.yml`); review that PR, never merge it
+unread. The exceptions:
+
+- `dxflrs/garage`: publishes no major.minor tags.
+- `oxigraph/oxigraph`: the user's choice.
+
 ## GitHub Actions and CI
 
-`.github/workflows/ci.yml` cannot be run locally, so every change to it is
-checked before it is pushed, and confirmed after.
+The workflows in `.github/workflows/` cannot be run locally, so every change to
+them is checked before it is pushed, and confirmed after. How refs and tools are
+pinned is in "Version pins" above.
 
 - **A ref in `uses:` must exist.** Before writing `owner/action@<ref>`, confirm
   that exact tag or commit exists in the action's repository. Do not assume a
   moving major tag (`@v10`) exists because a release (`v10.3.2`) does: some
   actions, `astral-sh/setup-uv` among them, publish only full version tags.
   Checking needs the network, so ask first.
-- **Use the major tag where the action publishes one** (`actions/checkout@v7`),
-  as GitHub recommends, so its fixes arrive without an edit. Use the full
-  version only where no major tag exists (`astral-sh/setup-uv@v10.3.2`).
 - **Check the inputs at that ref.** Read the action's `action.yml` at the new
   tag, not at `main`. Every `with:` key the workflow passes must still exist,
   and any changed default that matters (caching, for example) goes in the commit
   message.
 - **Tool pins follow the lockfile.** CI pins uv to the version that writes
-  `uv.lock` locally. When the local uv changes, update all three jobs in the
-  same change, run `uv lock`, and confirm `uv lock --check` passes.
+  `uv.lock` locally. When the local uv changes, update every `setup-uv` step in
+  `.github/workflows/` in the same change, run `uv lock`, and confirm
+  `uv lock --check` passes.
 - **Validate what can be validated.** Parse the file as YAML, and run the
   compose `config` commands the workflow runs. Anything else waits for a real
   run: after pushing a CI change, say that it is unverified and ask the user to
@@ -245,21 +261,11 @@ Plus the three Python suites ([testing.md](testing.md)) and, when frontend code
 changed, the frontend lint (see "Frontend runs in a container"). Adjust checks
 to the changed areas.
 
-### Ruff hook
+### Pre-commit hooks
 
-The repo tracks `.pre-commit-config.yaml` (ruff lint + format, scoped to every
-Python workspace member plus `tests/`, and the prefix-map coverage check). It runs on
-every commit once `pre-commit install` has run in the clone; run it manually with
-`pre-commit run --all-files`. It does not run the test suites.
-
-The hooks run `uv run --offline ruff …` **from the repo root**, matching CI.
-`[tool.ruff]` lives in the root `pyproject.toml` with an explicit
-`src = ["curator-backend", "dataexplorer-backend", "rfdb-core"]`, so import
-classification does not depend on cwd, and running from the root is the only
-invocation that also covers `rfdb-core/` and `tests/`. The ruff version comes from curator-backend's
-dev dependency, resolved through the workspace's single root `.venv`. The hook
-drops any stale `VIRTUAL_ENV` (`env -u`) so `uv` resolves that venv without a
-warning.
+What the hooks run and how to install them: [build-commands.md](build-commands.md) →
+"Pre-commit hooks". They do not run the test suites, so "Before every commit" above
+still applies.
 
 ### PR descriptions: changes grouped by topic
 
@@ -281,10 +287,6 @@ commit made while it is pending, rather than leaving it unstaged.
 
 ## Waiting and polling
 
-Never write an unbounded wait loop. Prefer `docker compose up -d --wait`: the
-stack declares healthchecks and `service_healthy` dependencies. When you must
-poll anyway, the loop needs a hard attempt cap, the observed state printed on
-every attempt, and a loud failure at the cap. Silence is not progress: a
-command that prints nothing is not evidence that something is still starting.
-Template and the Oxigraph liveness-vs-readiness caveat: `editor-runtime.md` →
-"Waiting for Readiness".
+Never write an unbounded wait loop. The rule, the template and the Oxigraph
+liveness-versus-readiness caveat: [editor-runtime.md](editor-runtime.md) → "Waiting
+for Readiness".

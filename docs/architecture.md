@@ -585,7 +585,7 @@ that pin its version. Version numbers live only in those files.
 Node and Vite never run in production: Node builds the static files and runs the
 development servers. CI pins Node, Python and uv in `.github/workflows/`. How
 images and runtimes are pinned, and the two stores' exceptions, is in
-[`.agent-defs/platform.md`](../.agent-defs/platform.md) ("Images").
+[`.agent-defs/repo-specific.md`](../.agent-defs/repo-specific.md) ("Version pins").
 
 - **Oxigraph** is the RDF triple store and the source of truth for graph data. All
   instance data lives in one named graph, `DATA_GRAPH_URI`: every SPARQL read uses
