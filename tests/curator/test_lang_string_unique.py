@@ -37,8 +37,8 @@ _PREFIXES = """
 """
 
 
-class _CapturingOxigraph:
-    """Oxigraph double: validates via the real SHACL validator and captures the
+class _CapturingStore:
+    """Store double: validates via the real SHACL validator and captures the
     Turtle that would be written."""
 
     def __init__(self) -> None:
@@ -57,16 +57,16 @@ class _CapturingOxigraph:
         return []
 
     def load_turtle(self, turtle: str) -> None:
-        """Capture the Turtle that would be loaded into Oxigraph."""
+        """Capture the Turtle that would be loaded into the store."""
         self.loaded_turtle = turtle
 
 
-def _request(oxigraph: _CapturingOxigraph) -> SimpleNamespace:
+def _request(store: _CapturingStore) -> SimpleNamespace:
     """Minimal request object expected by create_or_update_entity."""
     return SimpleNamespace(
         app=SimpleNamespace(
             state=SimpleNamespace(
-                store=oxigraph,
+                store=store,
                 shape_dep_graph={},
                 shacl_validator=ShaclValidator(str(SCHEMA_PATH)),
             )
@@ -103,15 +103,15 @@ def _conforms(body: str) -> bool:
 
 def test_language_tag_is_preserved_through_write() -> None:
     """A rdf:langString value keeps its language tag end to end."""
-    oxigraph = _CapturingOxigraph()
+    store = _CapturingStore()
     response = create_or_update_entity(
         _place_label_payload({"@value": "Верона", "@language": "ru"}),
-        _request(oxigraph),
+        _request(store),
     )
     assert response.success is True
     entity_id = response.entityId
 
-    written = Graph().parse(data=oxigraph.loaded_turtle, format="turtle")
+    written = Graph().parse(data=store.loaded_turtle, format="turtle")
     labels = list(written.objects(URIRef(entity_id), RDFS.label))
     assert len(labels) == 1
     assert isinstance(labels[0], Literal)
@@ -122,14 +122,12 @@ def test_language_tag_is_preserved_through_write() -> None:
 def test_untagged_value_is_accepted_when_string_allowed() -> None:
     """The label field allows xsd:string, so an untagged value is valid and stays
     untagged."""
-    oxigraph = _CapturingOxigraph()
-    response = create_or_update_entity(
-        _place_label_payload({"@value": "Verona"}), _request(oxigraph)
-    )
+    store = _CapturingStore()
+    response = create_or_update_entity(_place_label_payload({"@value": "Verona"}), _request(store))
     assert response.success is True
     entity_id = response.entityId
 
-    written = Graph().parse(data=oxigraph.loaded_turtle, format="turtle")
+    written = Graph().parse(data=store.loaded_turtle, format="turtle")
     labels = list(written.objects(URIRef(entity_id), RDFS.label))
     assert len(labels) == 1
     assert labels[0].language is None

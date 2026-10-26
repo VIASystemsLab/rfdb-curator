@@ -44,8 +44,8 @@ _SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "rfdb_schema.ttl
 _EXTRACTOR = SchemaExtractor(str(_SCHEMA_PATH))
 
 
-class _FakeOxigraph:
-    """Oxigraph stub backed by a real in-memory rdflib graph (no named graph)."""
+class _FakeStore:
+    """Store stub backed by a real in-memory rdflib graph (no named graph)."""
 
     def __init__(self) -> None:
         self.g = Graph()
@@ -98,7 +98,7 @@ def _drain(resp) -> bytes:
 @pytest.fixture
 def env():
     """Fake store + storage + request wired like app.state."""
-    store = _FakeOxigraph()
+    store = _FakeStore()
     storage = InMemoryStorage()
     request = SimpleNamespace(
         app=SimpleNamespace(

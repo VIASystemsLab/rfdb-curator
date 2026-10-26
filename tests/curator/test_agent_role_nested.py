@@ -85,8 +85,8 @@ def _minted(iri: str, name: str) -> bool:
     return re.fullmatch(rf"{re.escape(DATA)}{name}_[0-9a-f]{{12}}", iri) is not None
 
 
-class _GraphOxigraph:
-    """Oxigraph double backed by a real rdflib graph, so updates actually run.
+class _GraphStore:
+    """Store double backed by a real rdflib graph, so updates actually run.
 
     Creates need it too: naming a node checks the store for the IRI, and the
     records a payload references must be there for validation.
@@ -179,13 +179,13 @@ def _work_without_agent_role() -> EntityData:
     )
 
 
-def _dep_request(oxigraph: _GraphOxigraph) -> SimpleNamespace:
+def _dep_request(store: _GraphStore) -> SimpleNamespace:
     """Request object carrying the real shape dependency graph."""
     extractor = SchemaExtractor(str(SCHEMA_PATH))
     return SimpleNamespace(
         app=SimpleNamespace(
             state=SimpleNamespace(
-                store=oxigraph,
+                store=store,
                 shape_dep_graph=build_shape_dep_graph(extractor),
                 shacl_validator=ShaclValidator(str(SCHEMA_PATH)),
             )
@@ -201,7 +201,7 @@ def test_removing_agent_role_drops_link_and_orphan_bridge_node() -> None:
     merges can pull back in.  The person and role it referenced are standalone
     entities and must survive.
     """
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     response = create_or_update_entity(_work_without_agent_role(), _dep_request(store))
     assert response.success is True
 
@@ -221,7 +221,7 @@ def test_linking_another_records_card_is_refused() -> None:
     Accepted, the save would add a second person and role to the other record's
     connection and share it between two records.
     """
-    store = _GraphOxigraph(
+    store = _GraphStore(
         _STORED_WORK
         + """
 rfdb:other_work a mm:MusicEntity, lrmoo:F1_Work ;
@@ -251,7 +251,7 @@ def test_editing_the_person_on_a_connection_replaces_the_old_one() -> None:
     bridge node it describes, or the save is rejected for exceeding
     ``sh:maxCount 1`` on a node the curator only edited.
     """
-    store = _GraphOxigraph(
+    store = _GraphStore(
         _STORED_WORK
         + """
 rfdb:person_z a core:Person ;
@@ -276,7 +276,7 @@ rfdb:person_z a core:Person ;
     assert (agent_role, HAS_ROLE, URIRef(DATA + "role_librettist")) in store.g
 
 
-class _FailingWriteOxigraph(_GraphOxigraph):
+class _FailingWriteStore(_GraphStore):
     """Store whose first bulk load fails, so the write path has to roll back."""
 
     def __init__(self, turtle: str = "") -> None:
@@ -298,7 +298,7 @@ def test_failed_write_restores_the_removed_bridge_node() -> None:
     that stands between the curator and a connection whose node lost its person
     and role.
     """
-    store = _FailingWriteOxigraph(_STORED_WORK)
+    store = _FailingWriteStore(_STORED_WORK)
     with pytest.raises(HTTPException) as exc_info:
         create_or_update_entity(_work_without_agent_role(), _dep_request(store))
     assert exc_info.value.status_code == 503
@@ -318,7 +318,7 @@ def test_failed_write_restores_the_removed_bridge_node() -> None:
 
 def test_new_work_and_its_card_are_named_by_the_backend() -> None:
     """A record sent without ``@id`` and a card sent as a blank node get minted IRIs."""
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     response = create_or_update_entity(
         _new_work(_card("person_x", "role_composer")), _dep_request(store)
     )
@@ -339,13 +339,13 @@ def test_agent_role_without_type_is_rejected() -> None:
     type cannot be."""
     card = _card("person_x", "role_composer")
     del card["@type"]
-    response = create_or_update_entity(_new_work(card), _dep_request(_GraphOxigraph(_STORED_WORK)))
+    response = create_or_update_entity(_new_work(card), _dep_request(_GraphStore(_STORED_WORK)))
     assert response.success is False
 
 
 def test_create_with_an_id_is_refused() -> None:
     """``@id`` means update: an unknown one is a 404, and nothing is written."""
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     before = set(store.g)
     payload = _new_work()
     payload.data["@id"] = DATA + "chosen_by_the_client"
@@ -359,7 +359,7 @@ def test_minted_iri_already_in_use_is_redrawn() -> None:
     """A minted IRI the store already uses is drawn again, never merged into."""
     taken = uuid.UUID("aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa")
     fresh = uuid.UUID("bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb")
-    store = _GraphOxigraph(
+    store = _GraphStore(
         _STORED_WORK
         + """
 rfdb:MusicalWork_aaaaaaaaaaaa a mm:MusicEntity, lrmoo:F1_Work ; rdfs:label "First"@en .
@@ -380,7 +380,7 @@ rfdb:MusicalWork_aaaaaaaaaaaa a mm:MusicEntity, lrmoo:F1_Work ; rdfs:label "Firs
 
 def test_adding_a_card_next_to_an_existing_one_keeps_its_iri() -> None:
     """The kept card keeps its IRI and values; the new one is named and linked."""
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     payload = _work_without_agent_role()
     payload.data["core:hasAgentRole"] = [
         _card("person_y", "role_librettist", "stored_work_ar_0"),
@@ -405,7 +405,7 @@ def test_changed_card_replaces_its_values_even_when_not_listed_as_changed() -> N
     Here the client lists only the label as changed, yet changes the role on a
     card: the card must end with the new role only, not both.
     """
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     payload = _work_without_agent_role()
     payload.data["rdfs:label"] = {"@value": "Renamed Work", "@language": "en"}
     payload.data["core:hasAgentRole"] = [_card("person_y", "role_composer", "stored_work_ar_0")]
@@ -426,7 +426,7 @@ def test_changed_field_replaces_its_value_even_when_not_listed_as_changed() -> N
     Here the client lists nothing as changed, yet renames the Work: it must end
     with the new label only, not both.
     """
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     payload = _work_without_agent_role()
     payload.data["rdfs:label"] = {"@value": "Renamed Work", "@language": "en"}
     payload.originalTriples = []
@@ -438,7 +438,7 @@ def test_changed_field_replaces_its_value_even_when_not_listed_as_changed() -> N
 
 def test_field_left_out_and_not_listed_is_kept() -> None:
     """A field the payload does not carry is untouched unless listed as emptied."""
-    store = _GraphOxigraph(
+    store = _GraphStore(
         _STORED_WORK
         + '\nrfdb:stored_work <http://www.w3.org/2004/02/skos/core#altLabel> "Alt"@en .\n'
     )
@@ -460,7 +460,7 @@ def test_field_left_out_and_not_listed_is_kept() -> None:
 )
 def test_card_that_is_not_this_records_is_refused(card_iri: str) -> None:
     """A card IRI must be one this record links already; nothing is written otherwise."""
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     before = set(store.g)
     payload = _work_without_agent_role()
     card = _card("person_y", "role_composer")
@@ -474,7 +474,7 @@ def test_card_that_is_not_this_records_is_refused(card_iri: str) -> None:
 
 def test_existing_card_sent_without_its_values_is_refused() -> None:
     """A card is replaced by what is sent, so a bare reference would empty it."""
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     payload = _work_without_agent_role()
     payload.data["core:hasAgentRole"] = [{"@id": DATA + "stored_work_ar_0"}]
     with pytest.raises(HTTPException) as exc_info:
@@ -484,7 +484,7 @@ def test_existing_card_sent_without_its_values_is_refused() -> None:
 
 def test_describing_a_referenced_record_is_refused() -> None:
     """References are bare ``@id``s: a payload may not write onto the Person it cites."""
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     before = set(store.g)
     card = _card("person_x", "role_composer")
     card["core:hasAgent"] = {
@@ -502,7 +502,7 @@ def test_blank_node_outside_a_card_is_refused() -> None:
     payload = _new_work()
     payload.data["rdfs:seeAlso"] = {"rdfs:label": "anonymous"}
     with pytest.raises(HTTPException) as exc_info:
-        create_or_update_entity(payload, _dep_request(_GraphOxigraph(_STORED_WORK)))
+        create_or_update_entity(payload, _dep_request(_GraphStore(_STORED_WORK)))
     assert exc_info.value.status_code == 422
 
 
@@ -511,13 +511,13 @@ def test_blank_node_outside_a_card_is_refused() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _delete(store: _GraphOxigraph, iri: str) -> None:
+def _delete(store: _GraphStore, iri: str) -> None:
     delete_entity(_dep_request(store), entity_id=DATA + iri, shapeId="")
 
 
 def test_delete_of_a_missing_record_is_a_404() -> None:
     """Deleting an IRI the store does not describe is reported, not silently accepted."""
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     before = set(store.g)
     with pytest.raises(HTTPException) as exc_info:
         _delete(store, "never_created")
@@ -527,7 +527,7 @@ def test_delete_of_a_missing_record_is_a_404() -> None:
 
 def test_delete_removes_the_records_cards() -> None:
     """The record's cards are deleted with it; the people and roles they cite stay."""
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     _delete(store, "stored_work")
     assert list(store.g.triples((URIRef(DATA + "stored_work"), None, None))) == []
     assert list(store.g.triples((URIRef(DATA + "stored_work_ar_0"), None, None))) == []
@@ -536,7 +536,7 @@ def test_delete_removes_the_records_cards() -> None:
 
 def test_delete_is_refused_while_a_card_cites_the_record() -> None:
     """A Person used in a Work's card cannot go: the 409 names the Work, not the card."""
-    store = _GraphOxigraph(_STORED_WORK)
+    store = _GraphStore(_STORED_WORK)
     before = set(store.g)
     with pytest.raises(HTTPException) as exc_info:
         _delete(store, "person_y")
@@ -549,7 +549,7 @@ def test_delete_is_refused_while_a_card_cites_the_record() -> None:
 
 def test_delete_is_refused_while_a_record_links_it_directly() -> None:
     """A direct link counts too, for example an Expression pointing at its Work."""
-    store = _GraphOxigraph(
+    store = _GraphStore(
         _STORED_WORK
         + f"""
 rfdb:expression <{P148I}> rfdb:stored_work ; rdfs:label "An Expression"@en .
