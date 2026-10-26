@@ -10,7 +10,7 @@
 # defines. Here there is no TLS, no ACME and no routing — just files on :80,
 # reachable only from the `edge` Docker network.
 #
-# Why Caddy rather than nginx: the stack already pins caddy:2-alpine for the
+# Why Caddy rather than nginx: the stack already pins caddy:2.11-alpine for the
 # edge proxy, so this adds no image to review, update or trust. A `try_files`
 # nginx.conf would have been the same number of lines and one more base image.
 

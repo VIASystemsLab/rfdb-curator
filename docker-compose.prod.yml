@@ -12,7 +12,7 @@
 #   - No backend or frontend publishes a port either. The only host-facing
 #     service is `proxy`, which terminates TLS and routes by path prefix over
 #     the `edge` network. One origin for everything, so CORS is a non-issue.
-#   - Frontends are static builds (`target: production` → caddy:2-alpine
+#   - Frontends are static builds (`target: production` → caddy:2.11-alpine
 #     serving ./dist), never the Vite dev server, which is not built to sit
 #     behind a reverse proxy or take production traffic.
 #   - Config with no safe default uses `${VAR:?message}` so `docker compose up`
@@ -335,7 +335,7 @@ services:
       dataexplorer-backend:
         condition: service_healthy
     healthcheck:
-      # caddy:2-alpine ships busybox wget. A 200 for / means Caddy is up and
+      # caddy:2.11-alpine ships busybox wget. A 200 for / means Caddy is up and
       # serving the built bundle's index.html.
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 10s
@@ -373,7 +373,7 @@ services:
   # it, so routing is plain prefix rules with no method awareness:
   # /api/v1/curator/* → writer, /api/v1/dataexplorer/* and /rdf/* → reader.
   proxy:
-    image: caddy:2-alpine
+    image: caddy:2.11-alpine
     restart: unless-stopped
     depends_on:
       # Base services only — a `full`-profile dependency here would make the
@@ -538,7 +538,7 @@ services:
       dataexplorer-backend:
         condition: service_healthy
     healthcheck:
-      # caddy:2-alpine ships busybox wget. A 200 for / means Caddy is up and
+      # caddy:2.11-alpine ships busybox wget. A 200 for / means Caddy is up and
       # serving the built bundle's index.html.
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
       interval: 10s

@@ -4,7 +4,7 @@
 #
 #   development  docker-compose.yml     — Vite dev server + source bind-mount
 #   build        (intermediate)         — npm run build, emits /app/dist
-#   production   docker-compose.prod.yml — caddy:2-alpine serving that dist
+#   production   docker-compose.prod.yml — caddy:2.11-alpine serving that dist
 #
 # Both compose files name their stage with `target:` explicitly. Do not rely on
 # stage order: Docker defaults to the LAST stage, so appending one silently
@@ -91,11 +91,11 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # production — static files only, no Node, no Vite
 # ---------------------------------------------------------------------------
-# caddy:2-alpine because the edge proxy already pins it: one fewer base image to
+# caddy:2.11-alpine because the edge proxy already pins it: one fewer base image to
 # track than an nginx variant, for the same `try_files` behaviour. The Node
 # toolchain and node_modules do not survive into this stage, so the runtime
 # attack surface is a file server and a directory of static assets.
-FROM caddy:2-alpine AS production
+FROM caddy:2.11-alpine AS production
 
 COPY --from=build /app/dist /srv
 # Shared with graphexplorer-frontend; the header of proxy/spa.Caddyfile says why

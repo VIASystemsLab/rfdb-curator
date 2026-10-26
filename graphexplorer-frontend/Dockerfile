@@ -5,7 +5,7 @@
 #
 #   development  docker-compose.yml      — Vite dev server + source bind-mount
 #   build        (intermediate)          — npm run build, emits /app/dist
-#   production   docker-compose.prod.yml — caddy:2-alpine serving that dist
+#   production   docker-compose.prod.yml — caddy:2.11-alpine serving that dist
 #
 # Both compose files name their stage with `target:` explicitly; Docker's default
 # is the LAST stage, so never rely on order.
@@ -77,7 +77,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # production — static files only, no Node, no Vite
 # ---------------------------------------------------------------------------
-FROM caddy:2-alpine AS production
+FROM caddy:2.11-alpine AS production
 
 COPY --from=build /app/dist /srv
 # The same file curator-frontend's production stage copies — one static-server
