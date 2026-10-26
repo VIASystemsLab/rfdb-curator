@@ -456,6 +456,11 @@ through one of that record's helper nodes (a Person in a Work's `AgentRole`); th
 message names up to ten of them. Digital copies are left for
 `scripts/cleanup_files.py`.
 
+Both run as several store requests with no transaction across them (the deletes,
+then the load). Each takes a snapshot of the record and its helper nodes first; if
+any request fails, the snapshot is loaded back and the route answers 503, so a
+failure part-way does not leave a record half-written.
+
 ---
 
 ## Shape-Role Policy
