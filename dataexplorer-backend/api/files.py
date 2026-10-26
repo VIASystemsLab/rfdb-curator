@@ -34,7 +34,7 @@ promotion broke both sit under ``staged/``.
 Downloads are proxied through the backend (never a direct browser→Garage path)
 so Garage can stay on the internal network in production.
 
-Note what is *absent*: ``_assert_writable_mode``. The curator's ``api/files.py``
+Note what is *absent*: ``assert_writable_mode``. The curator's ``api/files.py``
 imports that from ``api.data`` to guard its routes. Nothing here mutates, so
 there is no mode to assert — and no import back into the write service.
 """

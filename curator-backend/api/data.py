@@ -76,7 +76,7 @@ def _is_non_vocab_iri(value: str) -> bool:
     return not any(value.startswith(prefix) for prefix in _VOCAB_PREFIXES)
 
 
-def _assert_writable_mode() -> None:
+def assert_writable_mode() -> None:
     """Refuse mutating operations when READ_ONLY mode is enabled."""
     if settings.read_only:
         raise HTTPException(
@@ -406,7 +406,7 @@ def create_or_update_entity(payload: EntityData, request: Request):
         referenced entities merged from store), so nested linked-node
         constraint violations are rejected within the same write request.
     """
-    _assert_writable_mode()
+    assert_writable_mode()
     _assert_shape_writable(payload.shapeId)
 
     store = request.app.state.store
@@ -652,7 +652,7 @@ def delete_entity(
     enable per-shape write protection via ``READ_ONLY_SHAPES``.  When absent,
     only the global ``READ_ONLY`` flag is checked.
     """
-    _assert_writable_mode()
+    assert_writable_mode()
     if shapeId:
         _assert_shape_writable(shapeId)
     _validate_iri(entity_id)
