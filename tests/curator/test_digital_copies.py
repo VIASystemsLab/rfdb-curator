@@ -33,13 +33,12 @@ from api.files import download_staged_file, stage_file
 from rfdb_core.file_storage import InMemoryStorage, registered_key, staged_key
 from rfdb_core.files_state import file_content_url
 from rfdb_core.schema_extractor import SchemaExtractor
-from rfdb_core.vocab import SCHEMA_CONTENT_URL
+from rfdb_core.vocab import SCHEMA_CONTENT_URL, SCHEMA_DIGITAL_DOCUMENT
 from scripts.cleanup_files import NoFileLinks, reconcile
 
 FILE_ID_RE = re.compile(r"^File_[0-9a-f]{12}$")
 RFDB = "https://rosfeatr.eu/rdf/data/"
 P138I = "http://www.cidoc-crm.org/cidoc-crm/P138i_has_representation"
-DIGITAL_DOCUMENT = "http://schema.org/DigitalDocument"
 
 _SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schema" / "rfdb_schema.ttl"
 _EXTRACTOR = SchemaExtractor(str(_SCHEMA_PATH))
@@ -392,7 +391,7 @@ def test_reconcile_bad_node_iri_422(env):
     """Digital-copy nodes outside the File_{12hex} namespace are rejected."""
     payload = Graph()
     payload.parse(
-        data=f"<{RFDB}evil> a <{DIGITAL_DOCUMENT}> .",
+        data=f"<{RFDB}evil> a <{SCHEMA_DIGITAL_DOCUMENT}> .",
         format="turtle",
     )
     with pytest.raises(HTTPException) as exc:
@@ -416,7 +415,8 @@ def test_promote_moves_staged_to_registered(env):
 def _link(env, file_id: str, parent: str = f"{RFDB}S1") -> None:
     """Write the parent→file link + node type triples into the fake store."""
     env.store.load_turtle(
-        f"<{parent}> <{P138I}> <{RFDB}{file_id}> . <{RFDB}{file_id}> a <{DIGITAL_DOCUMENT}> ."
+        f"<{parent}> <{P138I}> <{RFDB}{file_id}> . "
+        f"<{RFDB}{file_id}> a <{SCHEMA_DIGITAL_DOCUMENT}> ."
     )
 
 
@@ -439,7 +439,7 @@ def test_reconcile_script_rules(env):
     storage.put_pdf(registered_key("File_eeeeeeeeeeee"), io.BytesIO(b"%PDF-e"))
     _link(env, "File_eeeeeeeeeeee")
     # f) orphaned node: typed but unlinked → triples purged + object deleted
-    env.store.load_turtle(f"<{RFDB}File_ffffffffffff> a <{DIGITAL_DOCUMENT}> .")
+    env.store.load_turtle(f"<{RFDB}File_ffffffffffff> a <{SCHEMA_DIGITAL_DOCUMENT}> .")
     storage.put_pdf(registered_key("File_ffffffffffff"), io.BytesIO(b"%PDF-f"))
 
     clock["now"] = 1000.0 + 100_000  # everything above is now "old"
