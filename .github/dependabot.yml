@@ -1,0 +1,31 @@
+# Dependabot: security updates only. A security-update PR opens when a locked
+# dependency has a published advisory and a fixed version. Routine version
+# updates are off: `open-pull-requests-limit: 0` stops them, and these entries
+# then only tell security updates where each lockfile is.
+#
+# Security updates and alerts must also be enabled in the repository settings
+# (Settings → Code security). The weekly audit workflow (.github/workflows/
+# audit.yml) is the second net: it fails on runtime findings even if no PR is
+# open.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /curator-frontend
+      - /graphexplorer-frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
