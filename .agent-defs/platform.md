@@ -39,6 +39,10 @@ then arrive on the next rebuild; a minor release is a deliberate change. Never
 `latest`, never a major alone, never a full patch version. Secrets and `.env`
 follow `security.md`.
 
+Two exceptions keep a full version: Garage, which publishes no major.minor tags,
+and Oxigraph, by choice. Dependabot opens a PR when either publishes a new
+version (`.github/dependabot.yml`); review it, do not merge it blindly.
+
 ## Compose files
 
 Keep the default in the code and the value in `compose.yml` in agreement. When

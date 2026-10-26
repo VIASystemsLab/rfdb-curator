@@ -1,7 +1,11 @@
-# Dependabot: security updates only. A security-update PR opens when a locked
-# dependency has a published advisory and a fixed version. Routine version
-# updates are off: `open-pull-requests-limit: 0` stops them, and these entries
-# then only tell security updates where each lockfile is.
+# Dependabot: security updates only, with one exception. A security-update PR
+# opens when a locked dependency has a published advisory and a fixed version.
+# Routine version updates are off: `open-pull-requests-limit: 0` stops them,
+# and these entries then only tell security updates where each lockfile is.
+#
+# The exception is the two images pinned to a full version (Oxigraph, Garage;
+# see .agent-defs/platform.md, "Images"): a version-update PR opens when either
+# publishes a new release, so the pin is reviewed rather than forgotten.
 #
 # Security updates and alerts must also be enabled in the repository settings
 # (Settings → Code security). The weekly audit workflow (.github/workflows/
@@ -29,3 +33,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: oxigraph/oxigraph
+      - dependency-name: dxflrs/garage
+    open-pull-requests-limit: 2
