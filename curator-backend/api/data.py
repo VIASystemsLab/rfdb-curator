@@ -680,8 +680,10 @@ def delete_entity(
     # no cross-store transaction in the request path.
     wc = store.with_clause()
     if links:
-        # Cards first: if the record delete then fails, nothing is left pointing
-        # at a card that is gone.
+        # Cards first: they are found through the record's links, so once the
+        # record is gone they could not be found. The two updates are not atomic:
+        # if the record delete then fails, the record survives still linking to
+        # cards that are gone.
         values = " ".join(f"<{link}>" for link in links)
         store.update(
             f"""
