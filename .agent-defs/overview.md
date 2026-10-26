@@ -40,3 +40,5 @@ RossijskijFeatrDB (rfdb-curator) is a standalone SHACL-driven RDF curation proje
 | Runtime | Docker Compose |
 | Testing | pytest |
 | CI/CD | GitHub Actions |
+
+Per component, development against production, and where each version is pinned: [docs/architecture.md](../docs/architecture.md#software-stack), "Software Stack".

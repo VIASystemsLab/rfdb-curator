@@ -39,6 +39,8 @@ For deeper topic guides, see the [documentation](#documentation).
 - **RDF/Data Model:** [rdflib](https://rdflib.readthedocs.io/), [Turtle](https://www.w3.org/TR/turtle/), [JSON-LD](https://www.w3.org/TR/json-ld11/)
 - **Runtime:** [Docker Compose](https://docs.docker.com/compose/)
 
+What runs where, in development and in production, and which file pins each version: [Software Stack](docs/architecture.md#software-stack).
+
 ---
 
 ## Quick Start
