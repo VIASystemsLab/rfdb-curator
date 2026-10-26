@@ -118,7 +118,6 @@ in this repository too.
   usable, but the editor then shows "no records", which reads as data loss. Options: 503
   everywhere and a "store unreachable" state in both UIs, or keep empty answers and add a
   store-health indicator (see the Data Context Panel's Phase 2 under [UI](#ui)).
-- [ ] Verify that search autocomplete also matches on alternative labels (`skos:altLabel`), not only the primary label.
 - [ ] Smarter search ranking that favours edit distance without relying on a server-side cap or limit.
 - [ ] Bulk import (Excel/CSV → RDF).
 - [ ] Data export (RDF, JSON-LD, CSV) — the triples-only export, distinct from the full snapshot below.

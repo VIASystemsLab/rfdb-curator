@@ -334,6 +334,10 @@ services:
       READ_ONLY_SHAPES: *read_only_shapes
       LONG_TEXT_PREDICATES: *long_text_predicates
       EXTERNAL_ID_LINKS: *external_id_links
+      # Other names the record search matches besides rdfs:label (full IRIs). Only
+      # this service searches, so the curator does not get it. This is the rfdb
+      # schema's alternative label; a fork lists its own here.
+      SEARCH_LABEL_PREDICATES: '["http://www.w3.org/2004/02/skos/core#altLabel"]'
       PROJECT_NAME: "${PROJECT_NAME:-RossijskijFeatrDB}"
       S3_ENDPOINT: "http://garage:3900"
       S3_REGION: garage

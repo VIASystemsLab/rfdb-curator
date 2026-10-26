@@ -7,7 +7,8 @@ the dropdown is pre-populated when the field receives focus.
 
 SPARQL strategy: a flat `GROUP BY ?uri` with `SAMPLE` collapses entities that
 carry several `rdfs:label` / `rdfs:comment` values to one row each, and a FILTER
-applies the case-insensitive text match on the label or the IRI. Each result
+applies the case-insensitive text match on the label, the IRI, or any of the
+record's other names (the predicates in `SEARCH_LABEL_PREDICATES`). Each result
 carries `uri`, `label`, and (when present) `comment` — the dropdown shows the
 comment as a secondary line to help tell similarly-named entities apart.
 """
@@ -16,6 +17,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from core.config import settings
 from rfdb_core.sparql_text import regex_literal
 
 logger = logging.getLogger(__name__)
@@ -42,8 +44,11 @@ def search_entities(
     resolved from the shape metadata so the SPARQL query is always correct.
 
     Text matching is a case-insensitive, literal substring match (the text is
-    escaped, so `(` or `.` match themselves) over both the primary label and
-    the entity URI, so users can paste a partial IRI directly into the field.
+    escaped, so `(` or `.` match themselves) over the primary label, the
+    record's other names (``SEARCH_LABEL_PREDICATES``, by default
+    ``skos:altLabel``) and the entity URI, so users can paste a partial IRI
+    directly into the field. A record found by another name is still listed
+    under its primary label.
     An empty `query` string returns all entities up to `limit` (used for the
     initial dropdown population on field focus).
     """
@@ -65,9 +70,17 @@ def search_entities(
         return []
 
     pattern = regex_literal(query)
+    # Other names are matched in an EXISTS rather than joined in, so a record
+    # with many names does not multiply the rows before GROUP BY.
+    other_names = "|".join(f"<{p}>" for p in settings.search_label_predicates)
+    other_names_clause = (
+        f' || EXISTS {{ ?uri {other_names} ?name . FILTER(regex(str(?name), "{pattern}", "i")) }}'
+        if other_names
+        else ""
+    )
     filter_clause = (
         f'FILTER(regex(COALESCE(str(?label_raw), ""), "{pattern}", "i") '
-        f'|| regex(str(?uri), "{pattern}", "i"))'
+        f'|| regex(str(?uri), "{pattern}", "i"){other_names_clause})'
         if query
         else ""
     )

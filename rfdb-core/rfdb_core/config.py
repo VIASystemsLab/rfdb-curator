@@ -22,6 +22,7 @@ from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from rfdb_core.external_ids import PLACEHOLDER
+from rfdb_core.iri import iri_error
 
 
 class BaseServiceSettings(BaseSettings):
@@ -162,6 +163,15 @@ class BaseServiceSettings(BaseSettings):
     (``wdt:P214``) and RISM (``wdt:P5504``) IDs, with Wikidata's formatter URLs,
     the value both compose files set. Both services must get the same value."""
 
+    search_label_predicates: list[str] = ["http://www.w3.org/2004/02/skos/core#altLabel"]
+    """Full IRIs of the predicates holding a record's other names, which the record
+    search matches besides ``rdfs:label`` and the IRI.
+
+    A match on one of them still lists the record under its ``rdfs:label``.
+    Supplied as a JSON array string via ``SEARCH_LABEL_PREDICATES``; an empty one
+    means the label and IRI only. Only the reader's search reads it. The default
+    is the rfdb schema's ``skos:altLabel``, the value both compose files set."""
+
     # ------------------------------------------------------------------ #
     # HTTP / CORS                                                          #
     # ------------------------------------------------------------------ #
@@ -272,6 +282,26 @@ class BaseServiceSettings(BaseSettings):
         for predicate, template in v.items():
             if PLACEHOLDER not in template:
                 raise ValueError(f"template for {predicate} has no $1: {template!r}")
+        return v
+
+    @field_validator("search_label_predicates", mode="before")
+    @classmethod
+    def parse_search_label_predicates(cls, v: str | list[str]) -> list[str]:
+        """Accept ``SEARCH_LABEL_PREDICATES`` as a JSON array string or a list.
+
+        An empty string means no alternative labels, the same as ``[]``.
+        """
+        if isinstance(v, str):
+            return json.loads(v) if v.strip() else []
+        return v
+
+    @field_validator("search_label_predicates")
+    @classmethod
+    def check_search_label_predicates(cls, v: list[str]) -> list[str]:
+        """Refuse an IRI the search could not put into SPARQL as ``<…>``."""
+        for iri in v:
+            if reason := iri_error(iri):
+                raise ValueError(reason)
         return v
 
     @field_validator("read_only_shapes", mode="before")
