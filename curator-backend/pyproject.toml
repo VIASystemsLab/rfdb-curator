@@ -33,7 +33,7 @@ rfdb-core = { workspace = true }
 dev = [
     "pytest==9.1.1",
     "ruff==0.16.1",
-    "httpx2==2.9.1",
+    "httpx2==2.12.0",
 ]
 
 # [tool.ruff] lives in the repo-root pyproject.toml: one lint config for every
