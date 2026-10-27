@@ -89,7 +89,7 @@ services:
     # Pinned to a specific release so `docker compose pull` never silently
     # breaks the SPARQL / Graph Store Protocol API contract.
     # Update deliberately and re-run `docker compose up --build`.
-    image: oxigraph/oxigraph:0.5.7
+    image: oxigraph/oxigraph:0.5.13
     restart: unless-stopped
     ports:
       - "7878:7878"
