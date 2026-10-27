@@ -16,7 +16,7 @@ dependencies = [
     "pydantic-settings==2.14.2",
     "python-multipart==0.0.32",
     "boto3==1.43.64",
-    "pypdf==6.14.2",
+    "pypdf==6.21.2",
 ]
 
 # Resolve rfdb-core from the workspace (repo-root pyproject.toml) rather than
