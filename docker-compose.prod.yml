@@ -190,7 +190,7 @@ services:
   # garage.toml — run the one-time bootstrap before first use:
   #   COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env.prod scripts/garage-init.sh
   garage:
-    image: dxflrs/garage:v1.0.1
+    image: dxflrs/garage:v2.4.1
     restart: unless-stopped
     # `internal` ONLY, never `edge`. Garage has no auth at the S3 layer, so a
     # browser must never be able to reach it; blobs leave only through the
