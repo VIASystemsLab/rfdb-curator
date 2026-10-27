@@ -38,6 +38,10 @@ on it; where an open task builds on something already shipped, that context is n
     state as "a record is selected and the loaded one is not it" closes it.
   Fix with an ignore flag per effect (as the record fetch in `App.jsx` now has) and a short
   debounce on the search.
+- [ ] **DECIDE — the graph explorer's graph library.** It uses `reactflow` 11, the legacy
+  line; its successor is `@xyflow/react` 12 (renamed package, API changes). Evaluate moving
+  to it or to another library, against the explorer's needs (ELK layout, expanding nodes,
+  bridge badges) and the wish to keep dependencies few. `reactflow` 11 accepts React 19.
 - [ ] Warn on duplicate `owl:sameAs`: when a same-as value is entered, check whether another record already has it and warn the user (needs a backend lookup).
 - [ ] Data Context Panel enhancements on top of the shipped read-only baseline (the panel plus its metadata API — `GET /api/v1/dataexplorer/meta/prefixes`, `GET /api/v1/dataexplorer/meta/graphs` with per-graph active/empty status, `GET /api/v1/dataexplorer/meta/files`):
   - [ ] Prefixes: per-entry `source` attribution (`schema` / `jsonld-context` / `runtime`); explicit prefix-drift warnings when mappings differ across schema, JSON-LD context, and runtime; copy Turtle prefix declaration / copy namespace IRI; search by prefix or namespace substring.
@@ -214,12 +218,6 @@ in this repository too.
   Oxigraph together. The reader seeds nothing, so its workers can grow on their own. Past one
   host, the single Oxigraph and Garage instances are the limit; multi-user editing (above)
   also has to land before several curators write at once.
-- [ ] **CHECK — `no-cache` on the frontends' HTML.** In `proxy/spa.Caddyfile`, `header
-  /index.html Cache-Control "no-cache"` probably never matches `/` or a deep link: `header`
-  runs before the `try_files` rewrite, so it sees the original path. If so, browsers may keep
-  an old `index.html`, and with it old asset names, after a deploy. Check against a running
-  production build (`curl -I` on `/` and on a deep link), then fix by setting `no-cache` on
-  every path outside the immutable assets.
 - [ ] **DECIDE — the script that makes `data/glottolog_language_dev_subset.ttl`.** The file is
   committed, but the script that cut it from `data/glottolog_language.ttl` is not, so nobody
   can rebuild it or change the language list. Decide whether to commit it (and where:
@@ -235,6 +233,18 @@ in this repository too.
   suite's fixture now does. App-import helpers are repeated in four files; a per-suite
   fixture would do. The docstring of `tests/curator/test_seeder.py` lists only the
   `VOCAB_PATH` cases, though the file also tests `bootstrap_store`.
+- [ ] **Review the documentation: content, coherence, structure and style.** `README.md` and
+  `docs/` (seven files). Check every statement against the code, remove what is said twice
+  (one home, links elsewhere), make the files agree with each other and with
+  `.agent-defs/`, and give each a clear scope. Apply `.agent-defs/language.md` throughout:
+  it holds for every published text, and the docs still carry 124 em dashes.
+- [ ] **DECIDE — how code and tests get their settings.** Each service builds one settings
+  object when `core/config.py` is imported, and 15 modules import it directly. Tests override
+  it by patching that object or by dropping `core.config` from `sys.modules` and re-importing,
+  so results can depend on import order. Reconsider passing settings in (for example
+  FastAPI's cached `get_settings()` with `Depends`, swapped in tests through
+  `app.dependency_overrides`), refactor the tests to match, and record the practice in the
+  rules (`python-package.md`, configuration).
 - [ ] Investigate what dominates build/deploy time (backend especially) and whether it can be sped up.
 - [ ] Set up automated release to GitHub Releases and the GitHub package registry.
 - [ ] Verify versioning and commit tagging work with GitHub Actions (automatic release from tagged commits).

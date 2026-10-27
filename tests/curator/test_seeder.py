@@ -17,6 +17,10 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic_settings import SettingsError
 
+# These tests re-import service modules; the fixture restores them afterwards
+# (tests/conftest.py), so no other test sees the copies.
+pytestmark = pytest.mark.usefixtures("isolated_service_modules")
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -36,10 +40,6 @@ def _make_oxigraph_stub():
 
 class TestParseVocabPaths:
     """Tests for Settings.parse_vocab_paths field validator."""
-
-    def setup_method(self):
-        # Re-import with a clean environment for each test.
-        sys.modules.pop("core.config", None)
 
     def _make_settings(self, vocab_path_value: str, monkeypatch):
         monkeypatch.setenv("OXIGRAPH_URL", "http://localhost:7878")
@@ -82,10 +82,10 @@ class TestParseVocabPaths:
 class TestSeedStore:
     """Tests for seed_store() with vocab_paths list."""
 
-    def setup_method(self):
-        sys.modules.pop("core.seeder", None)
-
     def _import_seeder(self):
+        # A fresh import per test, inside the fixture that restores modules
+        # afterwards; setup_method would run before that fixture saves them.
+        sys.modules.pop("core.seeder", None)
         return importlib.import_module("core.seeder")
 
     def test_missing_file_returns_loaded_false(self, tmp_path):

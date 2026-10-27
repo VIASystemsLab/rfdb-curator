@@ -16,6 +16,10 @@ import pytest
 from rdflib import Graph
 from rdflib.plugins.parsers.notation3 import BadSyntax
 
+# These tests re-import service modules; the fixture restores them afterwards
+# (tests/conftest.py), so no other test sees the copies.
+pytestmark = pytest.mark.usefixtures("isolated_service_modules")
+
 
 def _import_backend_app(monkeypatch: pytest.MonkeyPatch, reset_data_on_startup: bool = False):
     """Import the backend app with deterministic environment values."""

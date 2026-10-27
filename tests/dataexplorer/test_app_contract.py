@@ -20,6 +20,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi.routing import RouteContext, iter_route_contexts
 
+# These tests re-import service modules; the fixture restores them afterwards
+# (tests/conftest.py), so no other test sees the copies.
+pytestmark = pytest.mark.usefixtures("isolated_service_modules")
+
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_DIR = ROOT / "dataexplorer-backend"
 SCHEMA_PATH = ROOT / "schema" / "rfdb_schema.ttl"

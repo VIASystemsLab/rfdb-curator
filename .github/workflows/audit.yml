@@ -1,0 +1,97 @@
+name: Audit
+
+# Known vulnerabilities in the locked dependencies. Separate from CI because an
+# advisory can appear without any change here: running this on every PR would
+# turn unrelated PRs red. It runs weekly, and on any change to a lockfile or a
+# manifest.
+#
+# Policy: a high or critical finding in a runtime dependency fails the run.
+# Development-only findings (dev servers, build tooling, linters, test tools)
+# are reported in the job summary and do not fail it. pip-audit reports no
+# severity, so any runtime finding on the Python side fails.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Mondays 06:00 UTC
+  push:
+    branches: [ main ]
+    paths:
+      - 'curator-frontend/package.json'
+      - 'curator-frontend/package-lock.json'
+      - 'graphexplorer-frontend/package.json'
+      - 'graphexplorer-frontend/package-lock.json'
+      - 'uv.lock'
+      - '**/pyproject.toml'
+      - '.github/workflows/audit.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'curator-frontend/package.json'
+      - 'curator-frontend/package-lock.json'
+      - 'graphexplorer-frontend/package.json'
+      - 'graphexplorer-frontend/package-lock.json'
+      - 'uv.lock'
+      - '**/pyproject.toml'
+      - '.github/workflows/audit.yml'
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [ curator-frontend, graphexplorer-frontend ]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '26.12'
+
+      # npm audit reads package-lock.json; it needs no install.
+      - name: Report every finding, development included
+        run: |
+          {
+            echo "## npm audit: ${{ matrix.app }}, all dependencies"
+            echo '```'
+            npm audit || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail on high or critical in runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  python-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.2
+        with:
+          version: '0.13.5'
+
+      # Every workspace member's locked dependencies, hashed. The members
+      # themselves are local code, not packages pip-audit can look up.
+      - name: Export the locked requirements
+        run: |
+          uv export --frozen --all-packages --no-emit-workspace --format requirements-txt > requirements-all.txt
+          uv export --frozen --all-packages --no-emit-workspace --no-dev --format requirements-txt > requirements-runtime.txt
+
+      - name: Report every finding, development included
+        run: |
+          {
+            echo "## pip-audit: all dependencies"
+            echo '```'
+            uvx pip-audit==2.10.1 --disable-pip -r requirements-all.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail on any finding in runtime dependencies
+        run: uvx pip-audit==2.10.1 --disable-pip -r requirements-runtime.txt

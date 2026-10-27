@@ -369,6 +369,35 @@ def _dependents(store, entity_id: str, links: list[str]) -> list[tuple[str, str 
     return [(row["record"], row.get("label")) for row in rows if row.get("record")]
 
 
+def _write_or_restore(store, updates: list[str], turtle: str | None, snapshot: Graph | None):
+    """Run ``updates``, then load ``turtle``; if any step fails, reload ``snapshot``.
+
+    The store runs each update and load as its own request, with no transaction
+    across them, so a failure part-way leaves the record partly written. A load
+    only adds triples, so reloading the snapshot taken before the first write
+    puts back whatever had been removed, whichever step failed.
+
+    Raises:
+        HTTPException 503: a step failed (the detail says whether the restore
+            succeeded too).
+    """
+    try:
+        for update in updates:
+            store.update(update)
+        if turtle is not None:
+            store.load_turtle(turtle)
+    except Exception as exc:
+        if snapshot is not None and len(snapshot) > 0:
+            try:
+                store.load_turtle(snapshot.serialize(format="turtle"))
+            except Exception as restore_exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Store write failed and rollback failed: {restore_exc}",
+                ) from restore_exc
+        raise HTTPException(status_code=503, detail=f"Store write failed: {exc}") from exc
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -430,6 +459,7 @@ def create_or_update_entity(payload: EntityData, request: Request):
             )
 
     existing_entity_graph = None
+    deletes: list[str] = []
     if not is_create:
         try:
             existing_entity_graph = store.construct(
@@ -565,8 +595,8 @@ def create_or_update_entity(payload: EntityData, request: Request):
             return f"<{entity_id}> <{pred_uri}> ?card . ?card ?cp ?co ."
 
         # The rollback snapshot above holds only <entity_id> ?p ?o. Add the
-        # cards the delete removes, before anything is deleted, so a failed load
-        # restores each card together with its link.
+        # cards the delete removes, before anything is deleted, so a failed
+        # write restores each card together with its link.
         try:
             for pred_uri in bridges_in_play:
                 existing_entity_graph += store.construct(
@@ -582,14 +612,14 @@ def create_or_update_entity(payload: EntityData, request: Request):
         wc = store.with_clause()
         for pred_uri in predicates_to_delete:
             if pred_uri in bridges_in_play:
-                store.update(
+                deletes.append(
                     f"""
                     {wc}
                     DELETE {{ ?card ?cp ?co . }}
                     WHERE  {{ {cards_where(pred_uri)} }}
                     """
                 )
-            store.update(
+            deletes.append(
                 f"""
                 {wc}
                 DELETE {{ <{entity_id}> <{pred_uri}> ?o . }}
@@ -597,23 +627,9 @@ def create_or_update_entity(payload: EntityData, request: Request):
                 """
             )
 
-    # Serialize to Turtle and bulk-load into Oxigraph.
-    # On write failure, attempt to restore the pre-existing entity graph if
-    # one was captured above.
-    turtle_data = data_graph.serialize(format="turtle")
-
-    try:
-        store.load_turtle(turtle_data)
-    except Exception as exc:
-        if existing_entity_graph is not None and len(existing_entity_graph) > 0:
-            try:
-                store.load_turtle(existing_entity_graph.serialize(format="turtle"))
-            except Exception as restore_exc:
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Store write failed and rollback failed: {restore_exc}",
-                ) from restore_exc
-        raise HTTPException(status_code=503, detail=f"Store write failed: {exc}") from exc
+    # The deletes, then one bulk load; a failure at any step restores the
+    # record as it was before the save.
+    _write_or_restore(store, deletes, data_graph.serialize(format="turtle"), existing_entity_graph)
 
     # Triples are persisted — promote any newly staged digital copies.
     _promote_staged_files(request, files_to_promote)
@@ -678,25 +694,36 @@ def delete_entity(
     # triples become orphans (no inbound link) and scripts/cleanup_files.py
     # collects both the triples and the stored objects. One cleanup mechanism,
     # no cross-store transaction in the request path.
-    wc = store.with_clause()
-    if links:
-        # Cards first: they are found through the record's links, so once the
-        # record is gone they could not be found. The two updates are not atomic:
-        # if the record delete then fails, the record survives still linking to
-        # cards that are gone.
-        values = " ".join(f"<{link}>" for link in links)
-        store.update(
+    values = " ".join(f"<{link}>" for link in links)
+    cards_where = f"VALUES ?link {{ {values} }} <{entity_id}> ?link ?card . ?card ?cp ?co ."
+
+    # Snapshot the record and its cards first, so a failure part-way through the
+    # two updates below can be undone.
+    try:
+        snapshot = store.construct(
             f"""
-            {wc}
-            DELETE {{ ?card ?cp ?co . }}
-            WHERE  {{ VALUES ?link {{ {values} }} <{entity_id}> ?link ?card . ?card ?cp ?co . }}
+            CONSTRUCT {{ <{entity_id}> ?p ?o }}
+            {store.from_clause()}
+            WHERE {{ <{entity_id}> ?p ?o }}
             """
         )
-    store.update(
-        f"""
-        {wc}
-        DELETE {{ <{entity_id}> ?p ?o . }}
-        WHERE  {{ <{entity_id}> ?p ?o . }}
-        """
-    )
+        if links:
+            snapshot += store.construct(
+                f"""
+                CONSTRUCT {{ ?card ?cp ?co }}
+                {store.from_clause()}
+                WHERE {{ {cards_where} }}
+                """
+            )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Store unavailable") from exc
+
+    wc = store.with_clause()
+    updates = []
+    if links:
+        # Cards first: they are found through the record's links, so once the
+        # record is gone they could not be found.
+        updates.append(f"{wc}\nDELETE {{ ?card ?cp ?co . }}\nWHERE {{ {cards_where} }}")
+    updates.append(f"{wc}\nDELETE {{ <{entity_id}> ?p ?o . }}\nWHERE {{ <{entity_id}> ?p ?o . }}")
+    _write_or_restore(store, updates, None, snapshot)
     return

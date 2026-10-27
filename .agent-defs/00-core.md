@@ -29,9 +29,10 @@ rule here conflicts with what seems convenient, the rule wins.
    `git commit -a`. Stage an explicit, enumerated list of paths.
 7. **One commit per topic**, and every commit you author ends its subject line
    with `[BOT]`. Never a commit called "update".
-8. **`.temp/` is gitignored scratch space.** Read it freely, say which file and
-   why before writing, never overwrite an existing file without a named yes,
-   never commit it, and never point a committed file at anything in it.
+8. **`.temp/` is local scratch space, excluded in `.git/info/exclude`.** Read it
+   freely, say which file and why before writing, never overwrite an existing
+   file without a named yes, never commit it, and never point a committed file
+   at anything in it.
 9. **Size-check before reading any file.** A large generated or downloaded file
    saturates the context window and blocks the user's work. Check the size
    first (`wc -l`, `ls -la`), and for anything large extract only what you need

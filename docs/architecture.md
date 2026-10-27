@@ -2,7 +2,7 @@
 
 How the pieces fit together: the schema-driven pipeline, the writer/reader service
 split, frontend responsibilities, how SHACL shapes are extracted into form and
-validation metadata, how validation and delete behave, and the storage/runtime stack. For what
+validation metadata, how validation and delete behave, and the software stack. For what
 the application requires of a schema see [data-model.md](data-model.md); for
 the day-to-day workflow of changing schema/data/code see [development.md](development.md).
 
@@ -456,6 +456,11 @@ through one of that record's helper nodes (a Person in a Work's `AgentRole`); th
 message names up to ten of them. Digital copies are left for
 `scripts/cleanup_files.py`.
 
+Both run as several store requests with no transaction across them (the deletes,
+then the load). Each takes a snapshot of the record and its helper nodes first; if
+any request fails, the snapshot is loaded back and the route answers 503, so a
+failure part-way does not leave a record half-written.
+
 ---
 
 ## Shape-Role Policy
@@ -565,33 +570,44 @@ storage-less deployments.
 
 ---
 
-## Storage and Runtime Stack
+## Software Stack
 
-The application runs as a small set of Docker Compose services.
+Each component, the tier it belongs to, how it runs in development
+(`docker-compose.yml`) and in production (`docker-compose.prod.yml`), and the files
+that pin its version. Version numbers live only in those files.
 
-- **Backend** — FastAPI + uvicorn. Loads and extracts the SHACL schema, validates
-  submitted JSON-LD with pySHACL, and reads/writes RDF through the Oxigraph HTTP API.
-- **Frontend** — React + Vite. Renders forms from the shapes catalogue and `/api/v1/curator/forms`.
-- **Oxigraph** — the RDF triple store. All instance data lives in a single named graph
-  identified by `DATA_GRAPH_URI`; every SPARQL read uses `FROM <uri>` and every Turtle
-  load targets `?graph=<uri>` via the Graph Store Protocol. It is the source of truth
-  for the graph data. Its volume (`oxigraph_data`) is backed up together with Garage's;
-  see [deployment.md](deployment.md#ongoing-operations-once-live).
-- **Garage** — an S3-compatible object store for digital copies (uploaded PDFs and
-  similar). A digital copy is modeled as a bridge node whose fields are machine-filled:
-  a file is staged first (`POST /api/v1/curator/files/staged`, previewable meanwhile at
-  `GET /api/v1/curator/files/staged/{fileId}` on the curator), travels in the JSON-LD payload
-  under its schema-declared predicate, is promoted from `staged/` to `registered/`
-  when the record is persisted, and is then served back through the reader's
-  `GET /rdf/data/{fileId}/content`.
-  RDF remains the source of truth; object storage is reconciled against it (see the
-  File Storage Metadata endpoint above and `scripts/cleanup_files.py`). That direction
-  also decides who may download what: a file is public because an entity references it,
-  not because its bytes sit under a particular prefix. Garage is wired
-  into dev Compose via `garage.toml` and the host-side `scripts/garage-init.sh`;
-  production hardening lives in the deployment notes.
+| Component | Tier | Development | Production | Version pinned in |
+|---|---|---|---|---|
+| `curator-frontend` (editor) | UI | Vite dev server on Node, `:5173`, hot reload over the bind-mounted source; proxies `/api` and `/rdf` to the backends | Static build, made with the same Node image, served by Caddy; the site root in `full` mode | `curator-frontend/Dockerfile`, `package.json`, `package-lock.json` |
+| `graphexplorer-frontend` | UI | Vite dev server on Node, host port `80`; proxies `/api` and `/rdf` to the reader | Static build served by Caddy, under `/explorer/`, or at the site root of a read-only instance | `graphexplorer-frontend/Dockerfile`, `package.json`, `package-lock.json` |
+| `proxy` | Web | Not deployed: the Vite servers proxy | Caddy: TLS, routing by path prefix; the only service on ports 80 and 443 | `docker-compose.prod.yml`, `proxy/Caddyfile` |
+| `curator-backend` (writer) | Server | uvicorn with `--reload` over the bind-mounted source, `:8000` | uvicorn from the image, one worker; `full` mode only | `curator-backend/Dockerfile`, `pyproject.toml`, `uv.lock` |
+| `dataexplorer-backend` (reader) | Server | uvicorn with `--reload`, `:8001` | uvicorn from the image, several workers | `dataexplorer-backend/Dockerfile`, `pyproject.toml`, `uv.lock` |
+| `rfdb-core` | Server library | Bind-mounted into both backends, reloaded with them | Installed in both backend images | `rfdb-core/pyproject.toml`, `uv.lock` |
+| Oxigraph | Store | Published on `:7878` | Internal network only | both compose files |
+| Garage | Store | S3 API published on `:3900` | Internal network only | both compose files, `garage.toml` |
 
-In production a reverse proxy (Caddy) terminates TLS and routes by path prefix to the
-frontends and the two backends, with Oxigraph and object storage kept internal-only; see
+Node and Vite never run in production: Node builds the static files and runs the
+development servers. CI pins Node, Python and uv in `.github/workflows/`. How
+images and runtimes are pinned, and the two stores' exceptions, is in
+[`.agent-defs/repo-specific.md`](../.agent-defs/repo-specific.md) ("Version pins").
+
+- **Oxigraph** is the RDF triple store and the source of truth for graph data. All
+  instance data lives in one named graph, `DATA_GRAPH_URI`: every SPARQL read uses
+  `FROM <uri>`, every Turtle load targets `?graph=<uri>` through the Graph Store
+  Protocol. Its volume is backed up together with Garage's; see
+  [deployment.md](deployment.md#ongoing-operations-once-live).
+- **Garage** is an S3-compatible object store for digital copies (uploaded PDFs). A
+  file is staged first (`POST /api/v1/curator/files/staged`, previewable at
+  `GET /api/v1/curator/files/staged/{fileId}`), travels in the JSON-LD payload under
+  its schema-declared predicate, is promoted from `staged/` to `registered/` when the
+  record is saved, and is served by the reader at `GET /rdf/data/{fileId}/content`.
+  RDF stays the source of truth and storage is reconciled against it (the File
+  Storage Metadata endpoint above, `scripts/cleanup_files.py`): a file is public
+  because a record references it, not because of its prefix. Development wires it
+  with `garage.toml` and the host-side `scripts/garage-init.sh`.
+
+In production the proxy terminates TLS and routes by path prefix, and neither store
+is reachable from outside; see
 [In production: one origin, and a mode](#in-production-one-origin-and-a-mode) and the
 [production runbook](deployment.md#production-deployment).

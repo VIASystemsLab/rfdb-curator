@@ -152,6 +152,15 @@ pre-commit is meant to catch formatting/hygiene issues before CI does.
 - ESLint
 - production build
 
+**Dependency audits** (`.github/workflows/audit.yml`, weekly and on any lockfile or
+manifest change):
+- `npm audit` per frontend: a high or critical finding in a runtime dependency fails
+  the run; development-only findings are listed in the job summary
+- `pip-audit` on the requirements exported from `uv.lock`: any runtime finding fails
+  the run (pip-audit reports no severity); development-only findings are listed
+- Dependabot (`.github/dependabot.yml`) opens security-fix PRs only, for npm, uv and
+  GitHub Actions; no routine version-update PRs
+
 **Integration checks (if practical):**
 - start Oxigraph
 - start both backends

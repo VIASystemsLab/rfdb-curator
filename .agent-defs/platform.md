@@ -33,11 +33,13 @@ apply, they say how.
 
 ## Images
 
-Pin image tags exactly. Never `latest`, never an open-ended range. Secrets and
-`.env` follow `security.md`.
+Pin every image tag. Never `latest`, never an open-ended range. Which form each
+pin takes is in `repo-specific.md`, "Version pins". Secrets and `.env` follow
+`security.md`.
 
 ## Compose files
 
-Keep the default in the code and the value in `compose.yml` in agreement. When
-they drift, the service works locally and fails in deployment, which is the
+The compose files carry the deployment values; keep each equal to the code's
+default for that setting (the general rule is in `code-style.md`, configuration).
+When they drift, the service works locally and fails in deployment, which is the
 worst way to find out.

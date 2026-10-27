@@ -311,6 +311,36 @@ def test_failed_write_restores_the_removed_bridge_node() -> None:
     assert (agent_role, HAS_ROLE, URIRef(DATA + "role_librettist")) in store.g
 
 
+class _FailingSecondUpdateStore(_GraphStore):
+    """Store whose second SPARQL update fails, part-way through a write's deletes."""
+
+    def __init__(self, turtle: str = "") -> None:
+        super().__init__(turtle)
+        self.updates = 0
+
+    def update(self, sparql: str) -> None:
+        """Run the first update, fail the second, run any after."""
+        self.updates += 1
+        if self.updates == 2:
+            raise OSError("simulated store failure mid-write")
+        super().update(sparql)
+
+
+def test_save_failing_between_its_deletes_restores_the_record() -> None:
+    """A store failure after the card is deleted but before its link puts both back.
+
+    Removing a connection runs two deletes (the card, then the link) before the
+    load; without a rollback over them the record would keep a link to a card
+    with no triples.
+    """
+    store = _FailingSecondUpdateStore(_STORED_WORK)
+    before = set(store.g)
+    with pytest.raises(HTTPException) as exc_info:
+        create_or_update_entity(_work_without_agent_role(), _dep_request(store))
+    assert exc_info.value.status_code == 503
+    assert set(store.g) == before
+
+
 # ---------------------------------------------------------------------------
 # Naming: the backend names every new record and card
 # ---------------------------------------------------------------------------
@@ -560,3 +590,17 @@ rfdb:expression <{P148I}> rfdb:stored_work ; rdfs:label "An Expression"@en .
     assert exc_info.value.status_code == 409
     assert "An Expression" in exc_info.value.detail
     assert (URIRef(DATA + "stored_work_ar_0"), RDF.type, AGENT_ROLE) in store.g
+
+
+def test_delete_failing_between_its_updates_restores_the_record_and_cards() -> None:
+    """A store failure after the cards are deleted but before the record puts the cards back.
+
+    A delete removes the record's cards, then the record. If the second update
+    fails, the record must not survive still linking to cards that are gone.
+    """
+    store = _FailingSecondUpdateStore(_STORED_WORK)
+    before = set(store.g)
+    with pytest.raises(HTTPException) as exc_info:
+        _delete(store, "stored_work")
+    assert exc_info.value.status_code == 503
+    assert set(store.g) == before

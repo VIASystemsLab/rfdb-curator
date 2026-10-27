@@ -1,6 +1,7 @@
 # The `.temp/` directory
 
-`.temp/` is gitignored scratch space: design brainstorms, deployment notes,
+`.temp/` is local scratch space, excluded from git per clone in `.git/info/exclude`
+(see "Local-only files" in `AGENTS.md`): design brainstorms, deployment notes,
 working documents, handoff notes. It may also hold large local artifacts, so
 list it before acting on it. Do not assume everything there is text.
 
@@ -43,7 +44,7 @@ work into a shared artifact.
 When a committed file needs the *reasoning* from a scratch note, inline the
 reasoning in enough detail to stand on its own and cite nothing.
 
-The same goes for everything else the repository gitignores, such as
+The same goes for everything else git ignores here, such as
 `CLAUDE.md` and `.claude/`. What is forbidden is pointing at a particular
 local file, or depending on one. Naming the local-only locations to say how
 the repository is laid out, as these rules do, is not.
@@ -55,6 +56,6 @@ account name besides. Write paths relative to the repository root, and say
 "this repository" rather than naming where it lives. `scripts/hooks/no-local-paths`
 rejects a commit that adds one, but the rule is not to write it at all.
 
-Corollary: a `paths-ignore:` entry for a gitignored path in a CI trigger is
-dead config as well as a mention. A gitignored file can never appear in a
+Corollary: a `paths-ignore:` entry for an ignored or excluded path in a CI trigger
+is dead config as well as a mention. Such a file can never appear in a
 pushed diff, so the entry can never match.

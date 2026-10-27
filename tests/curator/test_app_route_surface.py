@@ -19,6 +19,10 @@ from pathlib import Path
 import pytest
 from fastapi.routing import RouteContext, iter_route_contexts
 
+# These tests re-import service modules; the fixture restores them afterwards
+# (tests/conftest.py), so no other test sees the copies.
+pytestmark = pytest.mark.usefixtures("isolated_service_modules")
+
 BACKEND_DIR = Path(__file__).resolve().parents[2] / "curator-backend"
 
 API_PREFIX = "/api/v1/curator"

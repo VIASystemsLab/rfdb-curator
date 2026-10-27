@@ -76,13 +76,13 @@ class _CapturingStore:
         return []
 
 
-def _client(store, *, reverse: bool = False, search_router=router) -> TestClient:
+def _client(store, *, reverse: bool = False) -> TestClient:
     extractor = SchemaExtractor(str(SCHEMA_PATH))
     if reverse:
         shapes = list(reversed(extractor.get_all_shapes()))
         extractor.get_all_shapes = lambda: shapes
     app = FastAPI()
-    app.include_router(search_router, prefix="/api/v1/dataexplorer")
+    app.include_router(router, prefix="/api/v1/dataexplorer")
     app.state.schema_extractor = extractor
     app.state.store = store
     return TestClient(app)
@@ -150,11 +150,10 @@ def _search(client: TestClient, query: str) -> list[str]:
 
 def _client_with_label_predicates(monkeypatch, predicates: list[str]) -> TestClient:
     """A client whose search reads ``predicates`` as SEARCH_LABEL_PREDICATES."""
-    import api.entities as entities_module
+    from core.config import settings
 
-    # Other tests re-import service modules, so patch and mount the same module.
-    monkeypatch.setattr(entities_module.settings, "search_label_predicates", predicates)
-    return _client(_RenamedPlaceStore(), search_router=entities_module.router)
+    monkeypatch.setattr(settings, "search_label_predicates", predicates)
+    return _client(_RenamedPlaceStore())
 
 
 def test_an_alternative_label_matches_and_the_primary_label_is_shown(monkeypatch) -> None:

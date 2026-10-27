@@ -236,7 +236,7 @@ in read mode:
 | Service | Network | Ports | Notes |
 |---|---|---|---|
 | `proxy` (Caddy) | `edge` | **80, 443** | The only host-facing service. Terminates TLS, routes by path prefix. |
-| `curator-frontend` | `edge` | — | Static build of the editor, served by `caddy:2-alpine`. `full` only. |
+| `curator-frontend` | `edge` | — | Static build of the editor, served by `caddy:2.11-alpine`. `full` only. |
 | `graphexplorer-frontend` | `edge` | — | Static build of the explorer, same. Base. |
 | `curator-backend` | `internal` + `edge` | — | The only writer. `full` only. |
 | `dataexplorer-backend` | `internal` + `edge` | — | All reads plus the `/rdf/` data space. Base. |

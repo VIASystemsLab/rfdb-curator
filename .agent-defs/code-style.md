@@ -30,9 +30,17 @@ comment density, its idioms.
 
 ## Prefer the general rule to the special case
 
-A component should expose what varies as parameters with sensible defaults, so
-the next use retunes it by overriding a value rather than by copying the rule
-and editing the copy. Name it for what it is, not for where it first appeared.
+- **No helper for a single use**, or for uses that only might appear, unless it
+  clearly improves readability or makes the code testable.
+- **Once the same logic exists in a second place**, expose what varies as
+  parameters with sensible defaults, so the next use retunes it by overriding a
+  value rather than by copying the rule and editing the copy. Name it for what
+  it is, not for where it first appeared.
+- **Copies that must evolve independently stay copies**, with a comment saying
+  why.
+- **Duplication you find in existing code is the user's call.** Where it spans
+  several lines or several places, point it out with a proposed refactoring and
+  let the user decide; do not refactor unasked.
 
 **One number, one job.** If a value is doing two jobs at once, give the second
 job its own name before you change either.

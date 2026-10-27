@@ -10,7 +10,7 @@
 # defines. Here there is no TLS, no ACME and no routing — just files on :80,
 # reachable only from the `edge` Docker network.
 #
-# Why Caddy rather than nginx: the stack already pins caddy:2-alpine for the
+# Why Caddy rather than nginx: the stack already pins caddy:2.11-alpine for the
 # edge proxy, so this adds no image to review, update or trust. A `try_files`
 # nginx.conf would have been the same number of lines and one more base image.
 
@@ -25,9 +25,13 @@
 	# Hashed asset filenames (Vite's default) are immutable, so they can be
 	# cached hard. index.html must NOT be, or a browser keeps loading an old
 	# bundle that references assets the new deploy has already deleted.
+	# `header` sees the requested path, not the try_files rewrite: `/` and a
+	# deep link are served index.html under their own path. So no-cache goes
+	# on every path outside the hashed assets, not on /index.html alone.
 	@immutable path /assets/*
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
-	header /index.html Cache-Control "no-cache"
+	@html not path /assets/*
+	header @html Cache-Control "no-cache"
 
 	file_server
 
