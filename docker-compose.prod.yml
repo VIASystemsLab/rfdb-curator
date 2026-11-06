@@ -142,7 +142,7 @@ services:
   # Oxigraph — RDF triple store
   # --------------------------------------------------------------------------
   oxigraph:
-    image: oxigraph/oxigraph:0.5.7
+    image: oxigraph/oxigraph:0.5.13
     restart: unless-stopped
     # No `ports:` — unauthenticated triple store, must stay
     # unreachable from outside the Docker network.
