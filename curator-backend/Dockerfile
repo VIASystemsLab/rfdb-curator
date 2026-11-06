@@ -27,6 +27,12 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 
+# The base image's pip vendors a CA bundle that still trusts the withdrawn
+# emSign root, so every download it makes is open to a man-in-the-middle.
+# Replace it before anything else is installed. The wheel is pinned by
+# sha256, which the old pip checks, so this first download is verified too.
+RUN pip install --no-cache-dir "pip @ https://files.pythonhosted.org/packages/07/25/ee8c38ae72d66b844ce8eb9711ba905dba21ca1a8a0c960057c41cd23337/pip-26.3-py3-none-any.whl#sha256=f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13"
+
 # Copy and install dependencies before the source so this layer is cached
 # as long as requirements.txt does not change.
 #
