@@ -196,6 +196,7 @@ rebuild or run, and a new minor stays a deliberate change.
 | Base images and language runtimes: Dockerfiles, compose files, CI's `node-version` and `python-version` | major.minor | `node:26.12-bookworm-slim`, `python:3.12-slim`, `node-version: '26.12'` |
 | GitHub Actions | the major tag, as GitHub recommends; the full version where the action publishes no major tag | `actions/checkout@v7`, `astral-sh/setup-uv@v10.3.2` |
 | Tools CI installs | full version, so a run is reproducible; uv also matches the local uv that writes `uv.lock` (see "GitHub Actions and CI") | uv `version: '0.13.5'`, `pip-audit==2.10.1` |
+| pip in the backend images | full version with its sha256, in `docker/requirements-pip.txt`, installed before any other package | `pip==26.3 --hash=sha256:…` |
 | Python dependencies | exact, always, in each member's `pyproject.toml`, locked in `uv.lock` | `fastapi==0.141.1` |
 | npm dependencies | ranges in `package.json`, exact versions in `package-lock.json` as npm writes them | `"react": "^19.3.1"` |
 
@@ -207,6 +208,8 @@ unread. The exceptions:
 
 - `dxflrs/garage`: publishes no major.minor tags.
 - `oxigraph/oxigraph`: the user's choice.
+- pip in the backend images: the base image's pip is too old to trust, and only a
+  hash makes its download of the new one safe; a hash needs a full version.
 
 ## GitHub Actions and CI
 
