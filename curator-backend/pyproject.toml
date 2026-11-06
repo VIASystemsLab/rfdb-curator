@@ -16,7 +16,7 @@ dependencies = [
     "pydantic-settings==2.14.2",
     "python-multipart==0.0.32",
     "boto3==1.43.64",
-    "pypdf==6.21.2",
+    "pypdf==6.21.4",
 ]
 
 # Resolve rfdb-core from the workspace (repo-root pyproject.toml) rather than
@@ -33,7 +33,7 @@ rfdb-core = { workspace = true }
 dev = [
     "pytest==9.1.1",
     "ruff==0.16.1",
-    "httpx2==2.12.0",
+    "httpx2==2.16.0",
 ]
 
 # [tool.ruff] lives in the repo-root pyproject.toml: one lint config for every

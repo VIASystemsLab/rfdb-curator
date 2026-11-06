@@ -234,18 +234,16 @@ services:
       REPORT_SOURCE_HASH: "true"
     volumes:
       # Source bind-mount for hot-reload in development.
-      # Safe with this Dockerfile: pip installs packages into the system
-      # Python's site-packages (/usr/local/lib/python3.12/site-packages),
-      # NOT into /app, so the bind-mount does not shadow any installed
-      # dependencies.  If you switch to a virtualenv inside /app (e.g.
-      # /app/.venv), move it outside /app or protect it with an anonymous
-      # volume, otherwise the bind-mount will shadow it.
+      # Safe with this Dockerfile: uv installs packages into a virtualenv at
+      # /opt/venv, NOT into /app, so the bind-mount does not shadow any
+      # installed dependencies.  Keep the virtualenv outside /app, otherwise
+      # the bind-mount will shadow it.
       - ./curator-backend:/app
       # The shared library, hot-reloadable on the same terms as the service
       # code above. Mounted at the path the image installed it from (editable,
-      # so the .pth in site-packages resolves through here) — NOT under /app,
+      # so the .pth in the virtualenv resolves through here) — NOT under /app,
       # which the previous mount replaces wholesale.
-      - ./rfdb-core:/opt/rfdb-core
+      - ./rfdb-core:/opt/rfdb/rfdb-core
       # Read-only mounts for schema and data files.
       # The container runs as appuser (uid 1001); ensure host files are
       # world-readable (chmod o+r) if your umask is restrictive.
@@ -283,7 +281,7 @@ services:
     command:
       [
         "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000",
-        "--reload", "--reload-dir", "/app", "--reload-dir", "/opt/rfdb-core",
+        "--reload", "--reload-dir", "/app", "--reload-dir", "/opt/rfdb/rfdb-core",
       ]
 
   # --------------------------------------------------------------------------
@@ -359,7 +357,7 @@ services:
       - ./dataexplorer-backend:/app
       # The shared library, hot-reloadable — see the curator-backend service for
       # why this is mounted at /opt and why the install is editable.
-      - ./rfdb-core:/opt/rfdb-core
+      - ./rfdb-core:/opt/rfdb/rfdb-core
       # Schema only. No ./data mount: the reader never loads a seed file, so
       # giving it the seed data would just be an unused mount that implies
       # otherwise.
@@ -382,7 +380,7 @@ services:
     command:
       [
         "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001",
-        "--reload", "--reload-dir", "/app", "--reload-dir", "/opt/rfdb-core",
+        "--reload", "--reload-dir", "/app", "--reload-dir", "/opt/rfdb/rfdb-core",
       ]
 
   # --------------------------------------------------------------------------
