@@ -1,9 +1,0 @@
-# pip for the backend images, installed before any other package (see
-# curator-backend/Dockerfile and dataexplorer-backend/Dockerfile). The base
-# image's pip is old and its CA bundle cannot be trusted, so this pin carries
-# its hash: the old pip checks it, which makes this one download safe.
-#
-# A full-version exception (.agent-defs/repo-specific.md, "Version pins"):
-# Dependabot opens a PR when pip publishes a release (.github/dependabot.yml).
-pip==26.3 \
-    --hash=sha256:f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13

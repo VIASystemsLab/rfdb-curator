@@ -1,6 +1,6 @@
 # Documentation only — NOT installed by any build.
 # The service projects are the source of truth for Python dependencies:
-#   curator-backend/pyproject.toml  (managed by uv; its requirements.txt feeds the Docker image)
+#   each member's pyproject.toml, locked in uv.lock (which the Docker images install from)
 # These are the core RDF/validation/test packages the project centres on.
 rdflib==7.6.0
 pyshacl==0.40.1

@@ -22,7 +22,6 @@ on:
       - 'graphexplorer-frontend/package-lock.json'
       - 'uv.lock'
       - '**/pyproject.toml'
-      - 'docker/requirements-pip.txt'
       - '.github/workflows/audit.yml'
   pull_request:
     branches: [ main ]
@@ -33,7 +32,6 @@ on:
       - 'graphexplorer-frontend/package-lock.json'
       - 'uv.lock'
       - '**/pyproject.toml'
-      - 'docker/requirements-pip.txt'
       - '.github/workflows/audit.yml'
 
 jobs:
@@ -91,10 +89,9 @@ jobs:
           {
             echo "## pip-audit: all dependencies"
             echo '```'
-            uvx pip-audit==2.10.1 --disable-pip -r requirements-all.txt -r docker/requirements-pip.txt || true
+            uvx pip-audit==2.10.1 --disable-pip -r requirements-all.txt || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail on any finding in runtime dependencies
-        # pip is in the list because it stays in the backend images that ship.
-        run: uvx pip-audit==2.10.1 --disable-pip -r requirements-runtime.txt -r docker/requirements-pip.txt
+        run: uvx pip-audit==2.10.1 --disable-pip -r requirements-runtime.txt

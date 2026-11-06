@@ -33,8 +33,8 @@ rfdb-core = { workspace = true }
 #
 # pypdf: test_digital_copies_read.py builds real PDF bytes for fixtures (see
 # `_make_pdf`) even though the read service itself never parses one. A dev-group
-# pin gets it into this member's test environment without reaching
-# requirements.txt or the Docker image — see the runtime-dependencies comment
+# pin gets it into this member's test environment without reaching the Docker
+# image, which installs with --no-dev — see the runtime-dependencies comment
 # above. Pinned to the same version as curator-backend's runtime dependency;
 # the workspace resolver requires one version per package across all members.
 dev = [

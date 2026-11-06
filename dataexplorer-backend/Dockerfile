@@ -5,7 +5,7 @@
 # Deliberately the curator image with the writer bits removed: same base, same
 # layer order, same non-root user. Keeping them structurally identical means a
 # fix to one is an obvious copy to the other; the differences that matter are in
-# requirements.txt (no pyshacl/pypdf/python-multipart) and the port.
+# the --package uv installs (no pyshacl/pypdf/python-multipart) and the port.
 #
 # Both compose files build this one image. docker-compose.yml adds a source
 # bind-mount (./dataexplorer-backend:/app) and uvicorn --reload for hot-reloading;
@@ -14,6 +14,17 @@
 # Pin the version so `docker build` is fully reproducible.
 # Update deliberately when you want to take a new Python release.
 FROM python:3.12-slim
+
+# uv installs every package, straight from uv.lock, so the image runs exactly
+# the versions the suite was tested against and every download is checked
+# against the lockfile's hash. Same uv version as local and CI (see
+# .agent-defs/repo-specific.md, "Version pins").
+COPY --from=ghcr.io/astral-sh/uv:0.13.5 /uv /bin/uv
+
+# The base image's pip is never used, and it is old: its CA bundle still
+# trusts the withdrawn emSign root. Removing it keeps it from being used by
+# mistake and from being flagged in the shipped image.
+RUN python -m pip uninstall --yes pip
 
 # PYTHONUNBUFFERED: sends stdout/stderr straight to docker logs without
 #   stdio buffering.  Without this, uvicorn output can be held in the buffer
@@ -25,46 +36,45 @@ FROM python:3.12-slim
 #   owned by uid 1001 (appuser), where the host user cannot easily delete
 #   them.  The cost is that every cold start, including in production,
 #   compiles from source; the image does not pre-compile bytecode.
+#
+# UV_PROJECT_ENVIRONMENT: the virtualenv uv installs into. It lives OUTSIDE
+#   /app on purpose: the dev compose bind-mount replaces /app wholesale, so a
+#   virtualenv there would be shadowed at runtime. On PATH, so `uvicorn` in
+#   CMD is the virtualenv's.
+#
+# UV_PYTHON_DOWNLOADS=never: use the image's Python, never fetch another.
+# UV_LINK_MODE=copy: no uv cache is kept in the image, so nothing to link to.
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_LINK_MODE=copy \
+    PATH="/opt/venv/bin:$PATH"
 
+# The uv workspace (repo-root pyproject.toml and uv.lock) is rebuilt at
+# /opt/rfdb, outside /app for the same reason as the virtualenv.
+WORKDIR /opt/rfdb
+
+# Third-party dependencies first, from the lockfile and the members'
+# pyproject.toml files alone, so this layer stays cached until one of those
+# changes. uv needs every member's pyproject.toml to read the workspace, but
+# none of their code. --no-dev: the image gets runtime dependencies only.
+COPY pyproject.toml uv.lock ./
+COPY rfdb-core/pyproject.toml rfdb-core/
+COPY curator-backend/pyproject.toml curator-backend/
+COPY dataexplorer-backend/pyproject.toml dataexplorer-backend/
+RUN uv sync --frozen --no-cache --no-dev --package rfdb-dataexplorer-backend --no-install-workspace
+
+# The shared library (rfdb-core workspace member), installed EDITABLE, which
+# is what makes `- ./rfdb-core:/opt/rfdb/rfdb-core` in docker-compose.yml work:
+# the .pth written into the virtualenv points at this directory, so a
+# bind-mount over it is picked up live. uv installs workspace members editable
+# by default. The service itself is not a package and is not installed: its
+# code is run from /app.
+COPY rfdb-core/ rfdb-core/
+RUN uv sync --frozen --no-cache --no-dev --package rfdb-dataexplorer-backend
 
 WORKDIR /app
-
-
-# The base image's pip vendors a CA bundle that still trusts the withdrawn
-# emSign root, so every download it makes is open to a man-in-the-middle.
-# Replace it before anything else is installed. docker/requirements-pip.txt
-# pins the new pip by sha256, which the old pip checks, so this first
-# download is verified too.
-COPY docker/requirements-pip.txt /tmp/requirements-pip.txt
-RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements-pip.txt
-
-# Copy and install dependencies before the source so this layer is cached
-# as long as requirements.txt does not change.
-#
-# Security note: for stronger supply-chain guarantees, generate your
-# requirements.txt with `pip-compile --generate-hashes` and add
-# `--require-hashes` here so the build fails if any package has been
-# tampered with since the lockfile was created.
-COPY dataexplorer-backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-# The shared library (rfdb-core workspace member).  It lives OUTSIDE /app on
-# purpose: the compose bind-mount for hot-reload replaces /app wholesale, so
-# anything installed there would be shadowed at runtime.
-#
-# Installed EDITABLE, which is what makes `- ./rfdb-core:/opt/rfdb-core` in
-# docker-compose.yml work: the .pth written into site-packages points at this
-# directory, so a bind-mount over it is picked up live.  A regular
-# (non-editable) install would copy the sources into site-packages and the
-# bind-mount would silently have no effect.
-#
-# --no-deps: rfdb-core's runtime pins are a subset of requirements.txt above
-# (the workspace resolves one version per package across all members), so
-# re-resolving them here could only introduce drift.
-COPY rfdb-core/ /opt/rfdb-core/
-RUN pip install --no-cache-dir --no-deps -e /opt/rfdb-core
 
 # Copy dataexplorer-backend source.  In development the compose bind-mount
 # overlays this at runtime; this layer makes the image self-contained if

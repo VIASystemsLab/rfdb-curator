@@ -149,7 +149,7 @@ reporting.
   empty, check that `dataexplorer-backend` is up and that both services received
   `READ_ONLY_SHAPES` (`docker compose exec <svc> printenv READ_ONLY_SHAPES`).
 - **Hot reload not picking up changes:** verify bind mounts in `docker-compose.yml`. Note
-  that `rfdb-core` edits need the `--reload-dir /opt/rfdb-core` entry in the service
+  that `rfdb-core` edits need the `--reload-dir /opt/rfdb/rfdb-core` entry in the service
   command; without it the process keeps serving the previously imported library.
 - **CORS errors:** verify `CORS_ORIGINS` on **both** services and the frontend API
   base/proxy settings. The reader must allow both frontend origins, `http://localhost:5173`
