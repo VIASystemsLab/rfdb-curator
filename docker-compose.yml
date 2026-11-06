@@ -124,7 +124,7 @@ services:
     # Pinned like oxigraph:0.5.7 so `docker compose pull` can't shift the S3
     # API out from under curator-backend. This image is distroless (only the
     # /garage binary, no shell) — that's why bootstrap runs from the host.
-    image: dxflrs/garage:v1.0.1
+    image: dxflrs/garage:v2.4.1
     restart: unless-stopped
     environment:
       # Read by Garage because garage.toml omits `rpc_secret` (no secret in git).
